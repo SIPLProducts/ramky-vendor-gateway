@@ -146,7 +146,8 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
 
 
       {/* Right Actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2 pr-2">
+
         {showSwitcher && (
           <Select
             value={activeTenantId ?? '__all__'}
@@ -183,52 +184,23 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
           )}
         </Button>
 
-        {/* User Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full p-0">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div>
-                <p className="font-medium">{userName}</p>
-                <p className="text-xs text-muted-foreground font-normal">{roleLabels[userRole]}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="cursor-pointer">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/support" className="cursor-pointer">
-                <User className="h-4 w-4 mr-2" />
-                Help & Support
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setChangePasswordOpen(true)}
-              className="cursor-pointer"
-            >
-              <KeyRound className="h-4 w-4 mr-2" />
-              Change Password
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onSignOut} className="text-destructive focus:text-destructive cursor-pointer">
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User Avatar → Sign Out */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onSignOut}
+          aria-label="Sign out"
+          title="Sign out"
+          className="h-10 w-10 rounded-full p-0"
+        >
+          <Avatar className="h-8 w-8 ring-1 ring-primary/30 shadow-sm">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
         <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+
       </div>
     </header>
   );
