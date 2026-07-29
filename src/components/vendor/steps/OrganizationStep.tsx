@@ -361,10 +361,14 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
             <Input
               id="legalName"
               {...register('legalName')}
-              placeholder="Enter registered company name"
+              placeholder={identityLocked ? '' : 'Enter registered company name'}
               data-required
-              className={errors.legalName ? 'border-destructive' : ''}
+              readOnly={identityLocked}
+              className={`${errors.legalName ? 'border-destructive' : ''} ${identityLocked ? 'bg-muted/40 cursor-not-allowed' : ''}`}
             />
+            {identityLocked && (
+              <p className="text-[11px] text-muted-foreground">{identitySourceLabel}</p>
+            )}
             {errors.legalName && (
               <p className="text-xs text-destructive">{errors.legalName.message}</p>
             )}
@@ -375,9 +379,15 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
             <Input
               id="tradeName"
               {...register('tradeName')}
-              placeholder="Enter trade name if different from legal name"
+              placeholder={identityLocked ? '' : 'Enter trade name if different from legal name'}
+              readOnly={identityLocked}
+              className={identityLocked ? 'bg-muted/40 cursor-not-allowed' : ''}
             />
+            {identityLocked && (
+              <p className="text-[11px] text-muted-foreground">{identitySourceLabel}</p>
+            )}
           </div>
+
 
           <div className="grid gap-1.5">
             <Label>Type of Industry *</Label>
