@@ -98,7 +98,7 @@ function dedupeByPeriod(rows: FilingStatusRow[]): FilingStatusRow[] {
   return Array.from(byKey.values());
 }
 
-export function GstFilingStatusTable({ rows, limit }: { rows: FilingStatusRow[]; limit?: number }) {
+export function GstFilingStatusTable({ rows, limit, scrollable = true }: { rows: FilingStatusRow[]; limit?: number; scrollable?: boolean }) {
   if (!rows || rows.length === 0) return null;
 
   const sortedAll = dedupeByPeriod(rows).sort((a, b) => {
@@ -116,7 +116,7 @@ export function GstFilingStatusTable({ rows, limit }: { rows: FilingStatusRow[];
         <h4 className="text-sm font-semibold">GST Return Filing Status</h4>
         <p className="text-xs text-muted-foreground">GSTR1 — last {sorted.length} return{sorted.length === 1 ? "" : "s"} reported by the GST registry</p>
       </div>
-      <div className="max-h-72 overflow-auto">
+      <div className={scrollable ? "max-h-72 overflow-auto" : ""}>
         <Table className="[&_th]:border [&_td]:border [&_th]:text-center [&_td]:text-center">
           <TableHeader>
             <TableRow className="bg-muted/60 hover:bg-muted/60">
