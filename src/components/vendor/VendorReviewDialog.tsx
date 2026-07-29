@@ -704,34 +704,34 @@ export function VendorReviewDialog({
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="documents" className="mt-4 flex-1 overflow-auto pt-1">
+            <TabsContent value="documents" className="mt-3 flex-1 min-h-0 overflow-auto">
               <VendorDocuments vendorId={vendor.id} hideDownload />
             </TabsContent>
 
 
-            <TabsContent value="gst_compliance" className="mt-4 flex-1 overflow-hidden">
-              <ScrollArea className="h-full pr-4">
-                {gstReport && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">GSTIN</p>
-                        <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Registration Date</p>
-                        <p className="font-medium">{formatDate(gstReport.registrationDate, gstReport.registrationDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Filing Status</p>
-                        <p className="font-medium">{gstReport.filingStatus}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Last Filed Return</p>
-                        <p className="font-medium">{gstReport.lastFiledReturn}</p>
-                      </div>
+            <TabsContent value="gst_compliance" className="mt-3 flex-1 min-h-0 flex flex-col gap-3">
+              {gstReport && (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm shrink-0 px-1">
+                    <div>
+                      <p className="text-muted-foreground">GSTIN</p>
+                      <p className="font-mono font-medium">{vendor.gstin || '-'}</p>
                     </div>
+                    <div>
+                      <p className="text-muted-foreground">Registration Date</p>
+                      <p className="font-medium">{formatDate(gstReport.registrationDate, gstReport.registrationDate)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Filing Status</p>
+                      <p className="font-medium">{gstReport.filingStatus}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Last Filed Return</p>
+                      <p className="font-medium">{gstReport.lastFiledReturn}</p>
+                    </div>
+                  </div>
 
+                  <div className="flex-1 min-h-0 overflow-auto pr-1">
                     {(() => {
                       const rawRows: FilingStatusRow[] = (() => {
                         const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
@@ -760,9 +760,10 @@ export function VendorReviewDialog({
                       );
                     })()}
                   </div>
-                )}
-              </ScrollArea>
+                </>
+              )}
             </TabsContent>
+
           </Tabs>
         ) : (
           <div className="text-sm text-muted-foreground py-8 text-center">Vendor not found.</div>
