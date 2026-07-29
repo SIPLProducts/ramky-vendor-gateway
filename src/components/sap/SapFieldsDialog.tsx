@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData';
 import { getLocationLabel } from '@/lib/stateToSapLocation';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
+import { toProperCase } from '@/lib/textCase';
 
 export type WTaxRow = {
   witht: string;
