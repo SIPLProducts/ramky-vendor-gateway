@@ -32,6 +32,8 @@ import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPanStatus, formatAadhaarLinked } from "@/lib/panComprehensive";
+import { downloadTemplate } from "@/lib/downloadTemplate";
+
 
 /**
  * Maps the registration step's document type → the provider_name configured
