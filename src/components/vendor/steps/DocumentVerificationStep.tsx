@@ -2692,14 +2692,15 @@ export function DocumentVerificationStep({
                         <p className="text-sm font-medium">MSME Self-Declaration</p>
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
-                      <a
-                        href="/templates/non-msme-declaration.docx"
-                        download
+                      <button
+                        type="button"
+                        onClick={() => downloadTemplate("/templates/non-msme-declaration.docx")}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Template download
-                      </a>
+                      </button>
+
                       <InlineFilePicker
                         file={msmeDeclarationFile}
                         onPick={async (f) => {
