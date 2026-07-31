@@ -32,6 +32,8 @@ import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPanStatus, formatAadhaarLinked } from "@/lib/panComprehensive";
+import { downloadTemplate } from "@/lib/downloadTemplate";
+
 
 /**
  * Maps the registration step's document type → the provider_name configured
@@ -2460,17 +2462,16 @@ export function DocumentVerificationStep({
                                 GST Returns Declaration, sign it, and upload the signed copy to continue.
                               </div>
                             </div>
-                            <Button asChild type="button" variant="outline" size="sm">
-                              <a
-                                href="/templates/gst-returns-declaration.docx"
-                                download
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download GST Returns Declaration
-                              </a>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadTemplate("/templates/gst-returns-declaration.docx")}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download GST Returns Declaration
                             </Button>
+
                             <FileUpload
                               label="Signed GST Returns Declaration *"
                               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
@@ -2496,14 +2497,15 @@ export function DocumentVerificationStep({
                         <p className="text-sm font-medium">GST Self-Declaration</p>
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
-                      <a
-                        href="/templates/non-gst-declaration.docx"
-                        download
+                      <button
+                        type="button"
+                        onClick={() => downloadTemplate("/templates/non-gst-declaration.docx")}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Template download
-                      </a>
+                      </button>
+
                       <InlineFilePicker
                         file={gstDeclarationFile}
                         onPick={async (f) => {
@@ -2690,14 +2692,15 @@ export function DocumentVerificationStep({
                         <p className="text-sm font-medium">MSME Self-Declaration</p>
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
-                      <a
-                        href="/templates/non-msme-declaration.docx"
-                        download
+                      <button
+                        type="button"
+                        onClick={() => downloadTemplate("/templates/non-msme-declaration.docx")}
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Template download
-                      </a>
+                      </button>
+
                       <InlineFilePicker
                         file={msmeDeclarationFile}
                         onPick={async (f) => {

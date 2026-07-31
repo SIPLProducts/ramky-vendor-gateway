@@ -1,27 +1,22 @@
-## Goal
+## Cause (verified)
 
-Replace the declaration templates with the three uploaded Word files, and split the GST case into two distinct templates (currently one file serves both "not GST registered" and "GST returns not filed").
+`GET /templates/non-gst-declaration.docx` returns an **empty `Content-Type`** header. With no MIME type, the browser renders the raw bytes as text instead of saving the file. The `target="_blank"` on the links makes this worse — the file opens in a new tab, where the `download` attribute is ignored. That's exactly the garbled `PK...[Content_Types].xml` output in the screenshot.
 
-## Files to add in `public/templates/`
+## Change
 
-| Uploaded file | New path | Used for |
-|---|---|---|
-| 1.Non-GST_Declaration.docx | `non-gst-declaration.docx` | Vendor answers "No" to GST registered |
-| 2.Non-MSME_Declaration-2.docx | `non-msme-declaration.docx` | Vendor answers "No" to MSME registered |
-| 3.GST_Returns_Declaration-4.docx | `gst-returns-declaration.docx` | GSTR1 not filed / filing status check fails |
+1. Add a small helper `src/lib/downloadTemplate.ts`:
+   - `downloadTemplate(path, filename)` — `fetch` the file, read it as a Blob, force the DOCX MIME type (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), create an object URL, click a hidden `<a download={filename}>`, then revoke the URL.
+   - On fetch failure, fall back to a plain navigation to the path and show a toast.
 
-Old `gst-self-declaration.docx` and `msme-self-declaration.docx` are removed once no references remain.
+2. Replace the five raw anchor links with buttons that call the helper (no `target="_blank"`, no reliance on the server MIME type):
+   - `src/components/vendor/steps/DocumentVerificationStep.tsx` — GST Returns Declaration (~2465), Non-GST (~2500), Non-MSME (~2694)
+   - `src/components/vendor/kyc/GstDeclarationDialog.tsx` — GST Returns Declaration
+   - `src/components/vendor/kyc/GstKycTab.tsx` — Non-GST Declaration
 
-## Reference updates
-
-- `src/components/vendor/steps/DocumentVerificationStep.tsx`
-  - line ~2465 (GST filing not filed banner) → `gst-returns-declaration.docx`
-  - line ~2500 (GST = No path) → `non-gst-declaration.docx`
-  - line ~2694 (MSME = No path) → `non-msme-declaration.docx`
-- `src/components/vendor/kyc/GstDeclarationDialog.tsx` (GST filing not available dialog) → `gst-returns-declaration.docx`
-- `src/components/vendor/kyc/GstKycTab.tsx` (Non-GST declaration) → `non-gst-declaration.docx`
+   Keep the existing button/link styling and labels unchanged; only the download mechanism changes.
 
 ## Technical notes
 
-- The DOCX files are copied into `public/templates/` (they must be real files served by literal path so the `download` links work), not CDN asset pointers.
-- No changes to upload document types (`gst_self_declaration`, `msme_self_declaration`) or any backend/schema logic — templates and link targets only.
+- Frontend only. No changes to the DOCX files themselves or to upload/verification logic.
+- This also makes downloads work identically in the Lovable preview iframe, on the published app, and on the self-hosted Nginx server, regardless of whether the server sends a MIME type for `.docx`.
+- Optional (say if you want it): add an explicit `types { ... docx ... }` MIME mapping to the self-host Nginx config so direct URL hits also serve the right type. Not required once the blob download is in place.

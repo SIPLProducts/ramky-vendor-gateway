@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Download } from "lucide-react";
 import { FileUpload } from "@/components/vendor/FileUpload";
+import { downloadTemplate } from "@/lib/downloadTemplate";
+
 
 interface GstDeclarationDialogProps {
   open: boolean;
@@ -42,12 +44,16 @@ export function GstDeclarationDialog({
             </AlertDescription>
           </Alert>
 
-          <Button asChild type="button" variant="outline" size="sm">
-            <a href="/templates/gst-returns-declaration.docx" target="_blank" rel="noopener noreferrer" download>
-              <Download className="h-4 w-4 mr-2" />
-              Download Declaration Template
-            </a>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => downloadTemplate("/templates/gst-returns-declaration.docx")}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Declaration Template
           </Button>
+
 
           <FileUpload
             label="Signed GST Self-Declaration *"

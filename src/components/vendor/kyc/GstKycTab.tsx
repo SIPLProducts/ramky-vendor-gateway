@@ -26,6 +26,8 @@ import {
   formatCrossMatchFailure,
 } from '@/lib/nameMatch';
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { downloadTemplate } from '@/lib/downloadTemplate';
+
 
 interface GstKycTabProps {
   isGstRegistered: boolean;
@@ -486,12 +488,16 @@ export function GstKycTab(props: GstKycTabProps) {
             </AlertDescription>
           </Alert>
 
-          <Button asChild type="button" variant="outline" size="sm">
-            <a href="/templates/non-gst-declaration.docx" target="_blank" rel="noopener noreferrer" download>
-              <Download className="h-4 w-4 mr-2" />
-              Download Non-GST Self-Declaration Template
-            </a>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => downloadTemplate('/templates/non-gst-declaration.docx')}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Non-GST Self-Declaration Template
           </Button>
+
 
           <FileUpload
             label="Signed Non-GST Self-Declaration *"
