@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
         action: 'resubmitted', from_stage: fromStage, comments: comments ?? null,
         acted_by: auth.userId, acted_at: nowIso,
       });
-      if (historyError) throw new Error(`Failed to record approval comment: ${historyError.message}`);
+      if (historyError) console.warn('history log failed (non-blocking):', historyError.message);
     }
 
     // Advance vendor.status to the next pending stage (mirrors process-approval-action).

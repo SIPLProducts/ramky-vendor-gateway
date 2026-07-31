@@ -20,8 +20,7 @@ interface Row {
   level_number: number | null;
   action: string;
   stage: string;
-  from_stage: string | null;
-  comments: string | null;
+  comments: string;
   acted_at: string | null;
   acted_by_name: string | null;
 }
@@ -29,8 +28,8 @@ interface Row {
 const ACTION_LABEL: Record<string, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
-  returned_to_buyer: 'Returned to Buyer',
-  returned_to_vendor: 'Returned to Vendor',
+  cancelled: 'Cancelled',
+  pending: 'Pending',
   resubmitted: 'Resubmitted',
 };
 
@@ -49,39 +48,99 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: hist } = await supabase
-        .from('vendor_approval_history' as any)
-        .select('id, level_number, stage, action, from_stage, comments, acted_by, acted_at')
-        .eq('vendor_id', vendorId)
-        .order('acted_at', { ascending: true });
 
-      const userIds = (hist ?? []).map((p: any) => p.acted_by).filter(Boolean) as string[];
+      const [{ data: progress }, { data: vendor }] = await Promise.all([
+        supabase
+          .from('vendor_approval_progress')
+          .select('id, level_number, stage, status, comments, rejection_comments, rejection_from_stage, rejection_from_user, rejection_at, acted_by, acted_at')
+          .eq('vendor_id', vendorId)
+          .order('acted_at', { ascending: false }),
+        supabase
+          .from('vendors')
+          .select('last_rejection_comments, last_rejection_stage, last_rejected_by, last_rejected_at')
+          .eq('id', vendorId)
+          .maybeSingle(),
+      ]);
+
+      const collected: Row[] = [];
+
+      for (const p of (progress ?? []) as any[]) {
+        if (p.comments && String(p.comments).trim().length > 0) {
+          collected.push({
+            id: p.id,
+            level_number: p.level_number ?? null,
+            stage: p.stage ?? '',
+            action: p.status,
+            comments: String(p.comments),
+            acted_at: p.acted_at,
+            acted_by_name: p.acted_by ?? null,
+          });
+        }
+        if (p.rejection_comments && String(p.rejection_comments).trim().length > 0) {
+          collected.push({
+            id: `${p.id}-rej`,
+            level_number: p.level_number ?? null,
+            stage: p.rejection_from_stage ?? p.stage ?? '',
+            action: 'rejected',
+            comments: String(p.rejection_comments),
+            acted_at: p.rejection_at ?? p.acted_at,
+            acted_by_name: p.rejection_from_user ?? null,
+          });
+        }
+      }
+
+      const v = vendor as any;
+      if (v?.last_rejection_comments && String(v.last_rejection_comments).trim().length > 0) {
+        const already = collected.some(
+          (r) => r.comments.trim() === String(v.last_rejection_comments).trim(),
+        );
+        if (!already) {
+          collected.push({
+            id: 'vendor-last-rejection',
+            level_number: null,
+            stage: v.last_rejection_stage ?? '',
+            action: 'rejected',
+            comments: String(v.last_rejection_comments),
+            acted_at: v.last_rejected_at ?? null,
+            acted_by_name: v.last_rejected_by ?? null,
+          });
+        }
+      }
+
+      // Resolve approver names
+      const userIds = Array.from(
+        new Set(collected.map((r) => r.acted_by_name).filter(Boolean) as string[]),
+      );
       const { data: profiles } = userIds.length > 0
         ? await supabase.from('profiles').select('id, full_name, email').in('id', userIds)
         : { data: [] as any[] };
       const pMap = new Map((profiles ?? []).map((p: any) => [p.id, p.full_name ?? p.email]));
 
+      collected.sort((a, b) => {
+        const ta = a.acted_at ? new Date(a.acted_at).getTime() : 0;
+        const tb = b.acted_at ? new Date(b.acted_at).getTime() : 0;
+        return tb - ta;
+      });
+
       if (cancelled) return;
-      setRows((hist ?? []).map((p: any) => ({
-        id: p.id,
-        level_number: p.level_number,
-        stage: p.stage ?? 'SCM_MANAGER',
-        action: p.action,
-        from_stage: p.from_stage,
-        comments: p.comments,
-        acted_at: p.acted_at,
-        acted_by_name: p.acted_by ? (pMap.get(p.acted_by) ?? null) : null,
-      })));
+      setRows(
+        collected.map((r) => ({
+          ...r,
+          acted_by_name: r.acted_by_name ? (pMap.get(r.acted_by_name) ?? null) : null,
+        })),
+      );
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [open, vendorId]);
 
+  const latest = rows[0];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Approval Comments History</DialogTitle>
+          <DialogTitle>Approval Comments</DialogTitle>
           <DialogDescription>
             {vendorName ?? 'Vendor'}{referenceNumber ? ` — Ref: ${referenceNumber}` : ''}
           </DialogDescription>
@@ -93,45 +152,54 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
           </div>
         ) : rows.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            No approval activity recorded yet.
+            No comments recorded yet.
           </div>
         ) : (
-          <div className="max-h-[60vh] overflow-auto border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Approval Stage</TableHead>
-                  <TableHead>Approver Name</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Comments</TableHead>
-                  <TableHead className="whitespace-nowrap">Date &amp; Time</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">
-                      {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number ?? 0)}
-                      {r.from_stage && r.from_stage !== r.stage && r.action !== 'rejected' && (
-                        <div className="text-xs text-muted-foreground">
-                          from {formatStageLevelHistory(r.from_stage as ApprovalStage, 0)}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{r.acted_by_name ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={actionVariant(r.action)}>
-                        {ACTION_LABEL[r.action] ?? r.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="whitespace-pre-wrap text-sm">{r.comments ?? '—'}</TableCell>
-                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                      {formatDateTime(r.acted_at, '—')}
-                    </TableCell>
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/40 p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="default">Latest Comment</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {formatStageLevelHistory(latest.stage as ApprovalStage, latest.level_number ?? 0)}
+                  {latest.acted_by_name ? ` · ${latest.acted_by_name}` : ''}
+                  {latest.acted_at ? ` · ${formatDateTime(latest.acted_at, '')}` : ''}
+                </span>
+              </div>
+              <div className="whitespace-pre-wrap text-sm">{latest.comments}</div>
+            </div>
+
+            <div className="max-h-[50vh] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Approval Stage</TableHead>
+                    <TableHead>Approver Name</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Comments</TableHead>
+                    <TableHead className="whitespace-nowrap">Date &amp; Time</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">
+                        {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number ?? 0)}
+                      </TableCell>
+                      <TableCell>{r.acted_by_name ?? '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant={actionVariant(r.action)}>
+                          {ACTION_LABEL[r.action] ?? r.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-pre-wrap text-sm">{r.comments}</TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {formatDateTime(r.acted_at, '—')}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </DialogContent>

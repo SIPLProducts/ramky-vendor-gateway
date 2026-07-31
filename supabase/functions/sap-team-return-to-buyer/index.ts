@@ -178,7 +178,7 @@ Deno.serve(async (req) => {
       action: 'returned_to_buyer', from_stage: 'SAP_TEAM',
       comments: remarks ?? null, acted_by: auth.userId, acted_at: nowIso,
     });
-    if (historyError) throw new Error(`Failed to record approval comment: ${historyError.message}`);
+    if (historyError) console.warn('history log failed (non-blocking):', historyError.message);
 
     try {
       await admin.from('audit_logs').insert({

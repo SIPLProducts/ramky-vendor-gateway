@@ -1,31 +1,28 @@
-## Confirmed causes
+## Diagnosis (verified)
 
-- **“L1” is a UI mapping bug.** SAP rejection history is stored with `stage = 'SAP_TEAM'` and no level number, but the shared label formatter has no `SAP_TEAM` case and falls back to `L1`.
-- **DEV/PROD cannot currently read approval history.** The reported `PGRST205` proves the REST API cannot see `public.vendor_approval_history`. The repository contains its migration, but some self-hosted deployment paths do not reload the REST schema after migrations. On the connected local database, the table and SAP Team history rows do exist.
-- Approval functions currently **ignore history-insert errors**, so an approval can complete while its mandatory comment silently fails to enter the history table.
+Comments **are** being saved — just not where the dialog reads them.
 
-## Implementation plan
+- Query on `vendor_approval_progress` returns real comments (e.g. `CEO_OFFICE / approved / "hgjkl"`, `FINANCE_1 / "dgfhyjk"`, etc.), written on every approve/reject.
+- The `vendor_approval_history` insert is the part that fails (on prod it returns no rows at all — your screenshot shows NULL history for ref `20260730001`). Since the edge functions currently `throw` when that insert fails, it can also break the action itself.
 
-1. **Add an idempotent repair migration**
-   - Ensure `public.vendor_approval_history` exists with the required columns, foreign key, index, explicit grants, RLS, and vendor-visibility policies.
-   - Backfill recoverable approved/rejected comments from `vendor_approval_progress` without creating duplicates.
-   - Make the migration safe on local, DEV, and PROD whether the table already exists or is missing.
+## Plan
 
-2. **Make every self-hosted migration path refresh the REST schema**
-   - Add `NOTIFY pgrst, 'reload schema'` after migrations in the deployment scripts that currently omit it.
-   - Keep the existing reload in the newer self-hosted runner.
-   - This prevents newly created tables from continuing to return `PGRST205`.
+1. **ApprovalCommentsDialog reads from `vendor_approval_progress`**
+   - Fetch `id, level_number, stage, status, comments, acted_by, acted_at` where `vendor_id = ...` and `comments` is not null.
+   - Order **newest first** so the latest comment is always at the top; highlight the top row as "Latest".
+   - Also include `vendors.last_rejection_comments` / `last_rejection_stage` / `last_rejected_at` / `last_rejected_by` as a fallback entry when no progress row carries it (covers SAP Team rejections).
+   - Keep resolving approver names via `profiles`.
+   - Drop all `vendor_approval_history` reads.
 
-3. **Fix SAP Team display labels**
-   - Add `SAP_TEAM` to the shared approval-stage type and map it to **SAP Team** in both normal and history formatters.
-   - Stop fabricating level `1` for null-level stages in the comments dialog.
+2. **Stop history logging from blocking saves**
+   - In `process-approval-action`, `sap-team-reject-vendor`, `sap-team-return-to-buyer`, `buyer-reapprove-rejected`: make the `vendor_approval_history` insert best-effort (log a warning) instead of throwing, and guarantee `comments` is always written to `vendor_approval_progress` (and to `vendors.last_rejection_comments` on rejections).
+   - For SAP Team actions, ensure the comment is persisted on the vendor row so it can be shown even though there is no progress row.
 
-4. **Stop silent comment-history failures**
-   - Check the result of every `vendor_approval_history` insert in normal approval, buyer re-approval, SAP rejection, and SAP return flows.
-   - Return/log a clear backend error instead of silently reporting success when the history record cannot be written.
+3. **Immediate refresh after save**
+   - After a successful approve/reject in `StageApprovalView`, refresh the list and reopen/refresh the comments source so the newly saved comment shows without a page reload.
+   - Show the latest comment inline in the approval row (the existing `rejectionComments` slot is reused / extended to the latest comment of any action).
 
-5. **Verify**
-   - Confirm local history renders **SAP Team**, not **L1**.
-   - Confirm the repair migration is safe against the existing local table and history data.
-   - Validate the affected functions and frontend build.
-   - Provide the exact self-hosted deployment command for DEV and PROD; both must run migrations and functions without `--skip-migrations` or `--skip-functions`.
+## Technical notes
+
+- No schema change and no migration needed — `vendor_approval_progress.comments` already exists on dev and prod, so this works on the self-hosted server without a PostgREST cache reload.
+- `vendor_approval_history` is left in place but unused by the UI; nothing depends on it after this change.
