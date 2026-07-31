@@ -111,10 +111,10 @@ export function ApprovalCommentsDialog({ open, onOpenChange, vendorId, vendorNam
                 {rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">
-                      {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number ?? 1)}
+                      {formatStageLevelHistory(r.stage as ApprovalStage, r.level_number ?? 0)}
                       {r.from_stage && r.from_stage !== r.stage && r.action !== 'rejected' && (
                         <div className="text-xs text-muted-foreground">
-                          from {formatStageLevelHistory(r.from_stage as ApprovalStage, 1)}
+                          from {formatStageLevelHistory(r.from_stage as ApprovalStage, 0)}
                         </div>
                       )}
                     </TableCell>

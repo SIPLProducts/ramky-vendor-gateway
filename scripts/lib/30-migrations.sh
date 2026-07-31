@@ -43,3 +43,10 @@ for f in $(ls -1 "$MIG_SRC"/*.sql 2>/dev/null | sort); do
 done
 echo "Migrations: applied=$applied skipped=$skipped failed=$failed"
 [[ $failed -eq 0 ]] || { echo "Stopping: migration failures."; exit 1; }
+
+# PostgREST caches the database schema. Refresh it after every successful
+# migration run so newly-created tables are immediately available via REST.
+docker compose -f "$BACKEND_DIR/docker-compose.yml" exec -T db \
+  psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -c "NOTIFY pgrst, 'reload schema';" >/dev/null
+echo "PostgREST schema cache reload requested."

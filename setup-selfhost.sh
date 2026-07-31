@@ -375,6 +375,8 @@ if [[ $SKIP_MIGRATIONS -eq 0 && -d "$SOURCE_DIR/supabase/migrations" ]]; then
     fi
   done
   shopt -u nullglob
+  $PSQL -c "NOTIFY pgrst, 'reload schema';"
+  echo "PostgREST schema cache reload requested."
 fi
 
 # ---------- 9. Edge functions ----------

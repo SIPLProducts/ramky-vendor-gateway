@@ -4,7 +4,8 @@ export type ApprovalStage =
   | 'SCM_HEAD'
   | 'FINANCE_1'
   | 'FINANCE_2'
-  | 'CEO_OFFICE';
+  | 'CEO_OFFICE'
+  | 'SAP_TEAM';
 
 /**
  * Display label for a level within a stage.
@@ -18,6 +19,7 @@ export function formatStageLevel(stage: ApprovalStage | string, n: number): stri
   if (stage === 'FINANCE_1') return 'Finance 1';
   if (stage === 'FINANCE_2') return 'Finance 2';
   if (stage === 'CEO_OFFICE') return 'CEO Office';
+  if (stage === 'SAP_TEAM') return 'SAP Team';
   return `L${n}`;
 }
 
@@ -32,6 +34,7 @@ export function formatStageLevelHistory(stage: ApprovalStage | string, n: number
   if (stage === 'FINANCE_1') return 'Finance 1';
   if (stage === 'FINANCE_2') return 'Finance 2';
   if (stage === 'CEO_OFFICE') return 'CEO Office';
+  if (stage === 'SAP_TEAM') return 'SAP Team';
   return `L${n}`;
 }
 

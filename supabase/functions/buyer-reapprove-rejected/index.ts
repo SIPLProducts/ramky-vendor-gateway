@@ -113,11 +113,12 @@ Deno.serve(async (req) => {
       await admin.from('vendor_approval_progress').update({
         status: 'approved', acted_by: auth.userId, acted_at: nowIso, comments: comments ?? null,
       }).eq('id', buyerRow.id);
-      await admin.from('vendor_approval_history').insert({
+      const { error: historyError } = await admin.from('vendor_approval_history').insert({
         vendor_id, stage: 'BUYER', level_number: buyerRow.level_number,
         action: 'resubmitted', from_stage: fromStage, comments: comments ?? null,
         acted_by: auth.userId, acted_at: nowIso,
       });
+      if (historyError) throw new Error(`Failed to record approval comment: ${historyError.message}`);
     }
 
     // Advance vendor.status to the next pending stage (mirrors process-approval-action).
