@@ -26,6 +26,8 @@ import {
   formatCrossMatchFailure,
 } from '@/lib/nameMatch';
 import { CheckCircle2, XCircle } from 'lucide-react';
+import { downloadTemplate } from '@/lib/downloadTemplate';
+
 
 interface GstKycTabProps {
   isGstRegistered: boolean;
