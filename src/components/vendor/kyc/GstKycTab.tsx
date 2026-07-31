@@ -487,7 +487,7 @@ export function GstKycTab(props: GstKycTabProps) {
           </Alert>
 
           <Button asChild type="button" variant="outline" size="sm">
-            <a href="/templates/gst-self-declaration.docx" target="_blank" rel="noopener noreferrer" download>
+            <a href="/templates/non-gst-declaration.docx" target="_blank" rel="noopener noreferrer" download>
               <Download className="h-4 w-4 mr-2" />
               Download Non-GST Self-Declaration Template
             </a>
