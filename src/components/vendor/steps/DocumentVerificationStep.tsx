@@ -2462,7 +2462,7 @@ export function DocumentVerificationStep({
                             </div>
                             <Button asChild type="button" variant="outline" size="sm">
                               <a
-                                href="/templates/gst-self-declaration.docx"
+                                href="/templates/gst-returns-declaration.docx"
                                 download
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -2497,7 +2497,7 @@ export function DocumentVerificationStep({
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
                       <a
-                        href="/templates/gst-self-declaration.docx"
+                        href="/templates/non-gst-declaration.docx"
                         download
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >
@@ -2691,7 +2691,7 @@ export function DocumentVerificationStep({
                         <p className="text-xs text-muted-foreground">Download, sign, then upload</p>
                       </div>
                       <a
-                        href="/templates/msme-self-declaration.docx"
+                        href="/templates/non-msme-declaration.docx"
                         download
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline whitespace-nowrap"
                       >

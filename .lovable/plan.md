@@ -1,21 +1,27 @@
-## Current behavior (verified)
+## Goal
 
-In `src/components/vendor/steps/DocumentVerificationStep.tsx` (`runDocFlow`, ~line 1219), **any** OCR failure for a cheque opens the manual bank-entry dialog — including provider/configuration errors relayed from the KYC provider such as `Set use_pdf=True for PDF input` and `File required for multipart provider`. That's why the popup appears in both screenshots, with the provider error text used as the dialog subtitle.
+Replace the declaration templates with the three uploaded Word files, and split the GST case into two distinct templates (currently one file serves both "not GST registered" and "GST returns not filed").
 
-## Change
+## Files to add in `public/templates/`
 
-1. Add a small classifier in the same file, e.g. `isProviderConfigError(msg)`, matching provider/transport-level failures rather than "couldn't read the document":
-   - `use_pdf` / `use_pdf=True` / PDF-input errors
-   - `File required for multipart provider`
-   - other clearly non-OCR provider errors: "provider is not configured", "multipart", missing-file/invalid-request style messages
+| Uploaded file | New path | Used for |
+|---|---|---|
+| 1.Non-GST_Declaration.docx | `non-gst-declaration.docx` | Vendor answers "No" to GST registered |
+| 2.Non-MSME_Declaration-2.docx | `non-msme-declaration.docx` | Vendor answers "No" to MSME registered |
+| 3.GST_Returns_Declaration-4.docx | `gst-returns-declaration.docx` | GSTR1 not filed / filing status check fails |
 
-2. In the cheque branch of the OCR-failure path (`!ocrRes.success`), only call `openBankManualPopup(...)` when the error is *not* a provider config error. When it is:
-   - keep the document in `failed` state with the provider's message shown inline (existing red banner) plus a short hint that the document couldn't be sent to the verification service and to re-upload as an image/PDF or contact support,
-   - do not open the dialog.
+Old `gst-self-declaration.docx` and `msme-self-declaration.docx` are removed once no references remain.
 
-3. Leave all other manual-popup triggers unchanged: low-confidence OCR, unreadable cheque, and penny-drop/verification failures still open the manual dialog as today.
+## Reference updates
+
+- `src/components/vendor/steps/DocumentVerificationStep.tsx`
+  - line ~2465 (GST filing not filed banner) → `gst-returns-declaration.docx`
+  - line ~2500 (GST = No path) → `non-gst-declaration.docx`
+  - line ~2694 (MSME = No path) → `non-msme-declaration.docx`
+- `src/components/vendor/kyc/GstDeclarationDialog.tsx` (GST filing not available dialog) → `gst-returns-declaration.docx`
+- `src/components/vendor/kyc/GstKycTab.tsx` (Non-GST declaration) → `non-gst-declaration.docx`
 
 ## Technical notes
 
-- Frontend only; no edge function or schema change.
-- The same guard can be reused for the GST/PAN branches so a provider config error doesn't wrongly prompt manual GSTIN/PAN entry either (keeps behavior consistent; say if you'd rather restrict it to cheque only).
+- The DOCX files are copied into `public/templates/` (they must be real files served by literal path so the `download` links work), not CDN asset pointers.
+- No changes to upload document types (`gst_self_declaration`, `msme_self_declaration`) or any backend/schema logic — templates and link targets only.
