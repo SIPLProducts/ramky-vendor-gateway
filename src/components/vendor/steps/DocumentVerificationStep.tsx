@@ -2460,17 +2460,16 @@ export function DocumentVerificationStep({
                                 GST Returns Declaration, sign it, and upload the signed copy to continue.
                               </div>
                             </div>
-                            <Button asChild type="button" variant="outline" size="sm">
-                              <a
-                                href="/templates/gst-returns-declaration.docx"
-                                download
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download GST Returns Declaration
-                              </a>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadTemplate("/templates/gst-returns-declaration.docx")}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download GST Returns Declaration
                             </Button>
+
                             <FileUpload
                               label="Signed GST Returns Declaration *"
                               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
