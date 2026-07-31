@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Download } from "lucide-react";
 import { FileUpload } from "@/components/vendor/FileUpload";
+import { downloadTemplate } from "@/lib/downloadTemplate";
+
 
 interface GstDeclarationDialogProps {
   open: boolean;
