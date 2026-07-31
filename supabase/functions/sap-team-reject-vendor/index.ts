@@ -92,11 +92,14 @@ serve(async (req) => {
       details: { remarks, stage: "SAP_TEAM", auto_triggered: autoTriggered },
     });
 
-    await supabase.from("vendor_approval_history").insert({
+    const { error: historyError } = await supabase.from("vendor_approval_history").insert({
       vendor_id: vendorId, stage: "SAP_TEAM", level_number: null,
       action: "rejected", from_stage: "SAP_TEAM",
       comments: remarks ?? null, acted_by: auth.userId, acted_at: nowIso,
     });
+    if (historyError) {
+      throw new Error(`Failed to record approval comment: ${historyError.message}`);
+    }
 
     // ---- Notify the inviting buyer via SMTP ----
     let emailSent = false;
