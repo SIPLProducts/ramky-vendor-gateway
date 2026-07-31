@@ -1198,6 +1198,26 @@ export function DocumentVerificationStep({
     };
   };
 
+  /**
+   * Provider/transport-level failures (bad request shape, unsupported input,
+   * provider not configured) — these are NOT "the document couldn't be read",
+   * so we must not prompt the vendor for manual entry.
+   */
+  const isProviderConfigError = (msg?: string) => {
+    const m = (msg || "").toLowerCase();
+    if (!m) return false;
+    return (
+      m.includes("use_pdf") ||
+      m.includes("pdf input") ||
+      m.includes("multipart") ||
+      m.includes("file required") ||
+      m.includes("provider is not configured") ||
+      m.includes("not configured") ||
+      m.includes("invalid request") ||
+      m.includes("unsupported file")
+    );
+  };
+
   const runDocFlow = async (
     kind: OcrDocumentType,
     file: File,
@@ -1218,7 +1238,20 @@ export function DocumentVerificationStep({
     const ocrRes = await extractFromFile(file, kind, vendorId);
     if (!ocrRes.success || !ocrRes.extracted) {
       const errMsg = ocrRes.error || "Could not read document";
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: errMsg });
+      const providerIssue = isProviderConfigError(ocrRes.error);
+      setDoc({
+        status: "failed",
+        fileName: file.name,
+        fileSize: file.size,
+        file,
+        errorMessage: providerIssue
+          ? `${errMsg} — the document couldn't be sent to the verification service. Please re-upload the document (or try a clear image) and retry.`
+          : errMsg,
+      });
+      if (providerIssue) {
+        // Not an OCR read failure — do not offer manual entry.
+        return;
+      }
       if (kind === "cheque") {
         openBankManualPopup(
           chequeTargetRef.current,
@@ -1235,6 +1268,7 @@ export function DocumentVerificationStep({
       }
       return;
     }
+
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
       setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
