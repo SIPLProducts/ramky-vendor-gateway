@@ -98,7 +98,7 @@ serve(async (req) => {
       comments: remarks ?? null, acted_by: auth.userId, acted_at: nowIso,
     });
     if (historyError) {
-      throw new Error(`Failed to record approval comment: ${historyError.message}`);
+      console.warn('history log failed (non-blocking):', historyError.message);
     }
 
     // ---- Notify the inviting buyer via SMTP ----
