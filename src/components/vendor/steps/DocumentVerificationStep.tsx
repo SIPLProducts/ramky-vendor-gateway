@@ -1306,18 +1306,18 @@ export function DocumentVerificationStep({
       if (kind === "msme" && (v as any).isNameMismatch) {
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
-      } else if (kind === "cheque" && !(v as any).isNameMismatch) {
+      } else if (kind === "cheque" && !(v as any).isNameMismatch && !isProviderConfigError(msg)) {
         // For cheque/penny-drop failures that indicate the cheque couldn't
         // be read or verified (rate-limit, OCR mismatch, upstream 500,
         // account not found, etc.) — let the vendor enter bank details
         // manually and re-verify via the configured BANK API.
         // Skip the manual popup for pure cross-field Account Holder Name
-        // mismatches: OCR + penny-drop succeeded, so the inline red banner
-        // is the correct surface.
+        // mismatches and for provider/transport errors (use_pdf, multipart).
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
         openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
+
       } else if (kind === "gst") {
         const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
         openGstManualPopup(msg, gstin);
