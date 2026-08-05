@@ -1,71 +1,40 @@
-## Clarification: SAP API Settings in the app vs. middleware `.env`
+# Allow Deleting Users When No Replacement Exists
 
-### Question
-The middleware `.env` on the self-hosted server currently has empty values for:
-- `SAP_BP_API_URL`
-- `SAP_DMS_API_URL`
-- `SAP_BP_USERNAME`
-- `SAP_BP_PASSWORD`
+## Problem
 
-The app already has SAP API Settings configured for each API. Is it necessary to configure these values again in the middleware `.env`?
+Deleting a user is currently blocked in two places:
 
-### Short answer
-Yes — the middleware `.env` must contain the real SAP endpoint URL and Basic Auth credentials. The app's SAP API Settings and the middleware `.env` are two separate layers.
+1. In the app, the Delete User dialog says "No eligible replacement found" whenever the user still owns any work (in the screenshot: 1 approval flow). With no other user holding the same role, the Delete button stays disabled — there is no way out.
+2. Deleting the same user directly from the database console fails with a generic server error, because other tables still point at that user.
 
-### How the two layers work
+Since the vendor data has already been cleared and these users will be re-created, a replacement is not needed — the leftover references should simply be cleared.
 
-```text
-App (SAP API Settings)
-  ├─ stores the public middleware URL (middleware_url)
-  ├─ stores the shared proxy secret (proxy_secret)
-  ├─ stores direct-connection details (base_url + endpoint_path) only when "Connection = Direct"
-  └─ does NOT send SAP username/password to the middleware
+## What will change
 
-Middleware (Node.js server inside your network)
-  ├─ reads SAP_BP_API_URL from its own .env
-  ├─ reads SAP_DMS_API_URL from its own .env
-  ├─ reads SAP_BP_USERNAME / SAP_BP_PASSWORD from its own .env
-  └─ forwards the payload to SAP using these credentials
-```
+**1. "Delete without replacement" option in the Delete User dialog**
 
-Why the middleware keeps its own credentials: the SAP username/password must never leave the customer's network. The app only knows the middleware URL and the shared secret; the middleware knows the SAP credentials.
+- When the user has leftover work AND there is no eligible replacement, show a checkbox: "Delete anyway and clear this user's assignments".
+- Ticking it enables the Delete button (button label becomes "Force Delete") and shows a short warning listing what will be cleared.
+- When an eligible replacement does exist, behaviour stays exactly as today (replacement is required and preferred).
 
-### Required immediate fix on the self-hosted server
+**2. Backend support for forced deletion**
 
-Edit `/opt/Ramky_Applications/PROD/VMS/middleware/.env` and fill the empty values, then restart the service.
+`admin-delete-user` accepts a `force: true` flag (admin-only, same permission check as today). With `force`:
 
-```bash
-# Example values — replace with your actual SAP host/credentials
-SAP_BP_API_URL=https://49.207.9.62:44325/vendor/bp/create?sap-client=100
-SAP_DMS_API_URL=https://49.207.9.62:44325/vendor/bp/create?sap-client=100
-SAP_BP_USERNAME=s23hana2
-SAP_BP_PASSWORD=Sh@rv!3220
-```
+- Approval-flow columns pointing at the user (`scm_manager_user_id`, `scm_head_user_id`, `finance_1_user_id`, `finance_2_user_id`, `ceo_office_user_id`) are set to NULL.
+- Rows in `approval_matrix_approvers` and `buyer_scm_mappings` for that user are removed.
+- `vendor_invitations.created_by` and any pending `vendor_approval_progress.acted_by` references are detached (set to NULL) rather than blocking.
+- The auth user, profile, role rows and custom-role rows are then deleted.
+- The response reports exactly what was cleared, and the toast shows it.
 
-Also remove the duplicate/empty `SAP_BP_USERNAME=` and `SAP_BP_PASSWORD=` lines that currently appear after the placeholders; keep only one populated pair.
+Force delete is never silent: it only runs when the admin explicitly ticks the box.
 
-Then restart:
+**3. Clean database deletion**
 
-```bash
-sudo systemctl restart vms-middleware
-# or, if running manually:
-# cd /opt/Ramky_Applications/PROD/VMS/middleware && node server.js
-```
+Foreign keys from application tables to users are reviewed so a user delete cascades or nulls instead of erroring, which also fixes the failure seen when deleting from the database console.
 
-Verify the middleware is ready:
+## Technical notes
 
-```bash
-curl -s http://localhost:3012/health | python3 -m json.tool
-```
-
-The field `sapConfigured` should become `true` after the restart.
-
-### Proposed small improvements
-
-1. **Middleware health check already reports config state** — the app can use `sapConfigured` and `dmsConfigured` from `/health` to show a clearer warning when the middleware `.env` is incomplete.
-2. **Update SAP Connectivity Guide** in the app to explicitly state that the middleware `.env` must hold the SAP credentials, while the SAP API Settings screen only holds the middleware URL and proxy secret.
-3. **Optional: allow the middleware to be told the target URL per request** so the app can send `sapUrl` + `sapUsername` + `sapPassword` per API config, removing the duplicate configuration. This is a larger security/architecture change because credentials would travel from the app to the middleware; recommend keeping the credentials local to the middleware.
-
-### Recommended next step
-
-Start with the immediate fix above (fill the middleware `.env` and restart). If the goal is to reduce confusion, also apply improvement #2 (guide update) so the next admin does not face the same question.
+- Files: `supabase/functions/admin-delete-user/index.ts`, `src/components/admin/DeleteUserDialog.tsx`, plus a migration for the FK `ON DELETE SET NULL` / `CASCADE` adjustments.
+- The existing replacement/reassign path (`reassign-user-work`) is untouched.
+- Self-hosted server: the migration and the updated edge function need to be deployed with the usual deploy script for the change to take effect there.
