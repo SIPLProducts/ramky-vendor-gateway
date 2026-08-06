@@ -6,6 +6,8 @@ That text is produced by the `fetch-tenants-from-sap` function only when its own
 
 So the real situation is: **the edge function never got a reply from the SAP middleware within 25s** — it is not a nginx/SSL problem on the browser side. The browser call to `/supabase/functions/v1/fetch-tenants-from-sap` clearly succeeded (you got a JSON answer back).
 
+Since PROD (same code, same nginx pattern) works and only DEV fails, the difference is environment-level, not application code: the DEV `Tenants From SAP` config row, the DEV middleware `.env`, or the DEV middleware service on port 3002. PROD's working values are the reference to compare against.
+
 ## Where the connection breaks
 
 The function reads the `Tenants From SAP` row in SAP API Settings and, in `proxy` mode, posts to `<middleware_url>/sap/proxy`. Inside the Supabase edge-runtime container:
