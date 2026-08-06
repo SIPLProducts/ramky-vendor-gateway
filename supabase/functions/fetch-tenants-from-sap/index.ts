@@ -253,6 +253,7 @@ Deno.serve(async (req) => {
           return json({ success: false, message: "Proxy Secret is not set for 'Tenants From SAP'." });
         }
         const proxyUrl = `${normalizedMiddlewareBase}/sap/proxy`;
+        attemptedUrl = proxyUrl;
         const outgoingHeaders: Record<string, string> = {
           "Content-Type": "application/json",
           "x-middleware-key": middlewareKey,
