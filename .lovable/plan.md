@@ -1,49 +1,42 @@
-# Fix DEV tenant fetch — middleware is on the wrong port
+# DEV tenant fetch — next step after the port fix
 
-## Root cause (confirmed from your .env files)
+## Where things stand
 
-The code is identical in DEV and PROD. The difference is a port collision that exists only in DEV.
+The port collision is resolved. Your logs show the middleware bound successfully and answering:
 
 ```text
-                        DEV                         PROD
-middleware .env         PORT=3000                   PORT=3012
-backend .env            STUDIO_PORT=3000  <-- same  STUDIO_PORT=3010
-nginx /sap ->           127.0.0.1:3002              127.0.0.1:3012   (matches)
-nginx /studio/ ->       127.0.0.1:3000              127.0.0.1:3010
+Sharvi SAP middleware listening on :3002
+SAP target: http://10.200.1.4:8080
+GET /health 200 410 - 0.973 ms
 ```
 
-So in DEV:
+Two things remain:
 
-1. Nothing listens on **3002**, which is where nginx sends `/sap` and `/health`.
-2. The middleware is configured for **3000**, which Supabase Studio already occupies — it either fails to bind or the port answers as Studio, never as `/sap/proxy`.
+1. **A duplicate pm2 instance.** The error log shows `EADDRINUSE ... port: 3002`. One copy of the middleware owns 3002 and a second copy keeps crash-looping on it. That second process is harmless to traffic but hides real errors and will race after any reboot.
+2. **The timeout, if it still appears.** With 3002 answering locally, a remaining `in-code-timeout` can only come from the hop *before* the middleware — the edge function container reaching `http://10.200.1.7:9008` — or from SAP itself being slow to answer `/sap/proxy`.
 
-In PROD all three numbers line up (3012 middleware = 3012 nginx, Studio separately on 3010), which is why only DEV fails. The edge function then waits out its 25s abort timer and prints `Could not reach SAP: in-code-timeout`.
+## Steps on the DEV server
 
-## Your app config is already correct — the server side is not
+1. Remove the duplicate:
+   - `pm2 list` — look for two entries pointing at `DEV/VMS/middleware`.
+   - `pm2 delete <the crashing id>` then `pm2 save`.
+   - `pm2 logs vms-dev-middleware --lines 30` should now show no `EADDRINUSE`.
+2. Confirm the full path the app actually uses (not just localhost):
+   - `curl -s http://10.200.1.7:9008/health`
+   - Then exercise the real route with the DEV secret:
+     `curl -s -X POST http://10.200.1.7:9008/sap/proxy -H 'content-type: application/json' -H 'x-middleware-secret: 123456' -d '{"targetUrl":"http://10.200.1.4:8080/<tenants-path>","method":"GET"}'`
+   - Watch `pm2 logs` while that runs. If a line appears in the middleware log, the network path is fine and the delay is SAP-side. If nothing appears, nginx on 9008 or the edge container's egress is the blocker.
+3. If step 2 shows nothing from outside but localhost works, check that nginx on 9008 is actually running the DEV server block and that the DEV Supabase edge-runtime container can route to `10.200.1.7` (it cannot use `localhost`).
+4. Confirm the Proxy Secret saved in SAP API Settings is `123456` (DEV) and not the PROD value — a mismatch returns 401, which the UI currently also surfaces as a generic failure.
 
-The screenshot shows the DEV `Tenants From SAP` row is fine: Base URL `http://10.200.1.4:8080`, Via Proxy Server, Middleware URL `http://10.200.1.7:9008`, Middleware Port 3002.
+## Code changes in this repo (so this diagnoses itself next time)
 
-That is exactly the problem: the app asks nginx on 9008, nginx forwards `/sap` to `127.0.0.1:3002`, and the DEV middleware is not there — it is set to 3000. Saving the screen again will not change that; the port must be fixed on the server.
-
-## Fix
-
-1. On the DEV server, change `PORT=3000` to `PORT=3002` in `/opt/Ramky_Applications/DEV/VMS/middleware/.env`, then `systemctl restart vms-middleware` (DEV unit).
-2. Verify both return JSON:
-   - `curl http://127.0.0.1:3002/health`
-   - `curl http://10.200.1.7:9008/health`
-   If the second fails, the problem is nginx; if the first fails, the middleware did not start (check `journalctl -u vms-middleware -n 50` for `EADDRINUSE`).
-3. Confirm the Proxy Secret on that screen equals the DEV `MIDDLEWARE_SHARED_SECRET` — DEV and PROD use different values, so a copied PROD secret gives a 401.
-4. Confirm the DEV middleware's `SAP_BP_API_URL` host matches the Base URL host `10.200.1.4:8080` — `/sap/proxy` rejects any other target host. DEV already matches; PROD's is empty and should be filled with the same value.
-
-## Code changes in this repo (small, so this is self-diagnosing next time)
-
-- `supabase/functions/fetch-tenants-from-sap/index.ts`: abort with a real `AbortError` (or treat the `in-code-timeout` reason as an abort) so the UI shows "SAP did not respond within Ns (timeout)" instead of the misleading "Could not reach SAP", and include the attempted middleware URL in the returned message.
-- `middleware/server.js`: on startup, log the bound port clearly, and return an explicit `503 middleware not configured` from `/sap/proxy` when `SAP_BP_API_URL` is empty instead of a confusing host-mismatch error.
-- `src/components/admin/CreateUserDialog.tsx`: render the returned `hint` under the red error text.
+- `supabase/functions/fetch-tenants-from-sap/index.ts`: distinguish the failure modes instead of the blanket "Could not reach SAP: in-code-timeout" — report `timeout after Ns calling <url>`, `connection refused`, and `401 secret mismatch` separately, and return the attempted middleware URL in the response.
+- `middleware/server.js`: log every inbound `/sap/proxy` call with the target URL and the SAP response time, and return `503 middleware not configured` when `SAP_BP_API_URL` is empty.
+- `src/components/admin/CreateUserDialog.tsx`: render the returned hint (URL + failure kind) under the red error text.
 
 ## Notes
 
-- No database schema changes.
-- Steps 1–3 are server-side; the code changes need a DEV edge-function redeploy and frontend rebuild.
-- Your nginx config needs no changes — it is already consistent for both environments.
-- Rotate the SAP password you pasted in chat when convenient.
+- No database changes.
+- Code changes require a DEV edge-function redeploy and a frontend rebuild.
+- `SAP_BP_USERNAME`/`SAP_BP_PASSWORD` appear twice in your DEV `.env`; the later pair wins. Worth removing the placeholder pair to avoid confusion — and rotate the SAP password you pasted in chat.
