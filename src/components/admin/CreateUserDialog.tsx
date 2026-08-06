@@ -52,6 +52,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const [fetchingSap, setFetchingSap] = useState(false);
   const [sapFetched, setSapFetched] = useState(false);
   const [sapError, setSapError] = useState<string | null>(null);
+  const [sapHint, setSapHint] = useState<string | null>(null);
 
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
