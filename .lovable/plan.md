@@ -18,13 +18,11 @@ Localhost is therefore healthy. If `Could not reach SAP: in-code-timeout` still 
 
 1. Prove the path end to end, from outside localhost:
    - `curl -s http://10.200.1.7:9008/health`
-
-2. Confirm the full path the app actually uses (not just localhost):
-   - `curl -s http://10.200.1.7:9008/health`
    - Then exercise the real route with the DEV secret:
      `curl -s -X POST http://10.200.1.7:9008/sap/proxy -H 'content-type: application/json' -H 'x-middleware-secret: 123456' -d '{"targetUrl":"http://10.200.1.4:8080/<tenants-path>","method":"GET"}'`
-   - Watch `pm2 logs` while that runs. If a line appears in the middleware log, the network path is fine and the delay is SAP-side. If nothing appears, nginx on 9008 or the edge container's egress is the blocker.
-3. If step 2 shows nothing from outside but localhost works, check that nginx on 9008 is actually running the DEV server block and that the DEV Supabase edge-runtime container can route to `10.200.1.7` (it cannot use `localhost`).
+   - Watch `pm2 logs vms-dev-middleware` while that runs. A log line appearing means the network path is fine and the delay is SAP-side; nothing appearing means nginx on 9008 or the edge container's egress is the blocker.
+2. If the outside curl fails while localhost works, check that nginx on 9008 is serving the DEV block, and that the DEV edge-runtime container can route to `10.200.1.7` (it cannot use `localhost`).
+
 4. Confirm the Proxy Secret saved in SAP API Settings is `123456` (DEV) and not the PROD value — a mismatch returns 401, which the UI currently also surfaces as a generic failure.
 
 ## Code changes in this repo (so this diagnoses itself next time)
