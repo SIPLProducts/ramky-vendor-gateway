@@ -1,23 +1,23 @@
 # Fix DEV tenant fetch — middleware is on the wrong port
 
-## Root cause (confirmed from your two .env files)
+## Root cause (confirmed from your .env files)
 
-DEV middleware `.env` has `PORT=3000`.
-
-But everywhere else in DEV expects the middleware on **3002**:
+The code is identical in DEV and PROD. The difference is a port collision that exists only in DEV.
 
 ```text
-nginx (:80 and :9008)   location ~ ^/(sap|health)  ->  http://127.0.0.1:3002
-DEV middleware .env                                     PORT=3000
-DEV Supabase Studio                                     127.0.0.1:3000   <-- collision
+                        DEV                         PROD
+middleware .env         PORT=3000                   PORT=3012
+backend .env            STUDIO_PORT=3000  <-- same  STUDIO_PORT=3010
+nginx /sap ->           127.0.0.1:3002              127.0.0.1:3012   (matches)
+nginx /studio/ ->       127.0.0.1:3000              127.0.0.1:3010
 ```
 
-Two consequences:
+So in DEV:
 
-1. Nothing is listening on 3002, so any call routed through nginx `/sap` dies.
-2. Port 3000 is already the DEV Supabase Studio port, so the middleware either fails to bind or requests to 3000 land on Studio and never return a `/sap/proxy` answer.
+1. Nothing listens on **3002**, which is where nginx sends `/sap` and `/health`.
+2. The middleware is configured for **3000**, which Supabase Studio already occupies — it either fails to bind or the port answers as Studio, never as `/sap/proxy`.
 
-Either way the edge function waits until its own 25s abort timer fires and reports `Could not reach SAP: in-code-timeout`. PROD works because its `.env` has `PORT=3012`, which matches its nginx block.
+In PROD all three numbers line up (3012 middleware = 3012 nginx, Studio separately on 3010), which is why only DEV fails. The edge function then waits out its 25s abort timer and prints `Could not reach SAP: in-code-timeout`.
 
 ## Fix
 
