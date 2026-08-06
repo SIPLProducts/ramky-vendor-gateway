@@ -310,7 +310,6 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
                     <p className="text-sm text-destructive">{sapError}</p>
                     {sapHint && <p className="text-xs text-muted-foreground">{sapHint}</p>}
                   </div>
-                ) : (
                 ) : !sapFetched ? (
                   <p className="text-sm text-muted-foreground">Enter the email above and press Enter to load tenants from SAP.</p>
                 ) : sapTenants.length === 0 ? (
