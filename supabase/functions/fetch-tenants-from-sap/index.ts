@@ -221,7 +221,10 @@ Deno.serve(async (req) => {
 
     let sapJson: any = null;
     let networkError: string | null = null;
+    let errorHint: string | null = null;
+    let attemptedUrl: string = sapUrl;
     const requestBody = { UMAIL: email };
+
 
     // Honor configured timeout; clamp under Edge runtime wall-clock so failures surface as JSON error.
     const rawTimeout = Number(config.timeout_ms) || 30000;
