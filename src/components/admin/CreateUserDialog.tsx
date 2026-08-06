@@ -57,7 +57,7 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
     setShowPw(false);
-    setSapTenants([]); setSelectedCodes([]); setSapFetched(false); setSapError(null); setFetchingSap(false);
+    setSapTenants([]); setSelectedCodes([]); setSapFetched(false); setSapError(null); setSapHint(null); setFetchingSap(false);
   };
 
   useEffect(() => { if (!open) reset(); /* eslint-disable-next-line */ }, [open]);
