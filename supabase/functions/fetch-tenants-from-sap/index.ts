@@ -291,6 +291,14 @@ Deno.serve(async (req) => {
         });
         if (!res.ok) {
           networkError = `Middleware HTTP ${res.status}: ${text.slice(0, 300)}`;
+          if (res.status === 401 || res.status === 403) {
+            errorHint = `The middleware at ${proxyUrl} rejected the Proxy Secret. Make sure the Proxy Secret in SAP API Settings matches MIDDLEWARE_SHARED_SECRET in this environment's middleware/.env (DEV and PROD use different values).`;
+          } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+            errorHint = `The middleware at ${proxyUrl} could not reach SAP at ${sapUrl}. Check SAP_BP_API_URL in middleware/.env and that its host matches the Base URL configured here.`;
+          } else {
+            errorHint = `Called ${proxyUrl}.`;
+          }
+        }
         } else {
           let wrapper: any = null;
           try { wrapper = JSON.parse(text); }
