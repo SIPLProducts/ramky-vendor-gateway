@@ -459,17 +459,28 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
     return res.status(400).json({ ok: false, error: "Invalid 'url'." });
   }
 
-  if (SAP_BP_API_URL) {
-    const allowedHost = new URL(SAP_BP_API_URL).host;
-    if (targetHost !== allowedHost) {
-      return res.status(403).json({
-        ok: false,
-        error: `Target host ${targetHost} is not allowed. Only ${allowedHost} is permitted.`,
-      });
-    }
+  if (!SAP_BP_API_URL) {
+    console.error("[proxy] SAP_BP_API_URL is empty — middleware not configured");
+    return res.status(503).json({
+      ok: false,
+      error: "Middleware not configured: SAP_BP_API_URL is empty in middleware/.env.",
+      target: url,
+    });
   }
 
-  console.log("[proxy] forwarding", method || "POST", url, "headers:", redact(headers));
+  const allowedHost = new URL(SAP_BP_API_URL).host;
+  if (targetHost !== allowedHost) {
+    console.warn(`[proxy] rejected target host ${targetHost} (allowed: ${allowedHost})`);
+    return res.status(403).json({
+      ok: false,
+      error: `Target host ${targetHost} is not allowed. Only ${allowedHost} is permitted.`,
+    });
+  }
+
+  const startedAt = Date.now();
+  console.log(
+    `[proxy] in reqId=${req.reqId || "-"} ${method || "POST"} ${url} headers: ${JSON.stringify(redact(headers))}`,
+  );
 
   try {
     const finalHeaders = { ...(headers || {}) };
@@ -477,6 +488,9 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
       finalHeaders.Authorization = basicAuthHeader(SAP_BP_USERNAME, SAP_BP_PASSWORD);
     }
     const result = await forwardToSap({ url, method, headers: finalHeaders, body, reqId: req.reqId, username: useBasicAuth ? SAP_BP_USERNAME : null });
+    console.log(
+      `[proxy] out reqId=${req.reqId || "-"} sapStatus=${result.status} sapMs=${result.durationMs} totalMs=${Date.now() - startedAt} ${url}`,
+    );
     return res.status(200).json({
       ok: result.ok,
       sapStatus: result.status,
@@ -484,8 +498,10 @@ app.post("/sap/proxy", authGuard, async (req, res) => {
       sapResponse: result.body,
     });
   } catch (err) {
-    console.error("[proxy] error:", err);
     const info = describeFetchError(err);
+    console.error(
+      `[proxy] fail reqId=${req.reqId || "-"} totalMs=${Date.now() - startedAt} code=${info.code} ${url}: ${info.message}`,
+    );
     return res.status(502).json({
       ok: false,
       error: info.message,

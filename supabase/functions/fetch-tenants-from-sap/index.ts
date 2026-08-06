@@ -221,7 +221,10 @@ Deno.serve(async (req) => {
 
     let sapJson: any = null;
     let networkError: string | null = null;
+    let errorHint: string | null = null;
+    let attemptedUrl: string = sapUrl;
     const requestBody = { UMAIL: email };
+
 
     // Honor configured timeout; clamp under Edge runtime wall-clock so failures surface as JSON error.
     const rawTimeout = Number(config.timeout_ms) || 30000;
@@ -250,6 +253,7 @@ Deno.serve(async (req) => {
           return json({ success: false, message: "Proxy Secret is not set for 'Tenants From SAP'." });
         }
         const proxyUrl = `${normalizedMiddlewareBase}/sap/proxy`;
+        attemptedUrl = proxyUrl;
         const outgoingHeaders: Record<string, string> = {
           "Content-Type": "application/json",
           "x-middleware-key": middlewareKey,
@@ -287,6 +291,14 @@ Deno.serve(async (req) => {
         });
         if (!res.ok) {
           networkError = `Middleware HTTP ${res.status}: ${text.slice(0, 300)}`;
+          if (res.status === 401 || res.status === 403) {
+            errorHint = `The middleware at ${proxyUrl} rejected the Proxy Secret. Make sure the Proxy Secret in SAP API Settings matches MIDDLEWARE_SHARED_SECRET in this environment's middleware/.env (DEV and PROD use different values).`;
+          } else if (res.status === 502 || res.status === 503 || res.status === 504) {
+            errorHint = `The middleware at ${proxyUrl} could not reach SAP at ${sapUrl}. Check SAP_BP_API_URL in middleware/.env and that its host matches the Base URL configured here.`;
+          } else {
+            errorHint = `Called ${proxyUrl}.`;
+          }
+        }
         } else {
           let wrapper: any = null;
           try { wrapper = JSON.parse(text); }
@@ -357,9 +369,30 @@ Deno.serve(async (req) => {
         abortReason: String(controller.signal.reason ?? ""),
         stack: e?.stack || null,
       });
-      networkError = aborted
-        ? `SAP did not respond within ${Math.round(elapsed / 1000)}s (timeout). Increase the timeout in SAP API Settings → Tenants From SAP, and ensure the edge-runtime wall-clock limit on the server is higher.`
-        : `Could not reach SAP: ${e?.message || e}`;
+      const code = String(e?.cause?.code || e?.code || "");
+      const msg = String(e?.message || e);
+      const refused = /ECONNREFUSED|refused/i.test(code + msg);
+      const dnsFail = /ENOTFOUND|EAI_AGAIN|dns error|failed to lookup/i.test(code + msg);
+      const unreachable = /EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|connect timeout/i.test(code + msg);
+
+      if (aborted) {
+        networkError = `Timeout after ${Math.round(elapsed / 1000)}s calling ${attemptedUrl}.`;
+        errorHint = connectionMode === "proxy"
+          ? `Nothing answered in time at ${attemptedUrl}. Verify the middleware is listening on the port nginx forwards to, that this URL is reachable from the backend container (use the server IP, not localhost), and that SAP itself is responding.`
+          : `SAP at ${attemptedUrl} did not respond in time. Increase the timeout in SAP API Settings → Tenants From SAP.`;
+      } else if (refused) {
+        networkError = `Connection refused by ${attemptedUrl}.`;
+        errorHint = `Nothing is listening on that host/port. Check the middleware process and the nginx port mapping for this environment.`;
+      } else if (dnsFail) {
+        networkError = `Host in ${attemptedUrl} could not be resolved.`;
+        errorHint = `Use an IP address or a hostname resolvable from inside the backend container.`;
+      } else if (unreachable) {
+        networkError = `Network unreachable calling ${attemptedUrl}.`;
+        errorHint = `Check firewall/routing between the backend container and that host.`;
+      } else {
+        networkError = `Could not reach ${attemptedUrl}: ${msg}`;
+        errorHint = errorHint || `Connection mode: ${connectionMode}.`;
+      }
     }
 
     if (networkError || !sapJson) {
@@ -367,10 +400,14 @@ Deno.serve(async (req) => {
         success: false,
         elapsedTotalMs: Date.now() - tStart,
         networkError,
+        errorHint,
       });
       return json({
         success: false,
         message: networkError || "Empty response from SAP.",
+        hint: errorHint,
+        attempted_url: attemptedUrl,
+        connection_mode: connectionMode,
       });
     }
 

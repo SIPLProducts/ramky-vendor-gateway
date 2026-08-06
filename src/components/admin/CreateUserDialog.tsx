@@ -52,11 +52,12 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
   const [fetchingSap, setFetchingSap] = useState(false);
   const [sapFetched, setSapFetched] = useState(false);
   const [sapError, setSapError] = useState<string | null>(null);
+  const [sapHint, setSapHint] = useState<string | null>(null);
 
   const reset = () => {
     setFullName(''); setEmail(''); setPassword(''); setSelectedRole('vendor');
     setShowPw(false);
-    setSapTenants([]); setSelectedCodes([]); setSapFetched(false); setSapError(null); setFetchingSap(false);
+    setSapTenants([]); setSelectedCodes([]); setSapFetched(false); setSapError(null); setSapHint(null); setFetchingSap(false);
   };
 
   useEffect(() => { if (!open) reset(); /* eslint-disable-next-line */ }, [open]);
@@ -74,13 +75,16 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
       setSapTenants([]);
       return;
     }
-    setFetchingSap(true); setSapError(null);
+    setFetchingSap(true); setSapError(null); setSapHint(null);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-tenants-from-sap', {
         body: { email: trimmed },
       });
       if (error) throw error;
-      if (!(data as any)?.success) throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+      if (!(data as any)?.success) {
+        setSapHint((data as any)?.hint ?? null);
+        throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+      }
       const list: SapTenant[] = ((data as any).tenants ?? []).map((t: any) => ({
         code: String(t.code),
         name: String(t.name || t.code),
@@ -306,7 +310,10 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
                     <Loader2 className="h-4 w-4 animate-spin" /> Fetching tenants from SAP…
                   </div>
                 ) : sapError ? (
-                  <p className="text-sm text-destructive">{sapError}</p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-destructive">{sapError}</p>
+                    {sapHint && <p className="text-xs text-muted-foreground">{sapHint}</p>}
+                  </div>
                 ) : !sapFetched ? (
                   <p className="text-sm text-muted-foreground">Enter the email above and press Enter to load tenants from SAP.</p>
                 ) : sapTenants.length === 0 ? (
