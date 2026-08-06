@@ -75,13 +75,16 @@ export function CreateUserDialog({ open, onOpenChange, customRoles = [], onCreat
       setSapTenants([]);
       return;
     }
-    setFetchingSap(true); setSapError(null);
+    setFetchingSap(true); setSapError(null); setSapHint(null);
     try {
       const { data, error } = await supabase.functions.invoke('fetch-tenants-from-sap', {
         body: { email: trimmed },
       });
       if (error) throw error;
-      if (!(data as any)?.success) throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+      if (!(data as any)?.success) {
+        setSapHint((data as any)?.hint ?? null);
+        throw new Error((data as any)?.message || 'Failed to fetch tenants from SAP');
+      }
       const list: SapTenant[] = ((data as any).tenants ?? []).map((t: any) => ({
         code: String(t.code),
         name: String(t.name || t.code),
