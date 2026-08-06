@@ -19,15 +19,21 @@ So in DEV:
 
 In PROD all three numbers line up (3012 middleware = 3012 nginx, Studio separately on 3010), which is why only DEV fails. The edge function then waits out its 25s abort timer and prints `Could not reach SAP: in-code-timeout`.
 
+## Your app config is already correct — the server side is not
+
+The screenshot shows the DEV `Tenants From SAP` row is fine: Base URL `http://10.200.1.4:8080`, Via Proxy Server, Middleware URL `http://10.200.1.7:9008`, Middleware Port 3002.
+
+That is exactly the problem: the app asks nginx on 9008, nginx forwards `/sap` to `127.0.0.1:3002`, and the DEV middleware is not there — it is set to 3000. Saving the screen again will not change that; the port must be fixed on the server.
+
 ## Fix
 
-1. On the DEV server, change `PORT=3000` to `PORT=3002` in `/opt/Ramky_Applications/DEV/VMS/middleware/.env`, then restart the DEV middleware service.
-2. Verify: `curl http://127.0.0.1:3002/health` and `curl http://10.200.1.7:9008/health` both return JSON.
-3. In SAP API Settings → `Tenants From SAP` (DEV), confirm:
-   - Middleware URL points at a container-reachable address — `http://10.200.1.7:9008` is safest (`127.0.0.1` gets rewritten to `172.17.0.1` inside the edge container and may not resolve).
-   - Proxy Secret matches the DEV `MIDDLEWARE_SHARED_SECRET` (DEV and PROD use different values).
-   - `base_url` host matches the DEV middleware's `SAP_BP_API_URL` host — `/sap/proxy` rejects any other host.
-4. Note for PROD: its `SAP_BP_API_URL` / `SAP_DMS_API_URL` are empty. Tenant fetch may be running in direct mode there, but any proxy-mode call will fail the host check — worth filling in with the same SAP base URL.
+1. On the DEV server, change `PORT=3000` to `PORT=3002` in `/opt/Ramky_Applications/DEV/VMS/middleware/.env`, then `systemctl restart vms-middleware` (DEV unit).
+2. Verify both return JSON:
+   - `curl http://127.0.0.1:3002/health`
+   - `curl http://10.200.1.7:9008/health`
+   If the second fails, the problem is nginx; if the first fails, the middleware did not start (check `journalctl -u vms-middleware -n 50` for `EADDRINUSE`).
+3. Confirm the Proxy Secret on that screen equals the DEV `MIDDLEWARE_SHARED_SECRET` — DEV and PROD use different values, so a copied PROD secret gives a 401.
+4. Confirm the DEV middleware's `SAP_BP_API_URL` host matches the Base URL host `10.200.1.4:8080` — `/sap/proxy` rejects any other target host. DEV already matches; PROD's is empty and should be filled with the same value.
 
 ## Code changes in this repo (small, so this is self-diagnosing next time)
 
