@@ -1,41 +1,43 @@
-# Fix "Could not reach SAP: in-code-timeout" on DEV (10.200.1.7)
+# Fix DEV tenant fetch — middleware is on the wrong port
 
-## What the message actually means
+## Root cause (confirmed from your two .env files)
 
-That text is produced by the `fetch-tenants-from-sap` function only when its own 25-second abort timer fires. The function calls `controller.abort("in-code-timeout")`, and because the thrown value is a plain string (not an `AbortError`), the timeout branch is skipped and the generic "Could not reach SAP: …" wording is printed instead.
+DEV middleware `.env` has `PORT=3000`.
 
-So the real situation is: **the edge function never got a reply from the SAP middleware within 25s** — it is not a nginx/SSL problem on the browser side. The browser call to `/supabase/functions/v1/fetch-tenants-from-sap` clearly succeeded (you got a JSON answer back).
+But everywhere else in DEV expects the middleware on **3002**:
 
-Since PROD (same code, same nginx pattern) works and only DEV fails, the difference is environment-level, not application code: the DEV `Tenants From SAP` config row, the DEV middleware `.env`, or the DEV middleware service on port 3002. PROD's working values are the reference to compare against.
+```text
+nginx (:80 and :9008)   location ~ ^/(sap|health)  ->  http://127.0.0.1:3002
+DEV middleware .env                                     PORT=3000
+DEV Supabase Studio                                     127.0.0.1:3000   <-- collision
+```
 
-## Where the connection breaks
+Two consequences:
 
-The function reads the `Tenants From SAP` row in SAP API Settings and, in `proxy` mode, posts to `<middleware_url>/sap/proxy`. Inside the Supabase edge-runtime container:
+1. Nothing is listening on 3002, so any call routed through nginx `/sap` dies.
+2. Port 3000 is already the DEV Supabase Studio port, so the middleware either fails to bind or requests to 3000 land on Studio and never return a `/sap/proxy` answer.
 
-- `127.0.0.1` / `localhost` is rewritten to `172.17.0.1` (docker host). If the DEV middleware only listens on loopback, or the docker bridge IP differs, this hangs until the timer fires.
-- If the DEV config still points at the PROD middleware port (`3012`) instead of DEV `3002`, it also hangs.
-- The nginx blocks you pasted expose the middleware at `/sap` on ports 80 and 9008 for DEV — going through nginx (`http://10.200.1.7:9008`) is the reliable path from inside the container.
-- Secondary: the middleware's `/sap/proxy` rejects any target host other than the one in its own `SAP_BP_API_URL`. Your DEV `middleware/.env` currently has `SAP_BP_API_URL` empty, so this guard throws before reaching SAP — that alone can break tenant fetch.
+Either way the edge function waits until its own 25s abort timer fires and reports `Could not reach SAP: in-code-timeout`. PROD works because its `.env` has `PORT=3012`, which matches its nginx block.
 
-## Plan
+## Fix
 
-1. Diagnose (server-side, before code changes)
-   - Confirm what the DEV `Tenants From SAP` row holds: `connection_mode`, `middleware_url`, `proxy_secret`, `base_url + endpoint_path`, `timeout_ms`.
-   - From the server: `curl http://127.0.0.1:3002/health` and the same via `http://10.200.1.7:9008/health` to verify the DEV middleware is up and reachable through nginx.
-   - Read the DEV edge function logs for the `proxy.prepared` / `proxy.fetch.error` trace lines — they print the exact URL the container tried.
+1. On the DEV server, change `PORT=3000` to `PORT=3002` in `/opt/Ramky_Applications/DEV/VMS/middleware/.env`, then restart the DEV middleware service.
+2. Verify: `curl http://127.0.0.1:3002/health` and `curl http://10.200.1.7:9008/health` both return JSON.
+3. In SAP API Settings → `Tenants From SAP` (DEV), confirm:
+   - Middleware URL points at a container-reachable address — `http://10.200.1.7:9008` is safest (`127.0.0.1` gets rewritten to `172.17.0.1` inside the edge container and may not resolve).
+   - Proxy Secret matches the DEV `MIDDLEWARE_SHARED_SECRET` (DEV and PROD use different values).
+   - `base_url` host matches the DEV middleware's `SAP_BP_API_URL` host — `/sap/proxy` rejects any other host.
+4. Note for PROD: its `SAP_BP_API_URL` / `SAP_DMS_API_URL` are empty. Tenant fetch may be running in direct mode there, but any proxy-mode call will fail the host check — worth filling in with the same SAP base URL.
 
-2. Fix the DEV configuration
-   - Set the DEV middleware URL to a container-reachable address (`http://10.200.1.7:9008`), not `127.0.0.1:3002`.
-   - Fill DEV `middleware/.env`: `SAP_BP_API_URL`, `SAP_BP_USERNAME`, `SAP_BP_PASSWORD`, and `MIDDLEWARE_SHARED_SECRET` matching the Proxy Secret in SAP API Settings; restart the middleware service.
+## Code changes in this repo (small, so this is self-diagnosing next time)
 
-3. Code changes (small, in this repo)
-   - `supabase/functions/fetch-tenants-from-sap/index.ts`: abort with a proper `DOMException`/`AbortError` (or treat reason `in-code-timeout` as an abort) so the user sees a correct "SAP did not respond within Ns (timeout)" message plus the attempted URL, instead of a confusing "Could not reach SAP".
-   - Surface the attempted middleware URL and elapsed time in the JSON returned to the UI so this is self-diagnosable next time.
-   - `middleware/server.js`: when `SAP_BP_API_URL` is empty, return a clear `503 middleware not configured` from `/sap/proxy` rather than a host-mismatch error.
-   - `src/components/admin/CreateUserDialog.tsx`: show the returned hint/URL under the red error line.
+- `supabase/functions/fetch-tenants-from-sap/index.ts`: abort with a real `AbortError` (or treat the `in-code-timeout` reason as an abort) so the UI shows "SAP did not respond within Ns (timeout)" instead of the misleading "Could not reach SAP", and include the attempted middleware URL in the returned message.
+- `middleware/server.js`: on startup, log the bound port clearly, and return an explicit `503 middleware not configured` from `/sap/proxy` when `SAP_BP_API_URL` is empty instead of a confusing host-mismatch error.
+- `src/components/admin/CreateUserDialog.tsx`: render the returned `hint` under the red error text.
 
-## Technical notes
+## Notes
 
 - No database schema changes.
-- Edge function redeploy needed on DEV after step 3; middleware restart after step 2.
-- Nginx config itself needs no change for this issue — the `/sap` and `/supabase/` blocks you pasted are correct.
+- Steps 1–3 are server-side; the code changes need a DEV edge-function redeploy and frontend rebuild.
+- Your nginx config needs no changes — it is already consistent for both environments.
+- Rotate the SAP password you pasted in chat when convenient.
