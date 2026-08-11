@@ -10,11 +10,14 @@ Most of what you type is already saved: the form auto-saves the draft ~2.5s afte
 
 ## What will change
 
+- **Every tab is saved and restored, not just Documents.** Organization, Address, Contact, Financial & Infrastructure, Compliance and all admin-defined custom tabs are re-filled from the saved draft when you reopen the form, including uploaded files.
 - **Restore partial KYC.** Rebuild the Step 1 verified snapshot whenever *any* of GST, PAN, MSME or Bank data exists in the draft, instead of requiring PAN + bank together. Each block (GST, PAN, MSME, Bank, secondary bank, declaration files/reasons) is restored independently, so half-finished verification comes back exactly as left.
+- **No re-OCR and no re-validation on return.** Saved GST/PAN/MSME/Bank values, the extracted OCR details and their verified status are displayed straight from the saved draft — the KYC APIs are only called again if you change a number or re-upload a document.
 - **Save custom tab values.** Include `customFieldValues` in the payload for auto-save, Save Draft, submit and resubmit, so admin-defined tabs persist and reload like the built-in ones. The database column and the read-back logic already exist.
-- **Remember verified status per KYC section.** Persist the existing per-section verification status columns on every draft save (not only at submit) and use them to re-mark the GST / PAN / MSME / Bank tabs as Verified on reopen, so you don't re-verify what already passed.
-- **Return to the tab you left.** On reopening a draft, land on the first incomplete tab as it does now, but count partially verified Step 1 correctly so it doesn't push you backwards.
+- **Remember verified status per KYC section.** Persist the existing per-section verification status columns on every draft save (not only at submit) and use them to re-mark the GST / PAN / MSME / Bank tabs as Verified on reopen.
+- **Return to the tab you left.** On reopening a draft, land on the first incomplete tab, counting partially verified Step 1 correctly so it doesn't push you backwards.
 - **No change to reset behaviour.** Data is only cleared when you go Back to Main Screen / cancel, exactly as you asked.
+
 
 ## Technical notes
 
