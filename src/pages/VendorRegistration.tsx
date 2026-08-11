@@ -862,15 +862,17 @@ export default function VendorRegistration() {
                 msmeCertificateFile: existingFormData.statutory?.msmeCertificateFile ?? null,
                 msmeSelfDeclarationFile: existingFormData.statutory?.msmeSelfDeclarationFile ?? null,
                 msmeDeclarationReason: existingFormData.statutory?.msmeDeclarationReason || '',
-                bank: {
-                  accountNumber: existingFormData.bank.accountNumber,
-                  ifsc: existingFormData.bank.ifscCode || '',
-                  bankName: existingFormData.bank.bankName || '',
-                  branchName: existingFormData.bank.branchName || '',
-                  accountHolderName: existingFormData.organization?.legalName || '',
-                  accountType: existingFormData.bank.accountType || 'current',
-                  bankAddress: existingFormData.bank.bankAddress || '',
-                },
+                bank: existingFormData.bank?.accountNumber
+                  ? {
+                      accountNumber: existingFormData.bank.accountNumber,
+                      ifsc: existingFormData.bank.ifscCode || '',
+                      bankName: existingFormData.bank.bankName || '',
+                      branchName: existingFormData.bank.branchName || '',
+                      accountHolderName: existingFormData.organization?.legalName || '',
+                      accountType: existingFormData.bank.accountType || 'current',
+                      bankAddress: existingFormData.bank.bankAddress || '',
+                    }
+                  : undefined,
                 cancelledChequeFile: existingFormData.bank?.cancelledChequeFile ?? null,
                 bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
                   ? {
