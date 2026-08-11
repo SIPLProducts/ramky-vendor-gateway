@@ -946,14 +946,14 @@ export default function VendorRegistration() {
       return;
     }
 
-    const hash = JSON.stringify(formData);
+    const hash = JSON.stringify({ formData, customFieldValues });
     if (hash === lastSavedHashRef.current) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
       try {
         setAutoSaveState('saving');
-        await saveVendor(formData);
+        await saveVendor({ ...formData, customFieldValues });
         lastSavedHashRef.current = hash;
         setLastSavedAt(new Date());
         setAutoSaveState('saved');
@@ -966,7 +966,7 @@ export default function VendorRegistration() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
+  }, [formData, customFieldValues, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
 
   // Warn on refresh / tab-close if there are unsaved changes.
   // Compares the current formData hash to the last auto-saved hash — silent
