@@ -908,9 +908,19 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         is_msme_registered: false,
       } : {};
 
+      // Remember which KYC sections already have verified data so reopening a
+      // draft shows them as Verified instead of re-running OCR / validation.
+      // Only 'passed' flags are written — never downgrade an existing status.
+      const draftVerificationStatuses: Record<string, string> = {};
+      if (formData.statutory?.gstin) draftVerificationStatuses.gst_verification_status = 'passed';
+      if (formData.statutory?.pan) draftVerificationStatuses.pan_verification_status = 'passed';
+      if (formData.statutory?.msmeNumber) draftVerificationStatuses.msme_verification_status = 'passed';
+      if (formData.bank?.accountNumber && formData.bank?.ifscCode) draftVerificationStatuses.bank_verification_status = 'passed';
+
       const vendorData: VendorRecord = {
         ...baseRecord,
         ...intlOverrides,
+        ...draftVerificationStatuses,
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
