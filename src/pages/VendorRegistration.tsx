@@ -1397,10 +1397,12 @@ export default function VendorRegistration() {
       setAutoSaveState('saving');
       // On Step 1, build payload from the freshest lifted snapshot so we don't
       // miss the user's latest OCR edit / verification (state may not have flushed yet).
-      const payload =
+      const base =
         currentStep === 1 && latestStep1DataRef.current
           ? mergeVerifiedDataIntoForm(formData, latestStep1DataRef.current)
           : formData;
+      // Custom (admin-defined) tabs live in separate state — persist them too.
+      const payload = { ...base, customFieldValues };
       await saveVendor(payload);
       lastSavedHashRef.current = JSON.stringify(payload);
       setLastSavedAt(new Date());
