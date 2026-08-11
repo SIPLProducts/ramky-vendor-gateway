@@ -804,18 +804,27 @@ export default function VendorRegistration() {
             const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
             setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
-            // Step 1 = doc verification — pre-seed verifiedData if we have key fields
+            // Step 1 = doc verification — restore whatever was already captured.
+            // Each KYC block is rebuilt independently so partial progress
+            // (e.g. only GST done) comes back verified without re-running OCR.
             let step1Seed: VerifiedDocumentData | undefined = undefined;
-            if (existingFormData.statutory?.pan && existingFormData.bank?.accountNumber) {
+            const st = existingFormData.statutory;
+            const bk = existingFormData.bank;
+            const hasAnyKyc = !!(st?.gstin || st?.pan || st?.msmeNumber || bk?.accountNumber
+              || st?.gstCertificateFile || st?.panCardFile || st?.msmeCertificateFile || bk?.cancelledChequeFile
+              || st?.isGstRegistered === false || st?.isMsmeRegistered === false);
+            if (hasAnyKyc) {
               step1Seed = {
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
-                pan: {
-                  number: existingFormData.statutory.pan,
-                  holderName: existingFormData.organization?.legalName || '',
-                  apiName: existingFormData.organization?.legalName || '',
-                  nameMatchScore: 100,
-                },
+                pan: existingFormData.statutory?.pan
+                  ? {
+                      number: existingFormData.statutory.pan,
+                      holderName: existingFormData.organization?.legalName || '',
+                      apiName: existingFormData.organization?.legalName || '',
+                      nameMatchScore: 100,
+                    }
+                  : undefined,
                 panStatus: existingFormData.statutory.panStatus ?? null,
                 panAadhaarLinked: existingFormData.statutory.panAadhaarLinked ?? null,
                 panComprehensiveVerifiedAt: existingFormData.statutory.panComprehensiveVerifiedAt ?? null,
