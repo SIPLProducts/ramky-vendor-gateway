@@ -4,6 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VendorFormData, ValidationResult, VendorStatus } from '@/types/vendor';
 
+/** Form data plus the admin-defined custom tab values (persisted to vendors.custom_field_values). */
+type VendorFormDataWithCustom = VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> };
+
 interface UseVendorRegistrationOptions {
   invitationToken?: string;
   /**
@@ -358,7 +361,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   };
 
   // Convert form data to database format
-  const formDataToVendorRecord = (formData: VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> }, userId: string | null) => {
+  const formDataToVendorRecord = (formData: VendorFormDataWithCustom, userId: string | null) => {
     const isIntl = formData.vendorType === 'international';
     const intl = formData.international;
 
@@ -843,7 +846,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Create or update vendor
   const saveVendorMutation = useMutation({
-    mutationFn: async (formData: VendorFormData) => {
+    mutationFn: async (formData: VendorFormDataWithCustom) => {
       // Resolve the auth user with server-side validation. getSession() only
       // returns the locally cached JWT — if that JWT's `sub` points to a user
       // that was deleted/recreated server-side, inserting with it will violate
@@ -905,9 +908,19 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         is_msme_registered: false,
       } : {};
 
+      // Remember which KYC sections already have verified data so reopening a
+      // draft shows them as Verified instead of re-running OCR / validation.
+      // Only 'passed' flags are written — never downgrade an existing status.
+      const draftVerificationStatuses: Record<string, string> = {};
+      if (formData.statutory?.gstin) draftVerificationStatuses.gst_verification_status = 'passed';
+      if (formData.statutory?.pan) draftVerificationStatuses.pan_verification_status = 'passed';
+      if (formData.statutory?.msmeNumber) draftVerificationStatuses.msme_verification_status = 'passed';
+      if (formData.bank?.accountNumber && formData.bank?.ifscCode) draftVerificationStatuses.bank_verification_status = 'passed';
+
       const vendorData: VendorRecord = {
         ...baseRecord,
         ...intlOverrides,
+        ...draftVerificationStatuses,
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
@@ -1183,7 +1196,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Submit vendor for validation
   const submitVendorMutation = useMutation({
-    mutationFn: async (formData: VendorFormData) => {
+    mutationFn: async (formData: VendorFormDataWithCustom) => {
       const vendor = await saveVendorMutation.mutateAsync(formData);
 
       // Set verification statuses directly in the vendors table
@@ -1391,7 +1404,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   // Resubmit vendor after editing
   const resubmitVendorMutation = useMutation({
-    mutationFn: async (formData: VendorFormData) => {
+    mutationFn: async (formData: VendorFormDataWithCustom) => {
       if (!vendorId) throw new Error('No vendor to resubmit');
       if (!canEdit) throw new Error('Vendor cannot be edited in current status');
 

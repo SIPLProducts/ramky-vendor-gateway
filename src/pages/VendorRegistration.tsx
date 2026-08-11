@@ -804,18 +804,27 @@ export default function VendorRegistration() {
             const nextStep = filledSteps.length > 0 ? Math.min(...allSteps.filter(s => !filledSteps.includes(s))) : 1;
             setCurrentStep(isReturned ? 5 : (nextStep || 5));
           } else {
-            // Step 1 = doc verification — pre-seed verifiedData if we have key fields
+            // Step 1 = doc verification — restore whatever was already captured.
+            // Each KYC block is rebuilt independently so partial progress
+            // (e.g. only GST done) comes back verified without re-running OCR.
             let step1Seed: VerifiedDocumentData | undefined = undefined;
-            if (existingFormData.statutory?.pan && existingFormData.bank?.accountNumber) {
+            const st = existingFormData.statutory;
+            const bk = existingFormData.bank;
+            const hasAnyKyc = !!(st?.gstin || st?.pan || st?.msmeNumber || bk?.accountNumber
+              || st?.gstCertificateFile || st?.panCardFile || st?.msmeCertificateFile || bk?.cancelledChequeFile
+              || st?.isGstRegistered === false || st?.isMsmeRegistered === false);
+            if (hasAnyKyc) {
               step1Seed = {
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
-                pan: {
-                  number: existingFormData.statutory.pan,
-                  holderName: existingFormData.organization?.legalName || '',
-                  apiName: existingFormData.organization?.legalName || '',
-                  nameMatchScore: 100,
-                },
+                pan: existingFormData.statutory?.pan
+                  ? {
+                      number: existingFormData.statutory.pan,
+                      holderName: existingFormData.organization?.legalName || '',
+                      apiName: existingFormData.organization?.legalName || '',
+                      nameMatchScore: 100,
+                    }
+                  : undefined,
                 panStatus: existingFormData.statutory.panStatus ?? null,
                 panAadhaarLinked: existingFormData.statutory.panAadhaarLinked ?? null,
                 panComprehensiveVerifiedAt: existingFormData.statutory.panComprehensiveVerifiedAt ?? null,
@@ -853,15 +862,17 @@ export default function VendorRegistration() {
                 msmeCertificateFile: existingFormData.statutory?.msmeCertificateFile ?? null,
                 msmeSelfDeclarationFile: existingFormData.statutory?.msmeSelfDeclarationFile ?? null,
                 msmeDeclarationReason: existingFormData.statutory?.msmeDeclarationReason || '',
-                bank: {
-                  accountNumber: existingFormData.bank.accountNumber,
-                  ifsc: existingFormData.bank.ifscCode || '',
-                  bankName: existingFormData.bank.bankName || '',
-                  branchName: existingFormData.bank.branchName || '',
-                  accountHolderName: existingFormData.organization?.legalName || '',
-                  accountType: existingFormData.bank.accountType || 'current',
-                  bankAddress: existingFormData.bank.bankAddress || '',
-                },
+                bank: existingFormData.bank?.accountNumber
+                  ? {
+                      accountNumber: existingFormData.bank.accountNumber,
+                      ifsc: existingFormData.bank.ifscCode || '',
+                      bankName: existingFormData.bank.bankName || '',
+                      branchName: existingFormData.bank.branchName || '',
+                      accountHolderName: existingFormData.organization?.legalName || '',
+                      accountType: existingFormData.bank.accountType || 'current',
+                      bankAddress: existingFormData.bank.bankAddress || '',
+                    }
+                  : undefined,
                 cancelledChequeFile: existingFormData.bank?.cancelledChequeFile ?? null,
                 bank2: existingFormData.bank?.secondary?.enabled && existingFormData.bank.secondary?.accountNumber
                   ? {
@@ -946,14 +957,14 @@ export default function VendorRegistration() {
       return;
     }
 
-    const hash = JSON.stringify(formData);
+    const hash = JSON.stringify({ formData, customFieldValues });
     if (hash === lastSavedHashRef.current) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(async () => {
       try {
         setAutoSaveState('saving');
-        await saveVendor(formData);
+        await saveVendor({ ...formData, customFieldValues });
         lastSavedHashRef.current = hash;
         setLastSavedAt(new Date());
         setAutoSaveState('saved');
@@ -966,7 +977,7 @@ export default function VendorRegistration() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [formData, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
+  }, [formData, customFieldValues, invitationToken, vendorId, isLoadingVendor, isValidatingToken, isSubmitted, saveVendor, existingFormData]);
 
   // Warn on refresh / tab-close if there are unsaved changes.
   // Compares the current formData hash to the last auto-saved hash — silent
@@ -1397,10 +1408,12 @@ export default function VendorRegistration() {
       setAutoSaveState('saving');
       // On Step 1, build payload from the freshest lifted snapshot so we don't
       // miss the user's latest OCR edit / verification (state may not have flushed yet).
-      const payload =
+      const base =
         currentStep === 1 && latestStep1DataRef.current
           ? mergeVerifiedDataIntoForm(formData, latestStep1DataRef.current)
           : formData;
+      // Custom (admin-defined) tabs live in separate state — persist them too.
+      const payload = { ...base, customFieldValues };
       await saveVendor(payload);
       lastSavedHashRef.current = JSON.stringify(payload);
       setLastSavedAt(new Date());
@@ -1442,9 +1455,10 @@ export default function VendorRegistration() {
       }
     }
     try {
+      const submitPayload = { ...formData, customFieldValues } as VendorFormData;
       const vendor = isEditMode && vendorId
-        ? await resubmitVendor(formData)
-        : await submitVendor(formData);
+        ? await resubmitVendor(submitPayload)
+        : await submitVendor(submitPayload);
 
       setSubmittedReferenceNumber((vendor as any)?.reference_number ?? null);
 
