@@ -1442,9 +1442,10 @@ export default function VendorRegistration() {
       }
     }
     try {
+      const submitPayload = { ...formData, customFieldValues } as VendorFormData;
       const vendor = isEditMode && vendorId
-        ? await resubmitVendor(formData)
-        : await submitVendor(formData);
+        ? await resubmitVendor(submitPayload)
+        : await submitVendor(submitPayload);
 
       setSubmittedReferenceNumber((vendor as any)?.reference_number ?? null);
 
