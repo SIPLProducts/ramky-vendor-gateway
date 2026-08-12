@@ -40,7 +40,9 @@ echo ">> Host function files"
 check_file "$FN_DST/main/index.ts"
 check_file "$FN_DST/upload-vendor-document/index.ts"
 check_file "$FN_DST/kyc-api-execute/index.ts"
+check_file "$FN_DST/fetch-tenants-from-sap/index.ts"
 check_file "$FN_DST/_shared/auth.ts"
+
 
 echo ""
 echo ">> Function folders on host"
