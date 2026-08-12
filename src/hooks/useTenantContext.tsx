@@ -220,7 +220,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const seesAllTenants = isSuperAdmin;
 
   const { data: myTenants = [], isLoading } = useQuery({
-    queryKey: ['my-tenants', user?.id, seesAllTenants],
+    queryKey: ['my-tenants', user?.id, seesAllTenants, isCrossTenantReviewer],
     queryFn: async (): Promise<TenantOption[]> => {
       if (!user?.id) return [];
 
