@@ -65,6 +65,7 @@ if [[ -f "$COMPOSE_FILE" ]]; then
       /home/deno/functions/main/index.ts \
       /home/deno/functions/upload-vendor-document/index.ts \
       /home/deno/functions/kyc-api-execute/index.ts \
+      /home/deno/functions/fetch-tenants-from-sap/index.ts \
       /home/deno/functions/_shared/auth.ts
     do
       if [ -f "$f" ]; then echo "OK   $f"; else echo "MISS $f"; fi
@@ -75,11 +76,25 @@ if [[ -f "$COMPOSE_FILE" ]]; then
 fi
 
 echo ""
+echo ">> Worker boot / parse errors in recent logs"
+if [[ -f "$COMPOSE_FILE" ]]; then
+  if docker compose -f "$COMPOSE_FILE" logs --tail=300 functions 2>/dev/null | \
+       grep -E 'InvalidWorkerCreation|could not be parsed|Expression expected|failed to bootstrap runtime'; then
+    echo "-> A function failed to boot because its source could not be parsed."
+    echo "   Fix the file named in the error, then redeploy with scripts/selfhost/deploy-latest.sh."
+    status=1
+  else
+    echo "No worker boot/parse errors found in the last 300 log lines."
+  fi
+fi
+
+echo ""
 echo ">> Recent functions logs"
 if [[ -f "$COMPOSE_FILE" ]]; then
   docker compose -f "$COMPOSE_FILE" logs --tail=120 functions | \
-    grep -E 'main function|serving the request|InvalidWorkerCreation|entrypoint|upload-vendor-document|kyc-api-execute' || true
+    grep -E 'main function|serving the request|InvalidWorkerCreation|entrypoint|upload-vendor-document|kyc-api-execute|fetch-tenants-from-sap' || true
 fi
+
 
 echo ""
 if [[ $status -eq 0 ]]; then
