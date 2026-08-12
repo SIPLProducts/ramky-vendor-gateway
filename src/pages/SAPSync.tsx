@@ -31,6 +31,8 @@ import { SapFieldsDialog, SapFieldOverrides } from '@/components/sap/SapFieldsDi
 import { MultipleSapSyncDialog } from '@/components/sap/MultipleSapSyncDialog';
 import { ApprovalCommentsDialog } from '@/components/sap/ApprovalCommentsDialog';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
+import { useTenantContext } from '@/hooks/useTenantContext';
+
 import { getSapVenClass } from '@/lib/sapPayloadBuilder';
 import { formatVendorName } from '@/lib/textCase';
 import { supabase } from '@/integrations/supabase/client';
