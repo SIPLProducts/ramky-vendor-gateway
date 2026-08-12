@@ -103,19 +103,15 @@ export function EditUserDialog({
     }
   };
 
-  // Resolve fetched SAP tenants -> local tenant IDs (upsert by code).
+  // Resolve fetched SAP tenants -> local tenant IDs (server-side upsert by code).
   const resolveSapTenantIds = async (list: SapTenant[]): Promise<string[]> => {
     if (list.length === 0) return [];
-    const rows = list.map((t) => ({ code: t.code, name: t.name, is_active: true }));
-    const { error: upErr } = await supabase
-      .from('tenants')
-      .upsert(rows, { onConflict: 'code', ignoreDuplicates: false });
-    if (upErr) throw upErr;
-    const codes = list.map((t) => t.code);
-    const { data: tRows, error: fErr } = await supabase
-      .from('tenants').select('id, code').in('code', codes);
-    if (fErr) throw fErr;
-    return (tRows ?? []).map((r: any) => r.id);
+    const { data, error } = await supabase.functions.invoke('resolve-sap-tenants', {
+      body: { sap_tenants: list.map((t) => ({ code: t.code, name: t.name })) },
+    });
+    if (error) throw new Error(error.message || 'Could not save SAP tenants.');
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return ((data as any)?.tenant_ids ?? []) as string[];
   };
 
   const handleSave = async () => {
