@@ -1,34 +1,29 @@
-# Fix DEV SAP Sync 404 + clearer SAP error messages
+# Fix "row-level security policy for table tenants" when saving a user
 
-## What the response actually says
+## Why it happens (confirmed in code)
 
-The failure is not in the app or the middleware routing. The request travelled all the way to SAP, and **SAP itself replied with its "Service cannot be reached — 404 Not found" HTML page**. That means the SAP service URL the DEV middleware forwards to does not exist on the DEV SAP system (wrong path, wrong port, wrong `sap-client`, or the ICF service is not activated there).
+Creating and editing a user take two different paths:
 
-The message you see, `Middleware error: HTTP 200`, is misleading: the middleware answered fine (HTTP 200) and reported `ok:false` with SAP's real 404 inside. Our code only prints its own HTTP status, so the SAP status is lost.
+- **Create user** — the browser sends the fetched SAP tenants to the `admin-create-user` backend function, which upserts them into the `tenants` table with admin privileges. That always works.
+- **Edit user** — `EditUserDialog` upserts into `tenants` **directly from the browser**, as the logged-in user.
 
-## Part 1 — Configuration fix (server side, DEV)
+The `tenants` table only allows writes to `sharvi_admin`, the built-in `admin` role, or a user holding the `sharvi_admin_console` screen permission. The account you use in DEV is an admin-type custom role without that permission, so Postgres rejects the write with code 42501. In production the account you edit with is a built-in admin, so it slips through — same code, different account, which is why it looks environment-specific.
 
-On the DEV box, `middleware/.env` currently points `SAP_BP_API_URL` (and `SAP_DMS_API_URL`) at a path the DEV SAP system does not serve. Confirm with the SAP Basis team the correct DEV values, for example:
+## The fix
 
-```text
-SAP_BP_API_URL=http://<dev-sap-host>:<port>/vendor/bp/create?sap-client=<dev-client>
-SAP_DMS_API_URL=http://<dev-sap-host>:<port>/vendor/dms/upload?sap-client=<dev-client>
-```
+Make the edit path work like the create path: resolve SAP tenants on the server, never from the browser.
 
-Then restart the DEV middleware (`pm2 restart vms-dev-middleware`). Quick check before retrying from the app: `curl -i -u <user>:<pass> -X POST "<SAP_BP_API_URL>" -H 'Content-Type: application/json' -d '[]'` — an HTML 404 page means the URL is still wrong; JSON back means it is right.
+1. **New backend function `resolve-sap-tenants`**
+   - Validates the caller's token and requires the same authority as user management (`sharvi_admin`, `admin`, or the `user_management` screen permission); otherwise 403.
+   - Accepts `{ sap_tenants: [{ code, name }] }`, upserts them into `tenants` by `code` with admin privileges, and returns the matching tenant ids.
 
-Note: PROD works because its `.env` points at the correct PROD SAP service. Only the DEV `.env` needs correcting.
+2. **`src/components/admin/EditUserDialog.tsx`**
+   - Replace the direct `supabase.from('tenants').upsert(...)` in `resolveSapTenantIds` with a call to the new function, and surface a clear message if it returns 403 instead of the raw Postgres error.
 
-## Part 2 — Code change: report SAP's real status, not the middleware's
+3. **Same-turn deploy** of the new function so DEV picks it up.
 
-So this class of problem is self-explaining next time, in both sync paths:
+No RLS policy is loosened — tenant writes stay restricted, they just happen server-side after an explicit permission check.
 
-- `supabase/functions/sync-vendor-to-sap/index.ts` — when the middleware wrapper returns `ok:false`, use `sapStatus` from the wrapper in the message (e.g. `SAP returned HTTP 404 for <target URL> — the SAP service path is wrong or not activated`) instead of `HTTP 200`.
-- Detect an HTML body in `sapResponse` (starts with `<html`) and replace the raw markup in the dialog with a short line: `SAP returned an HTML error page (404 Not found) instead of JSON — check SAP_BP_API_URL in middleware/.env.`
-- `supabase/functions/sync-vendor-to-dms/index.ts` — apply the same two rules for the DMS path, and keep the per-document counts intact.
-- `middleware/server.js` — include the SAP target URL in the `ok:false` response for `/sap/bp/create` and `/sap/dms/upload` (it is already logged; adding it to the body makes the dialog actionable). No secrets are included.
+## Note on DEV vs PROD
 
-## Result
-
-- After the DEV `.env` correction, SAP Sync and DMS Sync work in DEV as they do in PROD.
-- If an SAP path is ever wrong again, the dialog says "SAP returned HTTP 404 for <url>" instead of an HTML dump and a confusing `HTTP 200`.
+If you also want the DEV account to behave like an admin elsewhere, grant its custom role the `sharvi_admin_console` screen permission — but that is optional; the fix above makes user editing work regardless of which admin-type role saves the record.
