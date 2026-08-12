@@ -501,15 +501,16 @@ export default function SAPSync() {
             <Input placeholder="Search vendors..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-11 h-11 rounded-xl" />
           </div>
           <TenantCombobox
-            tenants={buyerCompanies ?? []}
+            tenants={(myTenants?.length ? myTenants : (buyerCompanies ?? [])) as any}
             value={buyerCompanyFilter === 'all' ? null : buyerCompanyFilter}
             onChange={(id) => setBuyerCompanyFilter(id ?? 'all')}
             allowAll
-            allLabel="All Buyer Companies"
-            placeholder="Filter by buyer"
+            allLabel="All Tenants"
+            placeholder="Filter by tenant"
             className="w-56"
             triggerClassName="h-11 rounded-xl"
           />
+
         </div>
       </div>
 
