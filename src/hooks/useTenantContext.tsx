@@ -215,15 +215,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const seesAllTenants = isSuperAdmin || isCrossTenantReviewer;
+  // Admins see every active tenant. SAP Team is now scoped to the tenants assigned to
+  // them in User Management (with a fallback to all tenants when nothing is assigned).
+  const seesAllTenants = isSuperAdmin;
 
-  // Load tenants the user belongs to (super admins & SAP Team see ALL active tenants).
   const { data: myTenants = [], isLoading } = useQuery({
     queryKey: ['my-tenants', user?.id, seesAllTenants],
     queryFn: async (): Promise<TenantOption[]> => {
       if (!user?.id) return [];
 
-      if (seesAllTenants) {
+      const loadAll = async (): Promise<TenantOption[]> => {
         const { data, error } = await supabase
           .from('tenants')
           .select('id, name, code')
@@ -231,7 +232,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           .order('name');
         if (error) throw error;
         return data || [];
-      }
+      };
+
+      if (seesAllTenants) return loadAll();
 
       const { data, error } = await supabase
         .from('user_tenants')
@@ -239,13 +242,18 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         .eq('user_id', user.id);
       if (error) throw error;
 
-      return (data || [])
+      const assigned = (data || [])
         .map((row: any) => row.tenants)
         .filter((t: any) => t && t.is_active)
         .map((t: any) => ({ id: t.id, name: t.name, code: t.code }));
+
+      // SAP Team without explicit assignments keeps full visibility (sync must not break).
+      if (assigned.length === 0 && isCrossTenantReviewer) return loadAll();
+      return assigned;
     },
     enabled: !!user?.id,
   });
+
 
   const myTenantIds = useMemo(() => myTenants.map((t) => t.id), [myTenants]);
 
