@@ -135,9 +135,13 @@ export default function SAPSync() {
   const { data: dmsVendors, isLoading: dmsLoading, refetch: refetchDms } = useVendors(['dms_sync_pending', 'dms_synced']);
   const { data: rejectedVendors, isLoading: rejectedLoading, refetch: refetchRejected } = useVendors(['sap_team_closed' as any, 'sap_team_rejected' as any]);
   const { data: buyerCompanies } = useBuyerCompanies();
+  const { myTenants, myTenantIds } = useTenantContext();
   const sapSync = useSAPSync();
   const bulkSync = useMultipleSAPSync();
   const dmsSync = useDMSSync();
+
+  // Tenants assigned to the signed-in user (User Management). Empty = no restriction.
+  const scopedTenantIds = useMemo(() => new Set(myTenantIds), [myTenantIds]);
 
   const filterFn = (vendor: VendorRow) => {
     const q = searchTerm.toLowerCase();
@@ -147,14 +151,17 @@ export default function SAPSync() {
       ((vendor as any).account_holder_name || '').toLowerCase().includes(q) ||
       (vendor.gstin || '').toLowerCase().includes(q) ||
       vendor.id.toLowerCase().includes(q);
+    const inScope =
+      scopedTenantIds.size === 0 || !vendor.tenant_id || scopedTenantIds.has(vendor.tenant_id);
     const matchesBuyer = buyerCompanyFilter === 'all' || vendor.tenant_id === buyerCompanyFilter;
-    return matchesSearch && matchesBuyer;
+    return matchesSearch && matchesBuyer && inScope;
   };
 
 
   const filteredSap = (sapVendors || []).filter(filterFn);
   const filteredDms = (dmsVendors || []).filter(filterFn);
   const filteredRejected = (rejectedVendors || []).filter(filterFn);
+
 
   const refreshAllLists = () => { refetch(); refetchDms(); refetchRejected(); };
 
