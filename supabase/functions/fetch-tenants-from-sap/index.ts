@@ -298,8 +298,8 @@ Deno.serve(async (req) => {
           } else {
             errorHint = `Called ${proxyUrl}.`;
           }
-        }
         } else {
+
           let wrapper: any = null;
           try { wrapper = JSON.parse(text); }
           catch { networkError = `Invalid JSON from middleware: ${text.slice(0, 200)}`; }

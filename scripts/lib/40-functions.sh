@@ -84,8 +84,35 @@ verify_function_entrypoint "main"
 verify_function_entrypoint "upload-vendor-document"
 verify_function_entrypoint "kyc-api-execute"
 verify_function_entrypoint "log-login-attempt"
+verify_function_entrypoint "fetch-tenants-from-sap"
+
+# --- Syntax gate: a function that cannot be parsed makes edge-runtime fail at
+# boot with "InvalidWorkerCreation: ... The module's source code could not be
+# parsed". Catch that here, before the container is recreated.
+if command -v deno >/dev/null 2>&1; then
+  log "Checking edge function syntax with deno"
+  syntax_failed=0
+  while IFS= read -r fn_entry; do
+    if ! deno check --no-lock "$fn_entry" >/tmp/deno-check.out 2>&1; then
+      if grep -qi "could not be parsed\|Expression expected\|Unexpected token" /tmp/deno-check.out; then
+        echo "ERROR: syntax error in $fn_entry" >&2
+        tail -n 20 /tmp/deno-check.out >&2
+        syntax_failed=1
+      else
+        echo "  (type-only warnings in $fn_entry — ignored)"
+      fi
+    fi
+  done < <(find "$FN_DST" -mindepth 2 -maxdepth 2 -name index.ts)
+  if [[ $syntax_failed -eq 1 ]]; then
+    echo "Aborting: fix the syntax error(s) above before deploying." >&2
+    exit 1
+  fi
+else
+  echo "  deno not installed — skipping syntax gate (install deno to enable it)"
+fi
 
 ls -1 "$FN_DST" | sed 's/^/  fn: /' || true
+
 
 # --- Raise edge-runtime supervisor limits so long SAP calls (~35s+) don't
 # get killed with "WorkerRequestCancelled: request has been cancelled by
