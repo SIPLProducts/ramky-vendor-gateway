@@ -26,7 +26,8 @@ import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 import vendorTypeBg from '@/assets/vendor-type-bg.png';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';

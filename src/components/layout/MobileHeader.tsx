@@ -26,7 +26,8 @@ import {
 } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';

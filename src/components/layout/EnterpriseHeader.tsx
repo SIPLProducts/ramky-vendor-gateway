@@ -6,7 +6,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import { useAuth } from '@/hooks/useAuth';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 
 interface EnterpriseHeaderProps {
   showHelp?: boolean;

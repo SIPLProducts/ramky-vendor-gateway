@@ -5,7 +5,8 @@ import { CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, ShieldCheck, Ban, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 
 type Phase = 'loading' | 'redirecting' | 'denied' | 'error';
 
