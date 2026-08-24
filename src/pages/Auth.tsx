@@ -84,7 +84,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-gradient-to-br from-[hsl(210_60%_98%)] via-[hsl(205_55%_96%)] to-[hsl(210_40%_99%)]">
+    <div className="login-theme relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-gradient-to-br from-[hsl(210_60%_98%)] via-[hsl(205_55%_96%)] to-[hsl(210_40%_99%)]">
       {/* Top-right logo */}
       <div className="absolute top-5 right-8 z-10 hidden md:block">
         <img src={ramkyLogo} alt="Ramky Group" className="h-14 w-auto object-contain" />
