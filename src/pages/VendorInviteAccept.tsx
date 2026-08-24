@@ -5,7 +5,8 @@ import { CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, AlertCircle, ShieldCheck, Ban, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 
 type Phase = 'loading' | 'redirecting' | 'denied' | 'error';
 
@@ -211,10 +212,10 @@ export default function VendorInviteAccept() {
           }
 
           const friendly: Record<string, string> = {
-            smtp_not_configured: "Email service isn't configured yet. Please contact vendxsupport@ramky.com.",
-            smtp_send_failed: "We couldn't send the verification email. Please contact vendxsupport@ramky.com.",
-            generate_link_failed: "We couldn't generate your secure link. Please contact vendxsupport@ramky.com.",
-            provision_failed: "We couldn't prepare your account. Please contact vendxsupport@ramky.com.",
+            smtp_not_configured: "Email service isn't configured yet. Please contact vypaarsupport@ramky.com.",
+            smtp_send_failed: "We couldn't send the verification email. Please contact vypaarsupport@ramky.com.",
+            generate_link_failed: "We couldn't generate your secure link. Please contact vypaarsupport@ramky.com.",
+            provision_failed: "We couldn't prepare your account. Please contact vypaarsupport@ramky.com.",
             rate_limited: 'Too many verification emails were sent. Please try again in an hour.',
             env_missing: 'Server is missing required configuration. Please contact support.',
           };
@@ -252,10 +253,10 @@ export default function VendorInviteAccept() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="h-16 border-b bg-white px-6 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Vendor Portal" className="h-10 w-auto object-contain" />
-          <span className="text-sm font-semibold text-black">Vendor Portal</span>
+      <header className="h-16 border-b bg-white px-6 flex items-center justify-end">
+        <div className="flex items-center gap-3 flex-row-reverse">
+          <img src={ramkyLogo} alt="Vypaar Portal" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-semibold text-black">Vypaar Portal</span>
         </div>
       </header>
 
@@ -293,8 +294,8 @@ export default function VendorInviteAccept() {
               <CardContent className="text-center">
                 <p className="text-sm text-muted-foreground">
                   If you believe this is a mistake, please contact{' '}
-                  <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
-                    vendxsupport@ramky.com
+                  <a href="mailto:vypaarsupport@ramky.com" className="text-primary hover:underline">
+                    vypaarsupport@ramky.com
                   </a>.
                 </p>
               </CardContent>
@@ -329,8 +330,8 @@ export default function VendorInviteAccept() {
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
                   Please contact{' '}
-                  <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
-                    vendxsupport@ramky.com
+                  <a href="mailto:vypaarsupport@ramky.com" className="text-primary hover:underline">
+                    vypaarsupport@ramky.com
                   </a>{' '}
                   for help.
                 </p>

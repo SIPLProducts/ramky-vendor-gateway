@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import ramkyLogo from '@/assets/ramky-logo.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 
 export default function VendorLogin() {
   const [searchParams] = useSearchParams();
@@ -48,10 +49,10 @@ export default function VendorLogin() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
-      <header className="h-16 border-b bg-white px-6 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <img src={ramkyLogo} alt="Vendor Portal" className="h-10 w-auto object-contain" />
-          <span className="text-sm font-semibold text-black">Vendor Portal</span>
+      <header className="h-16 border-b bg-white px-6 flex items-center justify-end">
+        <div className="flex items-center gap-3 flex-row-reverse">
+          <img src={ramkyLogo} alt="Vypaar Portal" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-semibold text-black">Vypaar Portal</span>
         </div>
       </header>
 
@@ -124,10 +125,10 @@ export default function VendorLogin() {
               <p className="text-xs text-center text-muted-foreground">
                 Having trouble? Contact{' '}
                 <a
-                  href="mailto:vendxsupport@ramky.com"
+                  href="mailto:vypaarsupport@ramky.com"
                   className="text-primary hover:underline"
                 >
-                  vendxsupport@ramky.com
+                  vypaarsupport@ramky.com
                 </a>
               </p>
             </div>

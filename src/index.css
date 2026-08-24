@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Enterprise Vendor Portal - SAP Fiori Inspired Design System */
+/* Enterprise Vypaar Portal - SAP Fiori Inspired Design System */
 
 @layer base {
   :root {
@@ -698,3 +698,24 @@ textarea::placeholder {
   }
 }
 
+
+/* Ramky brand watermark background (login + registration main body) */
+@layer utilities {
+  .ramky-brand-bg {
+    position: relative;
+    isolation: isolate;
+    background-color: hsl(210 20% 97%);
+  }
+  .ramky-brand-bg::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: url("/__l5e/assets-v1/d17e30d7-0d08-43ed-94d6-0db9180a7bdd/ramky-group-logo.jpg");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: min(60vw, 620px);
+    opacity: 0.12;
+    pointer-events: none;
+  }
+}

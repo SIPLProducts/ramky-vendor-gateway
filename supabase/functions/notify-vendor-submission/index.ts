@@ -12,8 +12,8 @@ interface Body {
   resubmission?: boolean;
 }
 
-const supportEmail = "vendxsupport@ramky.com";
-const companyName = "Ramky Vendor Portal";
+const supportEmail = "vypaarsupport@ramky.com";
+const companyName = "Ramky Vypaar Portal";
 
 function buildHtml(opts: {
   inviterFirstName: string;
@@ -61,7 +61,7 @@ function buildHtml(opts: {
           </table>
 
           <p style="margin:0 0 24px;font-size:13px;line-height:1.7;color:#4a5568;">
-            You can review the application in the Ramky Vendor Portal. If you have any questions, please contact
+            You can review the application in the Ramky Vypaar Portal. If you have any questions, please contact
             <a href="mailto:${supportEmail}" style="color:#1e3a5f;text-decoration:none;font-weight:600;">${supportEmail}</a>.
           </p>
 

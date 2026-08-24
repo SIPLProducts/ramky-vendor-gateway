@@ -26,8 +26,8 @@ import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import ramkyLogo from '@/assets/ramky-logo.png';
-import vendorTypeBg from '@/assets/vendor-type-bg.png';
+import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
+const ramkyLogo = ramkyLogoAsset.url;
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1615,14 +1615,14 @@ export default function VendorRegistration() {
       <div className="min-h-screen bg-background">
         <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
           {isTokenMode ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-row-reverse order-last ml-auto">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black">Vypaar Portal</span>
             </div>
           ) : (
-            <Link to="/" className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-3 flex-row-reverse order-last ml-auto">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
         </header>
@@ -1652,31 +1652,22 @@ export default function VendorRegistration() {
       setCurrentStep(1);
     };
     return (
-      <div
-        className="h-screen overflow-hidden flex flex-col"
-        style={{
-          backgroundImage: `url(${vendorTypeBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed',
-        }}
-      >
+      <div className="ramky-brand-bg h-screen overflow-hidden flex flex-col">
         <header className="h-16 shrink-0 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-row-reverse order-last ml-auto">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
               <span className="text-sm font-semibold text-black">Vendor Registration</span>
             </div>
           ) : (
-            <Link to="/" className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-3 flex-row-reverse order-last ml-auto">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
         </header>
         <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-center p-1.5 sm:p-2 overflow-hidden">
-          <div className="relative w-[min(92vw,260px)] rounded-[12px] bg-white/10 backdrop-blur-sm border border-white/40 shadow-2xl flex flex-col">
+          <div className="relative w-[min(92vw,280px)] rounded-[12px] bg-white/85 backdrop-blur-sm border border-border shadow-2xl flex flex-col">
             <div className="relative p-2 space-y-0.5 flex flex-col overflow-hidden min-w-0">
 
               {isTokenMode && invitationEmail && (
@@ -1687,7 +1678,7 @@ export default function VendorRegistration() {
                 </div>
               )}
               <div className="shrink-0">
-                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-white leading-tight">Select Vendor Type</h1>
+                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-slate-900 leading-tight">Select Vendor Type</h1>
               </div>
 
               <VendorTypeSelector
@@ -1715,18 +1706,18 @@ export default function VendorRegistration() {
 
 
   return (
-    <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
+    <div className="ramky-brand-bg min-h-screen flex flex-col">
       {/* Header */}
       <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         {isTokenMode ? (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-row-reverse order-last">
             <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
             <span className="text-sm font-semibold text-black">Vendor Registration</span>
           </div>
         ) : (
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3 flex-row-reverse order-last">
             <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-            <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+            <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
           </Link>
         )}
         <div className="flex items-center gap-4">
