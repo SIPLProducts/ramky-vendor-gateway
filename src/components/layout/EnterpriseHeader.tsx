@@ -32,20 +32,12 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
 
   return (
     <header className="h-14 border-b bg-card/80 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 shadow-enterprise-sm">
-      <div className="flex items-center gap-4 order-last">
-        <Link to="/" className="flex items-center gap-3 flex-row-reverse order-last">
-          <img
-            src={ramkyLogo}
-            alt="Ramky"
-            className="h-10 w-auto object-contain"
-          />
-          <div className="hidden sm:block">
-            <span className="text-sm font-semibold text-foreground">Vypaar Portal</span>
-          </div>
-        </Link>
-      </div>
+      <Link to="/" className="flex items-center">
+        <span className="text-sm font-semibold text-foreground">Vypaar Portal</span>
+      </Link>
 
       <div className="flex items-center gap-2">
+
         {showSwitcher && (
           isBuyerRole ? (
             <TenantCombobox
