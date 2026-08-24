@@ -1679,7 +1679,7 @@ export default function VendorRegistration() {
                 </div>
               )}
               <div className="shrink-0">
-                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-white leading-tight">Select Vendor Type</h1>
+                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-slate-900 leading-tight">Select Vendor Type</h1>
               </div>
 
               <VendorTypeSelector
