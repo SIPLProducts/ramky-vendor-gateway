@@ -84,22 +84,22 @@ export default function Auth() {
 
   return (
     <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-gradient-to-br from-[hsl(210_60%_98%)] via-[hsl(205_55%_96%)] to-[hsl(210_40%_99%)]">
-      {/* Faint brand watermark, lower-left */}
-      <img
-        src={ramkyLogo}
-        alt=""
-        aria-hidden
-        className="pointer-events-none select-none absolute left-6 bottom-16 w-[28rem] max-w-[40vw] opacity-[0.14]"
-      />
-
       {/* Top-right logo */}
       <div className="absolute top-5 right-8 z-10 hidden md:block">
         <img src={ramkyLogo} alt="Ramky Group" className="h-14 w-auto object-contain" />
       </div>
 
       {/* Left Panel — Branding */}
-      <div className="relative hidden md:flex md:w-1/2 lg:w-[55%] flex-col justify-center px-10 lg:px-20">
-        <div className="max-w-md">
+      <div className="relative hidden md:flex md:w-1/2 lg:w-[55%] flex-col justify-center px-10 lg:px-20 overflow-hidden">
+        {/* Faint brand watermark, contained in this panel */}
+        <img
+          src={ramkyLogo}
+          alt=""
+          aria-hidden
+          className="pointer-events-none select-none absolute left-10 lg:left-20 bottom-10 w-[38%] max-w-[16rem] h-auto object-contain object-left opacity-[0.09]"
+        />
+
+        <div className="relative z-10 max-w-md">
           <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-foreground mb-5">
             Building Tomorrow's<br />Infrastructure Today
           </h2>
@@ -108,6 +108,7 @@ export default function Auth() {
           </p>
         </div>
       </div>
+
 
 
       {/* Right Panel — Auth Form */}
