@@ -28,7 +28,6 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
 const ramkyLogo = ramkyLogoAsset.url;
-import vendorTypeBg from '@/assets/vendor-type-bg.png';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1707,7 +1706,7 @@ export default function VendorRegistration() {
 
 
   return (
-    <div className="min-h-screen bg-[hsl(210,20%,97%)] flex flex-col">
+    <div className="ramky-brand-bg min-h-screen flex flex-col">
       {/* Header */}
       <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         {isTokenMode ? (
