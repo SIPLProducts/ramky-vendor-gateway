@@ -84,20 +84,39 @@ export default function Auth() {
   }
 
   return (
-    <div className="login-theme ramky-brand-bg min-h-screen flex flex-col">
-      {/* Logo — top right */}
-      <div className="w-full flex justify-end p-4 sm:p-6">
-        <img
-          src={ramkyLogo}
-          alt="Ramky Group"
-          className="h-14 sm:h-16 w-auto object-contain"
-        />
+    <div className="min-h-screen flex flex-col md:flex-row bg-background">
+      {/* Left Panel — Branding */}
+      <div className="hidden md:flex md:w-1/2 lg:w-[55%] bg-slate-50 flex-col items-center justify-center p-8 lg:p-16">
+        <div className="max-w-md text-center">
+          <img
+            src={ramkyLogo}
+            alt="Ramky Group"
+            className="h-28 lg:h-36 w-auto object-contain mx-auto mb-8"
+          />
+          <h2 className="text-3xl lg:text-4xl font-semibold text-foreground mb-4">
+            Vypaar Portal
+          </h2>
+          <p className="text-lg text-muted-foreground mb-6">
+            Towards sustainable growth
+          </p>
+          <p className="text-base text-muted-foreground">
+            Streamlined vendor onboarding, KYC management, and procurement collaboration for the Ramky Group.
+          </p>
+        </div>
       </div>
 
-      {/* Auth Form Section */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
+      {/* Right Panel — Auth Form */}
+      <div className="w-full md:w-1/2 lg:w-[45%] flex flex-col justify-center p-6 md:p-12">
+        <div className="w-full max-w-md mx-auto">
 
+          {/* Mobile-only logo */}
+          <div className="md:hidden flex justify-center mb-8">
+            <img
+              src={ramkyLogo}
+              alt="Ramky Group"
+              className="h-16 w-auto object-contain"
+            />
+          </div>
 
           <Card className="border-0 shadow-xl">
             <CardHeader className="text-center pb-2">
