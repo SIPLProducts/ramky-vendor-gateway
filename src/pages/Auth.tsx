@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 import ramkyLogo from '@/assets/ramky-logo-transparent.png';
+import loginHero from '@/assets/login-hero-construction.jpg';
 import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
 
 
@@ -91,19 +92,20 @@ export default function Auth() {
 
       {/* Left Panel — Branding */}
       <div className="relative hidden md:flex md:w-1/2 lg:w-[55%] flex-col justify-center px-10 lg:px-20 overflow-hidden">
-        {/* Faint brand watermark, contained in this panel */}
         <img
-          src={ramkyLogo}
-          alt=""
-          aria-hidden
-          className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-h-[80%] h-auto object-contain opacity-[0.16]"
+          src={loginHero}
+          alt="Construction site at sunset"
+          width={1024}
+          height={1536}
+          className="absolute inset-0 h-full w-full object-cover"
         />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/60 to-slate-900/70" />
 
         <div className="relative z-10 max-w-md">
-          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-foreground mb-5">
+          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-primary-foreground mb-5 drop-shadow">
             Building Tomorrow's<br />Infrastructure Today
           </h2>
-          <p className="text-base text-muted-foreground max-w-sm">
+          <p className="text-base text-primary-foreground/90 max-w-sm">
             Join our network of trusted vendors and partners. Streamline your onboarding process with our secure, efficient portal.
           </p>
         </div>

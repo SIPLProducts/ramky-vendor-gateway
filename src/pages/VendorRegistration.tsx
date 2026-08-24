@@ -1665,7 +1665,7 @@ export default function VendorRegistration() {
             </Link>
           )}
         </header>
-        <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-center p-1.5 sm:p-2 overflow-hidden">
+        <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-end p-1.5 sm:p-2 sm:pr-8 lg:pr-16 overflow-hidden">
           <div className="relative w-[min(92vw,300px)] rounded-[12px] bg-white/25 backdrop-blur-[2px] border-2 border-warning shadow-lg flex flex-col">
             <div className="relative p-2 space-y-0.5 flex flex-col overflow-hidden min-w-0">
 
