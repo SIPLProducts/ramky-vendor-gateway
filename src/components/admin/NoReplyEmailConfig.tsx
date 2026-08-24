@@ -48,7 +48,7 @@ const EMPTY: Form = {
   smtp_password: "",
   smtp_encryption: "tls",
   smtp_from_email: "",
-  smtp_from_name: "Sharvi Vypaar Portal — No Reply",
+  smtp_from_name: "Sharvi Vyapaar Portal — No Reply",
   smtp_reply_to: "",
   smtp_enabled: true,
 };
@@ -177,7 +177,7 @@ export function NoReplyEmailConfig() {
       const { data, error } = await supabase.functions.invoke("send-smtp-email", {
         body: {
           to,
-          subject: "Test email from Sharvi Vypaar Portal (No Reply)",
+          subject: "Test email from Sharvi Vyapaar Portal (No Reply)",
           html: `<p>This is a test email sent using the No-Reply SMTP configuration.</p>`,
           suppressReplyTo: true,
         },
@@ -317,7 +317,7 @@ export function NoReplyEmailConfig() {
           <div className="space-y-2">
             <Label>From Name</Label>
             <Input
-              placeholder="Sharvi Vypaar Portal — No Reply"
+              placeholder="Sharvi Vyapaar Portal — No Reply"
               value={form.smtp_from_name}
               onChange={(e) => setForm((f) => ({ ...f, smtp_from_name: e.target.value }))}
             />

@@ -110,7 +110,7 @@ const organizationJsonLd = {
   "@type": "Organization",
   name: "Sharvi Infotech",
   url: SITE_URL,
-  email: "vypaarsupport@ramky.com",
+  email: "vyapaarsupport@ramky.com",
   description: DESCRIPTION,
 };
 
@@ -173,7 +173,7 @@ export default function Landing() {
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
-            <a href="mailto:vypaarsupport@ramky.com?subject=Sharvi%20Vendor%20Gateway%20demo">
+            <a href="mailto:vyapaarsupport@ramky.com?subject=Sharvi%20Vendor%20Gateway%20demo">
               <Mail className="h-4 w-4 mr-2" /> Request a demo
             </a>
           </Button>
@@ -285,8 +285,8 @@ export default function Landing() {
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Button asChild size="lg" variant="secondary">
-                <a href="mailto:vypaarsupport@ramky.com?subject=Sharvi%20Vendor%20Gateway%20demo">
-                  <Mail className="h-4 w-4 mr-2" /> Email vypaarsupport@ramky.com
+                <a href="mailto:vyapaarsupport@ramky.com?subject=Sharvi%20Vendor%20Gateway%20demo">
+                  <Mail className="h-4 w-4 mr-2" /> Email vyapaarsupport@ramky.com
                 </a>
               </Button>
               <Button asChild size="lg" variant="outline" className="bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
@@ -302,7 +302,7 @@ export default function Landing() {
         <div className="container mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground">
           <div>© {new Date().getFullYear()} Sharvi Infotech. All rights reserved.</div>
           <div className="flex items-center gap-4">
-            <a href="mailto:vypaarsupport@ramky.com" className="hover:text-foreground">vypaarsupport@ramky.com</a>
+            <a href="mailto:vyapaarsupport@ramky.com" className="hover:text-foreground">vyapaarsupport@ramky.com</a>
             <Link to="/support" className="hover:text-foreground">Support</Link>
             <Link to="/auth" className="hover:text-foreground">Sign in</Link>
           </div>

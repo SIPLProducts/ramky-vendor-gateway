@@ -88,8 +88,8 @@ export default function VendorInviteCallback() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
       <header className="h-16 border-b bg-white px-6 flex items-center justify-end">
         <div className="flex items-center gap-3 flex-row-reverse">
-          <img src={ramkyLogo} alt="Vypaar Portal" className="h-10 w-auto object-contain" />
-          <span className="text-sm font-semibold text-black">Vypaar Portal</span>
+          <img src={ramkyLogo} alt="Vyapaar Portal" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-semibold text-black">Vyapaar Portal</span>
         </div>
       </header>
       <div className="flex-1 flex items-center justify-center p-6">

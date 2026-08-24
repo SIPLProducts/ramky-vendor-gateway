@@ -894,8 +894,8 @@ serve(async (req) => {
                     ${okRow("Synced At", syncedAt)}
                   </table>
                 </div>
-                <p style="margin-top:16px;">You can review this vendor in the Ramky Vypaar Portal.</p>
-                <p>Regards,<br/>Ramky Vypaar Portal</p>
+                <p style="margin-top:16px;">You can review this vendor in the Ramky Vyapaar Portal.</p>
+                <p>Regards,<br/>Ramky Vyapaar Portal</p>
               </div>`;
             const { error: mailErr } = await supabase.functions.invoke("send-smtp-email", {
               body: { to: recipients, subject, html },

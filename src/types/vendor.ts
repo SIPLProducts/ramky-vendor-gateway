@@ -1,4 +1,4 @@
-// Vypaar Portal Types - Enterprise Vendor Registration
+// Vyapaar Portal Types - Enterprise Vendor Registration
 
 export type VendorStatus =
   | 'draft'

@@ -211,10 +211,10 @@ export default function VendorInviteAccept() {
           }
 
           const friendly: Record<string, string> = {
-            smtp_not_configured: "Email service isn't configured yet. Please contact vypaarsupport@ramky.com.",
-            smtp_send_failed: "We couldn't send the verification email. Please contact vypaarsupport@ramky.com.",
-            generate_link_failed: "We couldn't generate your secure link. Please contact vypaarsupport@ramky.com.",
-            provision_failed: "We couldn't prepare your account. Please contact vypaarsupport@ramky.com.",
+            smtp_not_configured: "Email service isn't configured yet. Please contact vyapaarsupport@ramky.com.",
+            smtp_send_failed: "We couldn't send the verification email. Please contact vyapaarsupport@ramky.com.",
+            generate_link_failed: "We couldn't generate your secure link. Please contact vyapaarsupport@ramky.com.",
+            provision_failed: "We couldn't prepare your account. Please contact vyapaarsupport@ramky.com.",
             rate_limited: 'Too many verification emails were sent. Please try again in an hour.',
             env_missing: 'Server is missing required configuration. Please contact support.',
           };
@@ -254,8 +254,8 @@ export default function VendorInviteAccept() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
       <header className="h-16 border-b bg-white px-6 flex items-center justify-end">
         <div className="flex items-center gap-3 flex-row-reverse">
-          <img src={ramkyLogo} alt="Vypaar Portal" className="h-10 w-auto object-contain" />
-          <span className="text-sm font-semibold text-black">Vypaar Portal</span>
+          <img src={ramkyLogo} alt="Vyapaar Portal" className="h-10 w-auto object-contain" />
+          <span className="text-sm font-semibold text-black">Vyapaar Portal</span>
         </div>
       </header>
 
@@ -293,8 +293,8 @@ export default function VendorInviteAccept() {
               <CardContent className="text-center">
                 <p className="text-sm text-muted-foreground">
                   If you believe this is a mistake, please contact{' '}
-                  <a href="mailto:vypaarsupport@ramky.com" className="text-primary hover:underline">
-                    vypaarsupport@ramky.com
+                  <a href="mailto:vyapaarsupport@ramky.com" className="text-primary hover:underline">
+                    vyapaarsupport@ramky.com
                   </a>.
                 </p>
               </CardContent>
@@ -329,8 +329,8 @@ export default function VendorInviteAccept() {
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
                   Please contact{' '}
-                  <a href="mailto:vypaarsupport@ramky.com" className="text-primary hover:underline">
-                    vypaarsupport@ramky.com
+                  <a href="mailto:vyapaarsupport@ramky.com" className="text-primary hover:underline">
+                    vyapaarsupport@ramky.com
                   </a>{' '}
                   for help.
                 </p>
