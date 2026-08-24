@@ -96,7 +96,7 @@ export default function Auth() {
           src={ramkyLogo}
           alt=""
           aria-hidden
-          className="pointer-events-none select-none absolute left-10 lg:left-20 bottom-12 w-[34%] max-w-[15rem] h-auto object-contain object-left opacity-[0.11]"
+          className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-h-[80%] h-auto object-contain opacity-[0.16]"
         />
 
         <div className="relative z-10 max-w-md">
