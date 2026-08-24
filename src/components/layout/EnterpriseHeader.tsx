@@ -80,6 +80,9 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
             <TooltipContent side="bottom">Logout</TooltipContent>
           </Tooltip>
         )}
+        <div className="bg-card rounded-md p-1 ml-1">
+          <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain" />
+        </div>
       </div>
     </header>
   );
