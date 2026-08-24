@@ -84,26 +84,33 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-background">
+    <div className="relative min-h-screen flex flex-col md:flex-row bg-background">
+      {/* Top-right logo */}
+      <div className="absolute top-4 right-4 z-10 hidden md:block">
+        <div className="bg-card rounded-lg shadow-sm p-2">
+          <img src={ramkyLogo} alt="Ramky Group" className="h-10 w-auto object-contain" />
+        </div>
+      </div>
+
       {/* Left Panel — Branding */}
-      <div className="hidden md:flex md:w-1/2 lg:w-[55%] bg-slate-50 flex-col items-center justify-center p-8 lg:p-16">
+      <div className="hidden md:flex md:w-1/2 lg:w-[55%] bg-muted/40 flex-col items-center justify-center p-8 lg:p-16">
         <div className="max-w-md text-center">
-          <img
-            src={ramkyLogo}
-            alt="Ramky Group"
-            className="h-28 lg:h-36 w-auto object-contain mx-auto mb-8"
-          />
+          <div className="inline-block bg-card rounded-xl shadow-sm p-4 mb-8">
+            <img
+              src={ramkyLogo}
+              alt="Ramky Group"
+              className="h-24 lg:h-32 w-auto object-contain mx-auto"
+            />
+          </div>
           <h2 className="text-3xl lg:text-4xl font-semibold text-foreground mb-4">
-            Vypaar Portal
+            Building Tomorrow's Infrastructure Today
           </h2>
-          <p className="text-lg text-muted-foreground mb-6">
-            Towards sustainable growth
-          </p>
           <p className="text-base text-muted-foreground">
-            Streamlined vendor onboarding, KYC management, and procurement collaboration for the Ramky Group.
+            Join our network of trusted vendors and partners. Streamline your onboarding process with our secure, efficient portal.
           </p>
         </div>
       </div>
+
 
       {/* Right Panel — Auth Form */}
       <div className="w-full md:w-1/2 lg:w-[45%] flex flex-col justify-center p-6 md:p-12">
