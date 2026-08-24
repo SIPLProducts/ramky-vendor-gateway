@@ -183,8 +183,8 @@ serve(async (req: Request) => {
     }
 
     // 6. Resolve company name for the email
-    let companyName = "Vypaar Portal";
-    let supportEmail = "vypaarsupport@ramky.com";
+    let companyName = "Vyapaar Portal";
+    let supportEmail = "vyapaarsupport@ramky.com";
     try {
       if (invite.tenant_id) {
         const { data: branding } = await admin
@@ -220,7 +220,7 @@ serve(async (req: Request) => {
           <tr><td align="center">
             <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
               <tr><td style="background:#1e3a5f;padding:28px 36px;text-align:center;color:#fff;font-family:Georgia,serif;font-size:22px;font-weight:600;letter-spacing:1.5px;">
-                ${companyName.split(/\s+/)[0].toUpperCase()}<div style="font-size:11px;color:#d4a574;margin-top:4px;letter-spacing:3px;text-transform:uppercase;">Vypaar Portal</div>
+                ${companyName.split(/\s+/)[0].toUpperCase()}<div style="font-size:11px;color:#d4a574;margin-top:4px;letter-spacing:3px;text-transform:uppercase;">Vyapaar Portal</div>
               </td></tr>
               <tr><td style="padding:36px;">
                 <h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:22px;color:#1e3a5f;">Sign in to your vendor registration</h1>
@@ -245,7 +245,7 @@ serve(async (req: Request) => {
     const smtpPassword = String(smtpCfg.app_password ?? "").replace(/\s+/g, "");
     const smtpFromEmail = String(smtpCfg.user_email ?? smtpUsername).trim();
     if (!smtpUsername.includes("@") && smtpFromEmail.includes("@")) smtpUsername = smtpFromEmail;
-    const cleanFromName = (smtpCfg.from_name ?? "Vypaar Portal").toString().replace(/[<>"]/g, "").trim();
+    const cleanFromName = (smtpCfg.from_name ?? "Vyapaar Portal").toString().replace(/[<>"]/g, "").trim();
     const fromHeader = cleanFromName ? `${cleanFromName} <${smtpFromEmail}>` : smtpFromEmail;
 
     const transporter = nodemailer.createTransport({

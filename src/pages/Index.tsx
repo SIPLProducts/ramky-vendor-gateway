@@ -6,7 +6,7 @@ import { Building2, Users, ClipboardCheck, Shield, ArrowRight, LogIn, Sparkles, 
 export default function Index() {
   const roles = [
     {
-      title: 'Vypaar Portal',
+      title: 'Vyapaar Portal',
       description: 'Register and manage your vendor profile',
       icon: Building2,
       href: '/vendor/register',

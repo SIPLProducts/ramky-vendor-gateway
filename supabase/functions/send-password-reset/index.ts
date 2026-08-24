@@ -47,12 +47,12 @@ serve(async (req) => {
       throw new Error("Failed to generate reset link");
     }
 
-    const subject = "Reset your Ramky Vypaar Portal password";
+    const subject = "Reset your Ramky Vyapaar Portal password";
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1F2937;">
         <h2 style="color: #195B9B; margin: 0 0 12px;">Reset your password</h2>
         <p>Hi,</p>
-        <p>We received a request to reset the password for your Ramky Vypaar Portal account.</p>
+        <p>We received a request to reset the password for your Ramky Vyapaar Portal account.</p>
         <p style="margin: 24px 0;">
           <a href="${actionLink}"
              style="background:#195B9B;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;display:inline-block;font-weight:600;">
@@ -67,7 +67,7 @@ serve(async (req) => {
           This link will expire shortly. If you did not request this, please ignore this email.
         </p>
         <hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0;"/>
-        <p style="font-size: 11px; color: #9CA3AF;">Ramky Vypaar Portal · Do not reply to this email.</p>
+        <p style="font-size: 11px; color: #9CA3AF;">Ramky Vyapaar Portal · Do not reply to this email.</p>
       </div>
     `;
 

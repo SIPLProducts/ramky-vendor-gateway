@@ -112,7 +112,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
           </SheetTrigger>
           <SheetContent side="left" className="w-[85vw] max-w-[320px] p-0 flex flex-col">
             <SheetHeader className="px-4 py-3 border-b">
-              <SheetTitle className="text-center text-base">Vypaar Portal</SheetTitle>
+              <SheetTitle className="text-center text-base">Vyapaar Portal</SheetTitle>
             </SheetHeader>
             <nav className="flex-1 overflow-y-auto py-2">
               {visibleNavItems.length === 0 && !permsLoading && (
@@ -139,7 +139,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
           </SheetContent>
         </Sheet>
         <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm truncate text-foreground">Vypaar Portal</span>
+          <span className="font-semibold text-sm truncate text-foreground">Vyapaar Portal</span>
         </Link>
       </div>
 

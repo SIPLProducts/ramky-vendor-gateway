@@ -1616,12 +1616,12 @@ export default function VendorRegistration() {
           {isTokenMode ? (
             <div className="flex w-full items-center justify-between gap-3 flex-row-reverse">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black">Vypaar Portal</span>
+              <span className="text-sm font-semibold text-black">Vyapaar Portal</span>
             </div>
           ) : (
             <Link to="/" className="flex w-full items-center justify-between gap-3 flex-row-reverse">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vyapaar Portal</span>
             </Link>
           )}
         </header>
@@ -1661,7 +1661,7 @@ export default function VendorRegistration() {
           ) : (
             <Link to="/" className="flex w-full items-center justify-between gap-3 flex-row-reverse">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vyapaar Portal</span>
             </Link>
           )}
         </header>
@@ -1712,7 +1712,7 @@ export default function VendorRegistration() {
           <span className="text-sm font-semibold text-black">Vendor Registration</span>
         ) : (
           <Link to="/" className="flex items-center">
-            <span className="text-sm font-semibold text-black">Vypaar Portal</span>
+            <span className="text-sm font-semibold text-black">Vyapaar Portal</span>
           </Link>
         )}
         <div className="flex items-center gap-4">

@@ -6,7 +6,7 @@ import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 export function PublicHeader() {
   return (
     <header className="h-16 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50">
-      <h1 className="text-base font-bold text-foreground">Ramky Vypaar Portal</h1>
+      <h1 className="text-base font-bold text-foreground">Ramky Vyapaar Portal</h1>
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/support">
@@ -20,7 +20,7 @@ export function PublicHeader() {
             Feedback
           </Link>
         </Button>
-        <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
+        <img src={ramkyLogo} alt="Ramky Vyapaar Portal" className="h-10 w-auto object-contain" />
       </div>
     </header>
   );

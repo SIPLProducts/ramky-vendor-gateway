@@ -63,8 +63,8 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Resolve tenant company name dynamically
-    let companyName = "Ramky Vypaar Portal";
-    let supportEmail = "vypaarsupport@ramky.com";
+    let companyName = "Ramky Vyapaar Portal";
+    let supportEmail = "vyapaarsupport@ramky.com";
     try {
       const sbUrl = Deno.env.get("SUPABASE_URL");
       const sbKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -118,7 +118,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <tr>
                   <td style="background-color:#1e3a5f; border-radius:12px 12px 0 0; padding:36px 44px; text-align:center;">
                     <div style="font-family:Georgia,'Times New Roman',serif; font-size:24px; font-weight:600; color:#ffffff; letter-spacing:2px;">${brandShort}</div>
-                    <div style="font-size:11px; color:#d4a574; margin-top:6px; letter-spacing:3px; text-transform:uppercase; font-weight:500;">Vypaar Portal</div>
+                    <div style="font-size:11px; color:#d4a574; margin-top:6px; letter-spacing:3px; text-transform:uppercase; font-weight:500;">Vyapaar Portal</div>
                   </td>
                 </tr>
 

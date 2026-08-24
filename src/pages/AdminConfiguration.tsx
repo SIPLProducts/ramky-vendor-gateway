@@ -76,7 +76,7 @@ const defaultConfig: PortalConfig = {
   smtp_password: '',
   smtp_encryption: 'tls',
   smtp_from_email: '',
-  smtp_from_name: 'Sharvi Vypaar Portal',
+  smtp_from_name: 'Sharvi Vyapaar Portal',
   smtp_reply_to: '',
   smtp_use_app_password: true,
   smtp_enabled: false,
@@ -552,9 +552,9 @@ function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
       const { data, error } = await supabase.functions.invoke('send-smtp-email', {
         body: {
           to: testEmail,
-          subject: 'Sharvi Vypaar Portal — SMTP test email',
-          html: `<p>Hello,</p><p>This is a test email sent from <strong>${config.smtp_from_name || 'Sharvi Vypaar Portal'}</strong> using your configured SMTP server (<code>${config.smtp_host}:${config.smtp_port}</code>).</p><p>If you received this, your SMTP configuration is working ✅</p>`,
-          text: `SMTP test from ${config.smtp_from_name || 'Sharvi Vypaar Portal'} via ${config.smtp_host}:${config.smtp_port}`,
+          subject: 'Sharvi Vyapaar Portal — SMTP test email',
+          html: `<p>Hello,</p><p>This is a test email sent from <strong>${config.smtp_from_name || 'Sharvi Vyapaar Portal'}</strong> using your configured SMTP server (<code>${config.smtp_host}:${config.smtp_port}</code>).</p><p>If you received this, your SMTP configuration is working ✅</p>`,
+          text: `SMTP test from ${config.smtp_from_name || 'Sharvi Vyapaar Portal'} via ${config.smtp_host}:${config.smtp_port}`,
         },
       });
       if (error) throw error;
@@ -688,7 +688,7 @@ function SmtpSettings({ config, updateConfig }: SmtpSettingsProps) {
               <Label htmlFor="smtp_from_name">From Name</Label>
               <Input
                 id="smtp_from_name"
-                placeholder="Sharvi Vypaar Portal"
+                placeholder="Sharvi Vyapaar Portal"
                 value={config.smtp_from_name}
                 onChange={(e) => updateConfig('smtp_from_name', e.target.value)}
               />

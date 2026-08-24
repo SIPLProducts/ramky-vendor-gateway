@@ -203,7 +203,7 @@ serve(async (req) => {
                 ${row("Closed Date & Time", rejectedAtIst)}
               </table>
               <p>Vendor <b>${esc(vendorRef)}</b> has been closed because a vendor with the same details already exists in SAP. This vendor has been moved to the <b>Duplicate &amp; Closed</b> tab in the SAP Sync screen. No further action is required for this submission.</p>
-              <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vypaar Portal.</p>
+              <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
             </div>`;
 
           const { data: emailResp, error: emailInvokeErr } = await supabase.functions.invoke("send-smtp-email", {

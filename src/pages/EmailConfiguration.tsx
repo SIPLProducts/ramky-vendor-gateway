@@ -76,7 +76,7 @@ const EMPTY: FormState = {
   encryption: "tls",
   smtp_username: "",
   app_password: "",
-  from_name: "Sharvi Vypaar Portal",
+  from_name: "Sharvi Vyapaar Portal",
   reply_to: "",
   is_active: true,
   use_app_password: true,
@@ -248,7 +248,7 @@ export default function EmailConfiguration() {
   function exportPdf() {
     const doc = new jsPDF({ orientation: "landscape" });
     doc.setFontSize(14);
-    doc.text("Sharvi Vypaar Portal — Email Configuration", 14, 15);
+    doc.text("Sharvi Vyapaar Portal — Email Configuration", 14, 15);
     doc.setFontSize(10);
     doc.text(`Generated: ${formatDateTime(new Date())}`, 14, 22);
     const rows = rowsForExport();
@@ -448,7 +448,7 @@ export default function EmailConfiguration() {
                 <div className="space-y-2">
                   <Label>From Name</Label>
                   <Input
-                    placeholder="Sharvi Vypaar Portal"
+                    placeholder="Sharvi Vyapaar Portal"
                     value={form.from_name ?? ""}
                     onChange={(e) => setForm((f) => ({ ...f, from_name: e.target.value }))}
                   />
