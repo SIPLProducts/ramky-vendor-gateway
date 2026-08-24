@@ -1653,16 +1653,7 @@ export default function VendorRegistration() {
       setCurrentStep(1);
     };
     return (
-      <div
-        className="h-screen overflow-hidden flex flex-col"
-        style={{
-          backgroundImage: `url(${vendorTypeBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed',
-        }}
-      >
+      <div className="ramky-brand-bg h-screen overflow-hidden flex flex-col">
         <header className="h-16 shrink-0 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex items-center gap-3 flex-row-reverse order-last ml-auto">
