@@ -89,7 +89,7 @@ export default function Auth() {
         src={ramkyLogo}
         alt=""
         aria-hidden
-        className="pointer-events-none select-none absolute left-6 bottom-8 w-[34rem] max-w-[45vw] opacity-[0.07]"
+        className="pointer-events-none select-none absolute left-6 bottom-16 w-[28rem] max-w-[40vw] opacity-[0.14]"
       />
 
       {/* Top-right logo */}
