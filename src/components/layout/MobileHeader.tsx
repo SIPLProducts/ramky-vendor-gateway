@@ -139,9 +139,8 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </div>
           </SheetContent>
         </Sheet>
-        <Link to="/dashboard" className="flex items-center gap-2 min-w-0 flex-row-reverse">
-          <img src={ramkyLogo} alt="Ramky" className="h-11 w-auto object-contain shrink-0" />
-          <span className="font-semibold text-sm truncate text-black">Ramky VMS</span>
+        <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-sm truncate text-foreground">Vypaar Portal</span>
         </Link>
       </div>
 
