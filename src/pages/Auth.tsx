@@ -86,20 +86,18 @@ export default function Auth() {
   return (
     <div className="relative min-h-screen flex flex-col md:flex-row bg-background">
       {/* Top-right logo */}
-      <div className="absolute top-4 right-4 z-10 hidden md:block">
-        <div className="bg-card rounded-lg shadow-sm p-2">
-          <img src={ramkyLogo} alt="Ramky Group" className="h-10 w-auto object-contain" />
-        </div>
+      <div className="absolute top-4 right-6 z-10 hidden md:block">
+        <img src={ramkyLogo} alt="Ramky Group" className="h-16 w-auto object-contain mix-blend-multiply" />
       </div>
 
       {/* Left Panel — Branding */}
       <div className="hidden md:flex md:w-1/2 lg:w-[55%] bg-muted/40 flex-col items-center justify-center p-8 lg:p-16">
         <div className="max-w-md text-center">
-          <div className="inline-block bg-card rounded-xl shadow-sm p-4 mb-8">
+          <div className="mb-8">
             <img
               src={ramkyLogo}
               alt="Ramky Group"
-              className="h-24 lg:h-32 w-auto object-contain mx-auto"
+              className="h-40 lg:h-48 w-auto object-contain mx-auto mix-blend-multiply"
             />
           </div>
           <h2 className="text-3xl lg:text-4xl font-semibold text-foreground mb-4">
