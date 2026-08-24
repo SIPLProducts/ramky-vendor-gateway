@@ -31,23 +31,23 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full max-w-[200px] mx-auto overflow-hidden rounded-xl bg-white text-left',
-                'shadow-md transition-shadow duration-200 hover:shadow-xl',
+                'group relative w-full max-w-[220px] mx-auto overflow-hidden rounded-xl text-left',
+                'bg-white/45 backdrop-blur-sm border border-white/60',
+                'shadow-sm transition-all duration-200 hover:bg-white/70 hover:shadow-md',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                'flex items-center justify-center px-3 py-4',
-                selected && 'ring-2 ring-brand-green shadow-[0_0_0_4px_rgba(34,197,94,0.15)]',
-                disabled && 'opacity-60 cursor-not-allowed hover:shadow-md',
+                'flex items-center justify-between gap-2 px-3 py-3',
+                selected && 'border-brand-green ring-1 ring-brand-green bg-white/70',
+                disabled && 'opacity-60 cursor-not-allowed',
               )}
             >
-              {selected && (
-                <span className="absolute top-1 right-1 z-20 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white bg-brand-green rounded-full px-2 py-0.5 shadow">
-                  <Check className="h-3 w-3" /> Selected
-                </span>
-              )}
-
-              <h4 className="w-full text-center text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
+              <h4 className="flex-1 text-center text-xs sm:text-sm font-semibold text-slate-900 leading-tight">
                 {opt.title}
               </h4>
+              {selected && (
+                <span className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded-full bg-brand-green text-white shadow-sm">
+                  <Check className="h-3 w-3" />
+                </span>
+              )}
             </button>
           );
         })}
