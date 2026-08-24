@@ -1710,14 +1710,10 @@ export default function VendorRegistration() {
       {/* Header */}
       <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
         {isTokenMode ? (
-          <div className="flex items-center gap-3 flex-row-reverse order-last">
-            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-            <span className="text-sm font-semibold text-black">Vendor Registration</span>
-          </div>
+          <span className="text-sm font-semibold text-black">Vendor Registration</span>
         ) : (
-          <Link to="/" className="flex items-center gap-3 flex-row-reverse order-last">
-            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-            <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
+          <Link to="/" className="flex items-center">
+            <span className="text-sm font-semibold text-black">Vypaar Portal</span>
           </Link>
         )}
         <div className="flex items-center gap-4">
