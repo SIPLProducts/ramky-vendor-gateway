@@ -1,60 +1,32 @@
-# Go-Live Cutover: KYC-Only Onboarding for Existing SAP Vendors
+# Vypaar Portal Rebrand & UI Refresh
 
-Vendors that already have a SAP vendor code (KYC done manually before go-live) will complete their KYC through the portal, go through the normal approval chain, and finish in a terminal "KYC Completed" state — with no SAP sync and no DMS push. New vendors continue on the existing flow unchanged.
+Uses the attached Ramky Group logo ("Towards sustainable growth") as the new brand mark and background watermark.
 
-## How it works for users
+## 1. Logo asset
+- Upload the attached logo to CDN assets and reference it as the single brand image across the app.
+- Keep the existing logo file only where it is still needed; all headers and login switch to the new one.
+- Update the favicon from the same logo.
 
-**Buyer sends the invite**
-- The invitation form gets an "Existing SAP Vendor" toggle.
-- When switched on, a mandatory "SAP Vendor Code" field appears (plus the usual vendor name / email / contact number).
-- The flag and code carry over to the vendor record when the vendor claims the invite.
+## 2. Login page (`/auth`, `/vendor/login`)
+- Move the logo to the top-right corner of the page.
+- Replace the current construction hero photo with the Ramky logo treatment as the page background (large, centered, soft/low-opacity watermark on a light surface) so the sign-in card stays fully readable.
+- Support email: `vendxsupport@ramky.com` → `vypaarsupport@ramky.com`.
 
-**Vendor fills the form**
-- Identical experience: same steps, same GST / PAN / MSME / Bank verifications, same document uploads.
-- A small badge on the header shows "Existing SAP Vendor — KYC Update" so it's clear this is a re-KYC.
+## 3. Navigation bars
+Applies to the app header, mobile header, public header and the vendor registration header:
+- Logo moves to the right side of the bar; the title/nav items sit on the left.
+- Text "Vendor Portal" → "Vypaar Portal" everywhere (headers, page titles, browser tab title, meta description, manifest).
 
-**Approvals**
-- Exactly the same chain as today (Buyer, SCM Manager, SCM Head, Finance 1, Finance 2, CEO Office — as configured in the approval matrix).
-- Comments, rejections, return-to-vendor and history all behave the same.
+## 4. Vendor type selection / main body
+- Remove the flag/3D icons shown for the selected vendor type (Domestic / International cards keep text and selected state only).
+- Replace the blue background image with the Ramky logo watermark background.
+- Apply that same watermark background to the whole main body/content area of the registration screens, not just the vendor type block.
 
-**After the final approval**
-- New vendor: goes to Pending SAP Sync, as today.
-- Existing SAP vendor: goes straight to **KYC Completed** (terminal). It never appears in the SAP Sync queue or the DMS sync queue, and no sync can be triggered for it.
+## 5. Emails & support address
+- Replace `vendxsupport@ramky.com` with `vypaarsupport@ramky.com` in every email template and edge function (invitations, status notifications, approvals, password reset, submission notices, SMTP test) plus the in-app Support/Help pages and config defaults.
+- Update "Vendor Portal" wording to "Vypaar Portal" in email subjects and bodies.
 
-**Finding these records**
-- Vendor List, Dashboard and Reports get a "Vendor Origin" filter: All / New Vendors / Existing SAP Vendors.
-- Vendor List gains a SAP Vendor Code column and shows "KYC Completed" as a distinct status chip.
-- Reports export includes the flag and the existing SAP code so cutover progress can be tracked in Excel.
-
-## Cutover sequence (operational)
-
-1. Buyers invite the legacy vendor list with the toggle on and the correct SAP code.
-2. Vendors complete KYC; approvers process them alongside new vendors.
-3. Track progress with the "Existing SAP Vendors" filter until the legacy list is fully KYC Completed.
-4. New vendors registered during this window flow to SAP normally — no interference.
-
-## Technical details
-
-**Database (one migration)**
-- `vendor_invitations`: add `is_existing_sap_vendor boolean not null default false`, `existing_sap_vendor_code text`.
-- `vendors`: add `is_existing_sap_vendor boolean not null default false`, `existing_sap_vendor_code text`.
-- `vendor_status` enum: add value `kyc_completed`.
-- Existing rows default to `false`, so current behaviour is untouched.
-
-**Invite path**
-- `src/pages/AdminInvitations.tsx`: toggle + SAP code input, validation, pass through to the insert and to the invite edge function payload.
-- `get_invitation_by_token` / `record_invitation_access` / `claim_invitation` return the two new fields so the registration page can pick them up.
-- `src/hooks/useVendorRegistration.tsx`: copy the flag and code onto the vendor row on first draft save.
-
-**Approval terminal state**
-- `supabase/functions/process-approval-action/index.ts`: at the point where it currently sets `pending_sap_sync`, set `kyc_completed` instead when `is_existing_sap_vendor` is true.
-- `supabase/functions/buyer-reapprove-rejected/index.ts`: same branch on its final status.
-
-**Sync guards**
-- `src/pages/SAPSync.tsx`: filter out `is_existing_sap_vendor` rows from both the SAP and DMS queues.
-- `sync-vendor-to-sap` and `sync-vendor-to-dms` edge functions: reject with a clear message if the vendor is flagged, so no manual/API path can push a legacy vendor.
-
-**Status labels and UI**
-- Add `kyc_completed` ("KYC Completed") to the status maps in `VendorList.tsx`, `Dashboard.tsx`, `VendorStatus.tsx`, `VendorStageCell.tsx`, `RegistrationStatusTracker.tsx`, `src/lib/reports/loadVendorReport.ts`.
-- `RegistrationStatusTracker` ends the timeline at KYC Completed for flagged vendors (no SAP/DMS steps shown).
-- Vendor Origin filter added to `VendorList.tsx`, `Dashboard.tsx` and `Reports.tsx`; column + export field for the SAP code.
+## Technical notes
+- Files touched: `src/pages/Auth.tsx`, `src/pages/VendorLogin.tsx`, `src/pages/ResetPassword.tsx`, `src/pages/VendorInviteAccept.tsx`, `src/pages/VendorInviteCallback.tsx`, `src/pages/Index.tsx`, `src/pages/Landing.tsx`, `src/pages/SupportHelp.tsx`, `src/pages/VendorRegistration.tsx`, `src/pages/AdminConfiguration.tsx`, `src/pages/EmailConfiguration.tsx`, `src/components/layout/*Header.tsx`, `src/components/layout/Sidebar.tsx`, `src/components/vendor/steps/international/VendorTypeSelector.tsx`, `src/components/vendor/SubmissionSuccessDialog.tsx`, `src/components/admin/NoReplyEmailConfig.tsx`, `index.html`, `public/manifest.webmanifest`, and the `supabase/functions/*` email senders.
+- Background watermark implemented as a reusable CSS utility/token in `index.css` (fixed, centered, contain, low opacity) so all screens share one definition.
+- No changes to business logic, validation, workflow, or data — presentation and copy only.
