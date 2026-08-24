@@ -1751,6 +1751,7 @@ export default function VendorRegistration() {
             </div>
           </SheetContent>
           </Sheet>
+          <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
         </div>
       </header>
 
