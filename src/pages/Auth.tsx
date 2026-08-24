@@ -85,45 +85,20 @@ export default function Auth() {
   }
 
   return (
-    <div className="login-theme min-h-screen flex">
-      {/* Hero Image Section */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
+    <div className="login-theme ramky-brand-bg min-h-screen flex flex-col">
+      {/* Logo — top right */}
+      <div className="w-full flex justify-end p-4 sm:p-6">
         <img
-          src={authHeroImage}
-          alt="Infrastructure construction"
-          className="absolute inset-0 w-full h-full object-cover"
+          src={ramkyLogo}
+          alt="Ramky Group"
+          className="h-14 sm:h-16 w-auto object-contain"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary/40" />
-        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
-          <div className="flex items-center gap-3 mb-8">
-            <img 
-              src={ramkyLogo} 
-              alt="Sharvi Infotech Private Limited" 
-              className="h-16 w-auto bg-white/90 rounded-lg p-2"
-            />
-          </div>
-          
-          <h2 className="text-4xl font-bold mb-4 leading-tight">
-            Building Tomorrow's<br />Infrastructure Today
-          </h2>
-          <p className="text-lg text-white/90 max-w-md">
-            Join our network of trusted vendors and partners. Streamline your onboarding 
-            process with our secure, efficient portal.
-          </p>
-        </div>
       </div>
 
       {/* Auth Form Section */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
+      <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <img 
-              src={ramkyLogo} 
-              alt="Sharvi Infotech Private Limited" 
-              className="h-14 w-auto"
-            />
-          </div>
+
 
           <Card className="border-0 shadow-xl">
             <CardHeader className="text-center pb-2">
