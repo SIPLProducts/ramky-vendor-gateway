@@ -1615,12 +1615,12 @@ export default function VendorRegistration() {
         <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
           {isTokenMode ? (
             <div className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
               <span className="text-sm font-semibold text-black">Vypaar Portal</span>
             </div>
           ) : (
             <Link to="/" className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
               <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
@@ -1655,12 +1655,12 @@ export default function VendorRegistration() {
         <header className="h-16 shrink-0 border-b bg-white px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
           {isTokenMode ? (
             <div className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
               <span className="text-sm font-semibold text-black">Vendor Registration</span>
             </div>
           ) : (
             <Link to="/" className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
+              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
               <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
@@ -1750,7 +1750,7 @@ export default function VendorRegistration() {
             </div>
           </SheetContent>
           </Sheet>
-          <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain mix-blend-multiply" />
+          <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
         </div>
       </header>
 

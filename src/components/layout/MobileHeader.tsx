@@ -198,9 +198,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </AvatarFallback>
           </Avatar>
         </Button>
-        <div className="bg-card rounded-md p-0.5">
-          <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain shrink-0" />
-        </div>
+        <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain shrink-0" />
         <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
 

@@ -91,9 +91,7 @@ export function Header({ userRole, userName }: HeaderProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="bg-card rounded-md p-1 ml-1">
-          <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
-        </div>
+        <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
       </div>
     </header>
   );
