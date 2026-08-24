@@ -129,14 +129,6 @@ export function Sidebar({ userRole, userName, onSignOut, collapsed = false, onTo
         collapsed ? "w-[68px]" : "w-64"
       )}
     >
-      {/* Header */}
-      {!collapsed && (
-        <div className="border-b border-sidebar-border p-4">
-          <Link to="/dashboard" className="flex items-center justify-center">
-            <span className="text-sm font-semibold text-sidebar-foreground whitespace-nowrap text-center">Vypaar Portal</span>
-          </Link>
-        </div>
-      )}
 
       {/* Collapse Toggle */}
       <div className={cn(
