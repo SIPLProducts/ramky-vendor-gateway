@@ -26,8 +26,7 @@ import {
 } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import { useScreenPermissions } from '@/hooks/useScreenPermissions';
@@ -199,9 +198,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
             </AvatarFallback>
           </Avatar>
         </Button>
-        <div className="bg-card rounded-md p-0.5">
-          <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain shrink-0" />
-        </div>
+        <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain shrink-0" />
         <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
 
 

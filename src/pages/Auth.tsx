@@ -10,8 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
 
 
@@ -84,26 +83,27 @@ export default function Auth() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col md:flex-row bg-background">
+    <div className="relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-gradient-to-br from-[hsl(210_60%_98%)] via-[hsl(205_55%_96%)] to-[hsl(210_40%_99%)]">
+      {/* Faint brand watermark, lower-left */}
+      <img
+        src={ramkyLogo}
+        alt=""
+        aria-hidden
+        className="pointer-events-none select-none absolute -left-24 bottom-0 w-[46rem] max-w-[70vw] opacity-[0.07]"
+      />
+
       {/* Top-right logo */}
-      <div className="absolute top-4 right-6 z-10 hidden md:block">
-        <img src={ramkyLogo} alt="Ramky Group" className="h-16 w-auto object-contain mix-blend-multiply" />
+      <div className="absolute top-5 right-8 z-10 hidden md:block">
+        <img src={ramkyLogo} alt="Ramky Group" className="h-14 w-auto object-contain" />
       </div>
 
       {/* Left Panel — Branding */}
-      <div className="hidden md:flex md:w-1/2 lg:w-[55%] bg-muted/40 flex-col items-center justify-center p-8 lg:p-16">
-        <div className="max-w-md text-center">
-          <div className="mb-8">
-            <img
-              src={ramkyLogo}
-              alt="Ramky Group"
-              className="h-40 lg:h-48 w-auto object-contain mx-auto mix-blend-multiply"
-            />
-          </div>
-          <h2 className="text-3xl lg:text-4xl font-semibold text-foreground mb-4">
-            Building Tomorrow's Infrastructure Today
+      <div className="relative hidden md:flex md:w-1/2 lg:w-[55%] flex-col justify-center px-10 lg:px-20">
+        <div className="max-w-md">
+          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-foreground mb-5">
+            Building Tomorrow's<br />Infrastructure Today
           </h2>
-          <p className="text-base text-muted-foreground">
+          <p className="text-base text-muted-foreground max-w-sm">
             Join our network of trusted vendors and partners. Streamline your onboarding process with our secure, efficient portal.
           </p>
         </div>
@@ -111,7 +111,7 @@ export default function Auth() {
 
 
       {/* Right Panel — Auth Form */}
-      <div className="w-full md:w-1/2 lg:w-[45%] flex flex-col justify-center p-6 md:p-12">
+      <div className="relative w-full md:w-1/2 lg:w-[45%] flex flex-col justify-center p-6 md:p-12">
         <div className="w-full max-w-md mx-auto">
 
           {/* Mobile-only logo */}
@@ -122,6 +122,7 @@ export default function Auth() {
               className="h-16 w-auto object-contain"
             />
           </div>
+
 
           <Card className="border-0 shadow-xl">
             <CardHeader className="text-center pb-2">

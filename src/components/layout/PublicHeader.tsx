@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 import { HelpCircle, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 
 export function PublicHeader() {
   return (
@@ -21,9 +20,7 @@ export function PublicHeader() {
             Feedback
           </Link>
         </Button>
-        <div className="bg-card rounded-md p-1 ml-1">
-          <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
-        </div>
+        <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
       </div>
     </header>
   );

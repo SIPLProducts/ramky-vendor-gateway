@@ -6,8 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import { useAuth } from '@/hooks/useAuth';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 
 interface EnterpriseHeaderProps {
   showHelp?: boolean;
@@ -80,9 +79,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
             <TooltipContent side="bottom">Logout</TooltipContent>
           </Tooltip>
         )}
-        <div className="bg-card rounded-md p-1 ml-1">
-          <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain" />
-        </div>
+        <img src={ramkyLogo} alt="Ramky" className="h-9 w-auto object-contain" />
       </div>
     </header>
   );
