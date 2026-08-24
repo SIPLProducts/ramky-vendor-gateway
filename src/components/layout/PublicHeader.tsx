@@ -7,8 +7,8 @@ const ramkyLogo = ramkyLogoAsset.url;
 export function PublicHeader() {
   return (
     <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4 order-last">
+        <div className="flex items-center gap-3 flex-row-reverse">
           <img src={ramkyLogo} alt="Ramky Vypaar Portal" className="h-10 w-auto object-contain" />
           <div>
             <h1 className="text-base font-bold text-black">Ramky Vypaar Portal</h1>
