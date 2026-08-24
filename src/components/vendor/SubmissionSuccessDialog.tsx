@@ -69,10 +69,10 @@ export function SubmissionSuccessDialog({
                 , but we could not send the confirmation email to the buyer.
                 Our team has been notified. Please contact{" "}
                 <a
-                  href="mailto:vendxsupport@ramky.com"
+                  href="mailto:vypaarsupport@ramky.com"
                   className="text-primary underline"
                 >
-                  vendxsupport@ramky.com
+                  vypaarsupport@ramky.com
                 </a>{" "}
                 if you do not receive a follow-up.
               </p>

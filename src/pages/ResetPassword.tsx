@@ -138,7 +138,7 @@ export default function ResetPassword() {
             Reset Password
           </CardTitle>
           <CardDescription>
-            Choose a strong new password for your Sharvi Vendor Portal account.
+            Choose a strong new password for your Sharvi Vypaar Portal account.
           </CardDescription>
         </CardHeader>
         <CardContent>

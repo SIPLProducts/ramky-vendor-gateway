@@ -1617,12 +1617,12 @@ export default function VendorRegistration() {
           {isTokenMode ? (
             <div className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black">Vypaar Portal</span>
             </div>
           ) : (
             <Link to="/" className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
         </header>
@@ -1671,7 +1671,7 @@ export default function VendorRegistration() {
           ) : (
             <Link to="/" className="flex items-center gap-3">
               <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+              <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
             </Link>
           )}
         </header>
@@ -1726,7 +1726,7 @@ export default function VendorRegistration() {
         ) : (
           <Link to="/" className="flex items-center gap-3">
             <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-            <span className="text-sm font-semibold text-black hidden sm:block">Vendor Portal</span>
+            <span className="text-sm font-semibold text-black hidden sm:block">Vypaar Portal</span>
           </Link>
         )}
         <div className="flex items-center gap-4">

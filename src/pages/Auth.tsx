@@ -230,8 +230,8 @@ export default function Auth() {
           </p>
           <p className="text-center text-sm text-muted-foreground mt-2">
             For any queries or support, please contact:{" "}
-            <a href="mailto:vendxsupport@ramky.com" className="text-primary hover:underline">
-              vendxsupport@ramky.com
+            <a href="mailto:vypaarsupport@ramky.com" className="text-primary hover:underline">
+              vypaarsupport@ramky.com
             </a>
           </p>
         </div>

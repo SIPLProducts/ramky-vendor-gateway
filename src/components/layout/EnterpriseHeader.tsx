@@ -39,7 +39,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
             className="h-10 w-auto object-contain"
           />
           <div className="hidden sm:block">
-            <span className="text-sm font-semibold text-foreground">Vendor Portal</span>
+            <span className="text-sm font-semibold text-foreground">Vypaar Portal</span>
           </div>
         </Link>
       </div>
