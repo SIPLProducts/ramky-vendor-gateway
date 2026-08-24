@@ -14,3 +14,7 @@ The watermark logo in the login page's left panel is missing parts of the mark. 
 - Create a background-removed, non-cropped PNG at `src/assets/ramky-logo-transparent.png` from `user-uploads://Ramky_Group_Logo_Final.png`, preserving its native proportions with transparent padding.
 - `src/pages/Auth.tsx`: retune the watermark `<img>` width for the wider image (e.g. `w-[30rem] max-w-[42vw]`), keeping `opacity-[0.07]`, `pointer-events-none`, and the bottom-left placement.
 - Add `public/favicon.png` (64x64, padded square) and point `index.html`'s icon link at it, removing `public/favicon.ico`.
+
+## Watermark visibility
+
+Make the background watermark a bit more visible but still clearly a background element: raise its opacity from 7% to roughly 14-15% (`opacity-[0.14]`) so the mark reads faintly without competing with the headline text.
