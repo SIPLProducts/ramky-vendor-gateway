@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
 import { HelpCircle, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 
 export function PublicHeader() {
   return (

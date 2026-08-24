@@ -10,8 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
-import ramkyLogoAsset from '@/assets/ramky-group-logo.jpg.asset.json';
-const ramkyLogo = ramkyLogoAsset.url;
+import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
 
 
