@@ -30,9 +30,9 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
 
 
   return (
-    <header className="h-14 border-b bg-card/80 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 shadow-enterprise-sm">
-      <Link to="/" className="flex items-center">
-        <span className="text-lg font-semibold text-foreground tracking-wide whitespace-nowrap">Vyapaar Portal</span>
+    <header className="relative h-14 border-b bg-card/80 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 shadow-enterprise-sm">
+      <Link to="/" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center">
+        <span className="text-2xl font-bold text-foreground tracking-wide whitespace-nowrap">Vyapaar Portal</span>
       </Link>
 
       <div className="flex items-center gap-2">
