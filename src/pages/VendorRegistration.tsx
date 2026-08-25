@@ -1612,18 +1612,20 @@ export default function VendorRegistration() {
   if (isSubmitted && !isEditMode) {
     return (
       <div className="min-h-screen bg-background">
-        <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-          {isTokenMode ? (
-            <div className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="ml-4 text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
-            </div>
-          ) : (
-            <Link to="/" className="flex w-full items-center justify-between gap-3 flex-row-reverse">
-              <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-              <span className="ml-4 text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
-            </Link>
-          )}
+        <header className="h-16 border-b bg-white px-6 grid grid-cols-3 items-center sticky top-0 z-50 shadow-sm">
+          <div />
+          <div className="flex justify-center">
+            {isTokenMode ? (
+              <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
+            ) : (
+              <Link to="/" className="flex items-center">
+                <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
+              </Link>
+            )}
+          </div>
+          <div className="flex items-center justify-end">
+            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
+          </div>
         </header>
         <SuccessScreen
           status={vendorStatusState}
