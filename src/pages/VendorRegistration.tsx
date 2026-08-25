@@ -1735,7 +1735,7 @@ export default function VendorRegistration() {
                 <Mail className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-sm font-medium">Email Support</p>
-                  <p className="text-sm text-muted-foreground">vendor.support@ramky.com</p>
+                  <p className="text-sm text-muted-foreground">vyapaarsupport@ramky.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">

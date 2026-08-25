@@ -193,7 +193,7 @@ serve(async (req: Request) => {
           .eq("tenant_id", invite.tenant_id)
           .maybeSingle();
         if (branding?.company_name) companyName = branding.company_name;
-        if (branding?.help_email) supportEmail = branding.help_email;
+        if (branding?.help_email && !/vendx/i.test(branding.help_email)) supportEmail = branding.help_email;
       }
     } catch { /* ignore */ }
 
