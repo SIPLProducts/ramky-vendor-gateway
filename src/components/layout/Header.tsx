@@ -49,7 +49,7 @@ export function Header({ userRole, userName }: HeaderProps) {
 
   return (
     <header className="h-16 border-b bg-card px-6 flex items-center justify-between sticky top-0 z-50">
-      <h1 className="text-base font-bold text-foreground">Ramky Vyapaar Portal</h1>
+      <h1 className="text-lg font-bold text-foreground tracking-wide whitespace-nowrap">Ramky Vyapaar Portal</h1>
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" className="relative rounded-xl">
