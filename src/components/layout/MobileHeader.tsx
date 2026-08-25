@@ -101,9 +101,9 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
 
 
   return (
-    <header className="relative fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 h-16 px-3 flex items-center justify-between safe-area-top gap-2">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 h-16 px-3 flex items-center safe-area-top gap-2">
       {/* Left: Hamburger */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex-1 flex items-center justify-start">
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Open navigation">
@@ -141,12 +141,13 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
       </div>
 
       {/* Center: Title */}
-      <Link to="/dashboard" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center">
+      <Link to="/dashboard" className="flex-none flex items-center justify-center">
         <span className="font-bold text-lg truncate text-foreground tracking-wide whitespace-nowrap">Vyapaar Portal</span>
       </Link>
 
       {/* Right Actions */}
-      <div className="flex items-center gap-2 pr-2">
+      <div className="flex-1 flex items-center justify-end gap-2 pr-2">
+
 
         {showSwitcher && (
           <Select
