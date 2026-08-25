@@ -895,6 +895,7 @@ serve(async (req) => {
                   </table>
                 </div>
                 <p style="margin-top:16px;">You can review this vendor in the Ramky Vyapaar Portal.</p>
+                <p style="margin-top:16px;font-size:13px;color:#374151">For any queries, please contact <a href="mailto:vyapaarsupport@ramky.com" style="color:#1e3a5f;text-decoration:none;font-weight:600">vyapaarsupport@ramky.com</a>.</p>
                 <p>Regards,<br/>Ramky Vyapaar Portal</p>
               </div>`;
             const { error: mailErr } = await supabase.functions.invoke("send-smtp-email", {

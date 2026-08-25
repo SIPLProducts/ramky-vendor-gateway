@@ -82,7 +82,7 @@ const handler = async (req: Request): Promise<Response> => {
             .eq("tenant_id", inv.tenant_id)
             .maybeSingle();
           if (branding?.company_name) companyName = branding.company_name;
-          if (branding?.help_email) supportEmail = branding.help_email;
+          if (branding?.help_email && !/vendx/i.test(branding.help_email)) supportEmail = branding.help_email;
           if (!branding?.company_name) {
             const { data: tenant } = await sb
               .from("tenants")

@@ -194,7 +194,8 @@ Deno.serve(async (req) => {
                   ${row('Rejection Date & Time', rejectedAtIst)}
                 </table>
                 <p>Please log in to the Vyapaar Portal to review the remarks and resubmit the application.</p>
-                <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
+                <p style="margin-top:16px;font-size:13px;color:#374151">For any queries, please contact <a href="mailto:vyapaarsupport@ramky.com" style="color:#1e3a5f;text-decoration:none;font-weight:600">vyapaarsupport@ramky.com</a>.</p>
+              <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
               </div>`;
             const { data: emailResp, error: emailInvokeErr } = await admin.functions.invoke('send-smtp-email', {
               body: { to: buyerEmail, subject: 'Vendor Application Rejected', html },

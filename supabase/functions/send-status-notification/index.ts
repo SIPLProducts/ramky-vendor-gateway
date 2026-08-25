@@ -117,7 +117,7 @@ function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: 
     
     <p style="color: #888; font-size: 14px; margin: 0;">
       If you have any questions, please contact our support team.<br>
-      <strong>Email:</strong> vendor.support@company.com<br>
+      <strong>Email:</strong> vyapaarsupport@ramky.com<br>
       <strong>Phone:</strong> 1800-XXX-XXXX
     </p>
   </div>
