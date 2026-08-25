@@ -180,8 +180,8 @@ export function SuccessScreen({
       <div className="mt-6 text-center">
         <p className="text-sm text-muted-foreground">
           Have questions? Contact us at{' '}
-          <a href="mailto:vendor.support@ramky.com" className="text-primary hover:underline">
-            vendor.support@ramky.com
+          <a href="mailto:vyapaarsupport@ramky.com" className="text-primary hover:underline">
+            vyapaarsupport@ramky.com
           </a>
         </p>
       </div>
