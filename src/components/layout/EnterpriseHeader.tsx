@@ -32,7 +32,7 @@ export function EnterpriseHeader({ showHelp = true }: EnterpriseHeaderProps) {
   return (
     <header className="h-14 border-b bg-card/80 backdrop-blur-md px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30 shadow-enterprise-sm">
       <Link to="/" className="flex items-center">
-        <span className="text-sm font-semibold text-foreground">Vyapaar Portal</span>
+        <span className="text-lg font-semibold text-foreground tracking-wide whitespace-nowrap">Vyapaar Portal</span>
       </Link>
 
       <div className="flex items-center gap-2">

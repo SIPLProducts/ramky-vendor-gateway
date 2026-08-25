@@ -139,7 +139,7 @@ export function MobileHeader({ userName, userRole, onSignOut }: MobileHeaderProp
           </SheetContent>
         </Sheet>
         <Link to="/dashboard" className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-sm truncate text-foreground">Vyapaar Portal</span>
+          <span className="font-semibold text-base truncate text-foreground tracking-wide whitespace-nowrap">Vyapaar Portal</span>
         </Link>
       </div>
 
