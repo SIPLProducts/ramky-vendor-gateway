@@ -711,7 +711,7 @@ textarea::placeholder {
     position: fixed;
     inset: 0;
     z-index: -1;
-    background-image: url("/__l5e/assets-v1/d17e30d7-0d08-43ed-94d6-0db9180a7bdd/ramky-group-logo.jpg");
+    background-image: url("./assets/ramky-logo-transparent.png");
     background-repeat: no-repeat;
     background-position: center;
     background-size: min(60vw, 620px);
