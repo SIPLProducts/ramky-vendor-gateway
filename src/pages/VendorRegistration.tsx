@@ -1712,15 +1712,18 @@ export default function VendorRegistration() {
   return (
     <div className="ramky-brand-bg min-h-screen flex flex-col">
       {/* Header */}
-      <header className="h-16 border-b bg-white px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-        {isTokenMode ? (
-          <span className="ml-4 text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vendor Registration</span>
-        ) : (
-          <Link to="/" className="ml-4 flex min-w-0 items-center">
+      <header className="h-16 border-b bg-white px-6 grid grid-cols-3 items-center sticky top-0 z-50 shadow-sm">
+        <div />
+        <div className="flex justify-center">
+          {isTokenMode ? (
             <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
-          </Link>
-        )}
-        <div className="flex items-center gap-4">
+          ) : (
+            <Link to="/" className="flex items-center">
+              <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
+            </Link>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-4">
           <AutoSaveIndicator state={autoSaveState} lastSavedAt={lastSavedAt} className="hidden sm:flex" />
           <Sheet>
             <SheetTrigger asChild>
