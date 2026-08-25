@@ -1666,18 +1666,18 @@ export default function VendorRegistration() {
           )}
         </header>
         <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-end p-1.5 sm:p-2 sm:pr-8 lg:pr-16 overflow-hidden">
-          <div className="relative w-[min(92vw,300px)] rounded-[12px] bg-white/25 backdrop-blur-[2px] border-2 border-warning shadow-lg flex flex-col">
-            <div className="relative p-2 space-y-0.5 flex flex-col overflow-hidden min-w-0">
+          <div className="relative w-[min(92vw,340px)] rounded-[14px] bg-white border-2 border-warning shadow-xl flex flex-col">
+            <div className="relative p-5 space-y-4 flex flex-col overflow-hidden min-w-0">
 
               {isTokenMode && invitationEmail && (
-                <div className="p-1.5 bg-white/70 border border-blue-100 rounded-lg shrink-0 min-w-0">
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg shrink-0 min-w-0">
                   <p className="text-xs text-slate-700 break-all">
                     <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
                   </p>
                 </div>
               )}
               <div className="shrink-0">
-                <h1 className="text-sm sm:text-base md:text-lg font-semibold text-slate-900 leading-tight">Select Vendor Type</h1>
+                <h1 className="text-base font-semibold text-slate-900 leading-tight">Select Vendor Type</h1>
               </div>
 
               <VendorTypeSelector
@@ -1685,14 +1685,15 @@ export default function VendorRegistration() {
                 onChange={setPendingChoiceType}
                 disabled={isSubmitting}
               />
-              <div className="flex justify-end pt-0.5 shrink-0">
-                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[128px] h-9">
+              <div className="flex justify-center pt-1 shrink-0">
+                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[160px] h-11 text-sm font-semibold">
                   Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
             </div>
           </div>
+
         </main>
 
 
