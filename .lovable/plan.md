@@ -1,24 +1,31 @@
-# Fix: "Could not find the function public.check_my_smtp_configured" on the self-hosted server
+# Fix password-reset links to use the current portal URL
 
-## What's happening
-When you click **Create Invitation**, the app first checks whether your account has an active SMTP sender configured. It does that by calling a database function named `check_my_smtp_configured`.
+The email template does **not** hardcode `vendx.ramky.com`. The forgot-password screen already sends the current browser address (`window.location.origin/reset-password`), but the self-hosted authentication service generates the final verification link from its configured site/API URL. The screenshot confirms that this server configuration is still producing the old `vendx.ramky.com` host and replacing the requested redirect with the same old host.
 
-That function exists in the project's migration files, but it has never been applied to the self-hosted database — so the database says "function not found" and the invitation is blocked. On Lovable Cloud it works because the migration ran there.
+## What will be changed
 
-This is a deployment gap, not an app bug: nothing in the frontend needs to change.
+1. **Make reset-link generation environment-aware**
+   - Update the password-reset function to use the portal origin that initiated the request.
+   - Validate the origin and always build the final destination as `<current portal origin>/reset-password`.
+   - Normalize both the Reset Password button URL and the visible fallback URL, including the self-hosted `/supabase/auth/v1/verify` path.
 
-## Fix
-1. Apply the missing migration to the self-hosted database so the function is created with the correct permissions (`authenticated` may execute; anonymous may not).
-2. Re-run the standard self-host migration step so any other migrations that were never applied get applied too, rather than patching just this one function.
-3. Reload the API schema cache so the new function is visible immediately (otherwise the "schema cache" message can persist for a few minutes).
-4. Verify by opening Vendor Invitations and creating an invitation again.
+2. **Correct the self-hosted authentication configuration**
+   - Ensure the deployment configuration writes the active `PUBLIC_BASE_URL` into the authentication site URL and public API URL.
+   - Add the corresponding `/reset-password` URL to the allowed redirect list so the authentication service does not silently fall back to an old domain.
+   - For production, deploy with `PUBLIC_BASE_URL=https://vyapaar.ramky.com`; DEV can continue using its own address without code changes.
 
-## Technical notes
-- Missing object: `public.check_my_smtp_configured()` from `supabase/migrations/20260505103815_b9e2b69d-d60e-442a-a3e7-08fa43d10538.sql`.
-- Caller: `src/pages/AdminInvitations.tsx` (`supabase.rpc('check_my_smtp_configured')`).
-- Depends on table `public.smtp_email_configs` — if that table is also missing on the server, its migration must be applied first.
-- Apply via `bash scripts/selfhost/run-migrations.sh` (or `scripts/deploy-vms-server.sh --skip-build --skip-functions`), then `NOTIFY pgrst, 'reload schema';`.
-- No frontend rebuild required.
+3. **Deploy the affected server pieces**
+   - Redeploy `send-password-reset`.
+   - Apply the refreshed authentication environment on the self-hosted server and restart the authentication service so the old `vendx.ramky.com` value is removed from generated links.
+   - No database table change is required.
 
-## Result
-Creating a vendor invitation on the self-hosted server works again, and the SMTP-configured check behaves the same as on the hosted environment.
+4. **Verify the complete flow**
+   - Request a reset from `https://vyapaar.ramky.com/auth`.
+   - Confirm both the email button and copied fallback URL use `vyapaar.ramky.com`, never `vendx.ramky.com`.
+   - Confirm clicking either link verifies the recovery token, opens `/reset-password`, accepts a new password, and returns to the login page.
+
+## Technical scope
+
+- `src/components/auth/ForgotPasswordDialog.tsx` already supplies the current origin; preserve that behavior.
+- Update `supabase/functions/send-password-reset/index.ts` with validated origin handling and generated-link normalization, following the existing self-hosted normalization pattern used by vendor invitation links.
+- Update the self-host deployment auth URL/redirect configuration and its deployment guidance so every environment uses its own `PUBLIC_BASE_URL`.
