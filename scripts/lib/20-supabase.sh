@@ -218,3 +218,24 @@ for i in $(seq 1 90); do
   sleep 2
 done
 [[ $ready -eq 1 ]] || echo "WARNING: Kong did not respond within 180s. Check: docker compose -f $BACKEND_DIR/docker-compose.yml ps"
+
+log "Verifying active authentication URLs"
+expected_api="${PUBLIC_BASE_URL}/supabase"
+expected_redirect="${PUBLIC_BASE_URL}/reset-password"
+active_site=$(docker compose -f "$BACKEND_DIR/docker-compose.yml" exec -T auth sh -c 'printf %s "$GOTRUE_SITE_URL"')
+active_api=$(docker compose -f "$BACKEND_DIR/docker-compose.yml" exec -T auth sh -c 'printf %s "$API_EXTERNAL_URL"')
+active_redirect=$(docker compose -f "$BACKEND_DIR/docker-compose.yml" exec -T auth sh -c 'printf %s "$GOTRUE_URI_ALLOW_LIST"')
+
+if [[ "$active_site" != "$PUBLIC_BASE_URL" ||
+      "$active_api" != "$expected_api" ||
+      "$active_redirect" != "$expected_redirect" ]]; then
+  echo "ERROR: authentication service loaded stale public URLs." >&2
+  echo "Expected site: $PUBLIC_BASE_URL" >&2
+  echo "Active site:   ${active_site:-<empty>}" >&2
+  echo "Expected API:  $expected_api" >&2
+  echo "Active API:    ${active_api:-<empty>}" >&2
+  echo "Expected reset allow-list: $expected_redirect" >&2
+  echo "Active reset allow-list:   ${active_redirect:-<empty>}" >&2
+  exit 1
+fi
+echo "Authentication URLs verified for $PUBLIC_BASE_URL"

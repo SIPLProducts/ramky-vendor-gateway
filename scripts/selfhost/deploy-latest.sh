@@ -51,6 +51,32 @@ set_backend_env() {
   fi
 }
 
+verify_auth_urls() {
+  local expected_site="$1"
+  local expected_api="${expected_site}/supabase"
+  local expected_redirect="${expected_site}/reset-password"
+  local active_site active_api active_redirect
+
+  active_site=$(docker compose -f "$COMPOSE_FILE" exec -T auth sh -c 'printf %s "$GOTRUE_SITE_URL"')
+  active_api=$(docker compose -f "$COMPOSE_FILE" exec -T auth sh -c 'printf %s "$API_EXTERNAL_URL"')
+  active_redirect=$(docker compose -f "$COMPOSE_FILE" exec -T auth sh -c 'printf %s "$GOTRUE_URI_ALLOW_LIST"')
+
+  if [[ "$active_site" != "$expected_site" ||
+        "$active_api" != "$expected_api" ||
+        "$active_redirect" != "$expected_redirect" ]]; then
+    echo "ERROR: authentication service loaded stale public URLs." >&2
+    echo "Expected site: $expected_site" >&2
+    echo "Active site:   ${active_site:-<empty>}" >&2
+    echo "Expected API:  $expected_api" >&2
+    echo "Active API:    ${active_api:-<empty>}" >&2
+    echo "Expected reset allow-list: $expected_redirect" >&2
+    echo "Active reset allow-list:   ${active_redirect:-<empty>}" >&2
+    exit 1
+  fi
+
+  echo "   authentication URLs verified for $expected_site"
+}
+
 ensure_functions_main() {
   mkdir -p "$FN_DST/main"
   if [[ -f "$FN_DST/main/index.ts" ]]; then
@@ -128,8 +154,12 @@ if [[ -n "${PUBLIC_BASE_URL:-}" && -f "$ENV_FILE" ]]; then
   set_backend_env ADDITIONAL_REDIRECT_URLS "${PUBLIC_BASE_URL}/reset-password"
   echo ">> Recreating auth so the updated URL configuration is loaded"
   docker compose -f "$COMPOSE_FILE" up -d --force-recreate auth
+  echo ">> Verifying active authentication URLs"
+  verify_auth_urls "$PUBLIC_BASE_URL"
 elif [[ -z "${PUBLIC_BASE_URL:-}" ]]; then
-  echo "NOTICE: PUBLIC_BASE_URL was not supplied; existing authentication URLs were preserved."
+  echo "ERROR: PUBLIC_BASE_URL is required so authentication links cannot retain a stale environment address." >&2
+  echo "Example: sudo PUBLIC_BASE_URL=http://10.200.1.7 bash $0 --skip-migrations --skip-frontend" >&2
+  exit 1
 fi
 
 # ---------- 1. Migrations ----------
