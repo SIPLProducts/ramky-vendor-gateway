@@ -54,6 +54,29 @@ export default function ResetPassword() {
           return;
         }
 
+        // Direct recovery flow: the email opens this portal first, then the
+        // SDK verifies GoTrue's official hashed token without a server redirect.
+        const tokenHash = search.get('token_hash');
+        const tokenType = search.get('type');
+        if (tokenHash) {
+          if (tokenType && tokenType !== 'recovery') {
+            if (!cancelled) setError('This reset link is invalid. Please request a new one.');
+            return;
+          }
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          });
+          if (cancelled) return;
+          window.history.replaceState({}, document.title, window.location.pathname);
+          if (verifyError) {
+            setError(verifyError.message || 'This reset link is invalid or has expired. Please request a new one.');
+            return;
+          }
+          setReady(true);
+          return;
+        }
+
         // 2) PKCE flow: ?code=...
         const code = search.get('code');
         if (code) {
