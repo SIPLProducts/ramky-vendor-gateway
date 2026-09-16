@@ -62,6 +62,24 @@ const normalizeActionLink = (rawActionLink: string, resetUrl: URL | null, sameHo
   return actionUrl.toString();
 };
 
+const buildPortalRecoveryLink = (
+  properties: Record<string, unknown>,
+  resetUrl: URL | null,
+  fallbackActionLink: string,
+): string => {
+  if (!resetUrl) return fallbackActionLink;
+
+  const hashedToken = typeof properties.hashed_token === 'string'
+    ? properties.hashed_token
+    : null;
+  if (!hashedToken) return fallbackActionLink;
+
+  const portalUrl = new URL(resetUrl.toString());
+  portalUrl.searchParams.set('token_hash', hashedToken);
+  portalUrl.searchParams.set('type', 'recovery');
+  return portalUrl.toString();
+};
+
 const escapeHtml = (value: string) => value
   .replaceAll('&', '&amp;')
   .replaceAll('"', '&quot;')
@@ -102,11 +120,26 @@ serve(async (req) => {
       throw linkError;
     }
 
-    const rawActionLink = (linkData as any)?.properties?.action_link as string | undefined;
+    const properties = linkData?.properties as Record<string, unknown> | undefined;
+    const rawActionLink = typeof properties?.action_link === 'string'
+      ? properties.action_link
+      : undefined;
     if (!rawActionLink) {
       throw new Error("Failed to generate reset link");
     }
-    const actionLink = normalizeActionLink(rawActionLink, trustedResetUrl, isSameHostRequest(req, trustedResetUrl));
+    const fallbackActionLink = normalizeActionLink(
+      rawActionLink,
+      trustedResetUrl,
+      isSameHostRequest(req, trustedResetUrl),
+    );
+    // Prefer the official hashed token and verify it inside the portal. This
+    // avoids GoTrue's redirect fallback and raw-token incompatibilities on
+    // self-hosted installations while keeping older versions compatible.
+    const actionLink = buildPortalRecoveryLink(
+      properties || {},
+      trustedResetUrl,
+      fallbackActionLink,
+    );
     const safeActionLink = escapeHtml(actionLink);
 
     const subject = "Reset your Ramky Vyapaar Portal password";
