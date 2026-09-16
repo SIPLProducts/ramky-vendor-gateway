@@ -78,20 +78,43 @@ First run: ~5–10 min. Re-runs are safe (secrets persisted, migrations tracked)
 9. `ufw` allows 22 + 80 only.
 10. Prints a summary with URLs, credentials, and next steps.
 
-### Updating an existing server domain
+### Updating DEV or QA authentication URLs
 
 Always pass the public portal URL when deploying after a hostname change. This
 updates the authentication link host and restarts the auth service before the
-latest functions are installed:
+latest functions are installed. The deployment now stops with an error if the
+running auth service did not load the supplied site, API, and reset URL values.
+
+DEV:
+
+```bash
+cd /opt/Ramky_Applications/DEV/VMS/source
+sudo PUBLIC_BASE_URL=http://10.200.1.7 \
+  bash scripts/selfhost/deploy-latest.sh --skip-migrations --skip-frontend
+```
+
+QA (replace the example with the exact browser URL used for QA):
+
+```bash
+cd /opt/Ramky_Applications/QA/VMS/source
+sudo PUBLIC_BASE_URL=https://qa.example.com \
+  APP_ROOT=/opt/Ramky_Applications/QA/VMS \
+  bash scripts/selfhost/deploy-latest.sh --skip-migrations --skip-frontend
+```
+
+Production:
 
 ```bash
 cd /opt/Ramky_Applications/PROD/VMS/source
 sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
+  APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
   bash scripts/selfhost/deploy-latest.sh --skip-migrations --skip-frontend
 ```
 
-DEV uses the same command with its own URL. Do not reuse the production URL in
-DEV or the DEV URL in production.
+Do not reuse one environment's URL in another. After this command finishes,
+discard previously issued reset emails and request a new link. Recovery links
+are short-lived, single-use, and cannot be repaired after they return
+`otp_expired`.
 
 ## 4. After setup
 
