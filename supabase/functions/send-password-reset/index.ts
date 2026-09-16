@@ -23,16 +23,20 @@ const getTrustedResetUrl = (req: Request, redirectTo?: string): URL | null => {
   const candidate = new URL(redirectTo);
   if (!['http:', 'https:'].includes(candidate.protocol)) return null;
 
-  // On self-hosted installations the app and /supabase API share one host.
-  // Only normalize links back to that host; never trust an arbitrary origin
-  // supplied in the request body, because recovery links contain credentials.
-  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const requestHost = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
-  if (!requestHost || candidate.host.toLowerCase() !== requestHost.toLowerCase()) return null;
-
-  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  if (forwardedProto === 'http' || forwardedProto === 'https') {
-    candidate.protocol = `${forwardedProto}:`;
+  // The browser Origin is authoritative for hosted deployments, where the
+  // edge-function host differs from the app host. Self-hosted installations
+  // can fall back to the forwarded request host. Never trust an arbitrary URL
+  // from the body because recovery links contain credentials.
+  const requestOrigin = req.headers.get('origin');
+  if (requestOrigin) {
+    const originUrl = new URL(requestOrigin);
+    if (candidate.origin.toLowerCase() !== originUrl.origin.toLowerCase()) return null;
+  } else {
+    const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    const requestHost = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
+    if (!requestHost || candidate.host.toLowerCase() !== requestHost.toLowerCase()) return null;
+    const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    if (forwardedProto === 'http' || forwardedProto === 'https') candidate.protocol = `${forwardedProto}:`;
   }
   candidate.pathname = '/reset-password';
   candidate.search = '';
@@ -71,8 +75,9 @@ serve(async (req) => {
     const { email, redirectTo } = parsed.data;
     const trustedResetUrl = getTrustedResetUrl(req, redirectTo);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) throw new Error("Server authentication configuration is unavailable");
     const admin = createClient(supabaseUrl, serviceKey);
 
     // Generate the recovery link (does NOT auto-send any email)
