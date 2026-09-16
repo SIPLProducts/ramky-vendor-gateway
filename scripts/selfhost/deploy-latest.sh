@@ -25,6 +25,7 @@ MIG_DIR="${MIG_DIR:-$BACKEND_DIR/migrations}"
 FN_DST="${FN_DST:-$BACKEND_DIR/volumes/functions}"
 SOURCE_DIR="${SOURCE_DIR:-$(pwd)}"
 COMPOSE_FILE="$BACKEND_DIR/docker-compose.yml"
+ENV_FILE="$BACKEND_DIR/.env"
 
 SKIP_BUILD=0; SKIP_MIG=0; SKIP_FN=0; SKIP_FE=0
 for a in "$@"; do
@@ -39,6 +40,16 @@ done
 
 [[ $EUID -eq 0 ]] || { echo "Run with sudo."; exit 1; }
 [[ -d "$SOURCE_DIR/supabase" ]] || { echo "SOURCE_DIR=$SOURCE_DIR has no supabase/ folder."; exit 1; }
+
+set_backend_env() {
+  local key="$1" val="$2" esc
+  esc=$(printf '%s' "$val" | sed -e 's/[\/&]/\\&/g')
+  if grep -qE "^${key}=" "$ENV_FILE"; then
+    sed -i -E "s|^${key}=.*|${key}=${esc}|" "$ENV_FILE"
+  else
+    echo "${key}=${val}" >> "$ENV_FILE"
+  fi
+}
 
 ensure_functions_main() {
   mkdir -p "$FN_DST/main"
@@ -104,6 +115,22 @@ echo " VMS self-host deploy   $(date -Is)"
 echo " Source repo : $SOURCE_DIR"
 echo " App root    : $APP_ROOT"
 echo "=========================================================="
+
+# Keep GoTrue's public links aligned with the portal domain on code updates.
+# Pass PUBLIC_BASE_URL explicitly when a domain changes, for example:
+# PUBLIC_BASE_URL=https://vyapaar.ramky.com sudo -E bash scripts/selfhost/deploy-latest.sh
+if [[ -n "${PUBLIC_BASE_URL:-}" && -f "$ENV_FILE" ]]; then
+  PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
+  echo ">> Updating authentication URLs for $PUBLIC_BASE_URL"
+  set_backend_env SITE_URL "$PUBLIC_BASE_URL"
+  set_backend_env API_EXTERNAL_URL "${PUBLIC_BASE_URL}/supabase"
+  set_backend_env SUPABASE_PUBLIC_URL "${PUBLIC_BASE_URL}/supabase"
+  set_backend_env ADDITIONAL_REDIRECT_URLS "${PUBLIC_BASE_URL}/reset-password"
+  echo ">> Recreating auth so the updated URL configuration is loaded"
+  docker compose -f "$COMPOSE_FILE" up -d --force-recreate auth
+elif [[ -z "${PUBLIC_BASE_URL:-}" ]]; then
+  echo "NOTICE: PUBLIC_BASE_URL was not supplied; existing authentication URLs were preserved."
+fi
 
 # ---------- 1. Migrations ----------
 if [[ $SKIP_MIG -eq 0 && -d "$SOURCE_DIR/supabase/migrations" ]]; then

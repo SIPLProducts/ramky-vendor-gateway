@@ -35,7 +35,7 @@ rsync -av --delete \
 ```bash
 ssh root@10.200.1.7
 cd /opt/Ramky_Applications/DEV/VMS/source
-sudo bash scripts/deploy-vms-server.sh
+sudo PUBLIC_BASE_URL=http://10.200.1.7 bash scripts/deploy-vms-server.sh
 ```
 
 First run: ~5–10 min. Re-runs are safe (secrets persisted, migrations tracked).
@@ -57,8 +57,9 @@ First run: ~5–10 min. Re-runs are safe (secrets persisted, migrations tracked)
 1. Installs Node 20, Docker + Compose, nginx, ufw, htpasswd.
 2. Clones `supabase/supabase` `docker/` into `backend/`, generates strong
    secrets once (`backend/.env.secrets`, chmod 600), writes `backend/.env`
-   with `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_PUBLIC_URL` pointing to
-   `http://10.200.1.7/supabase`. Adds a `docker-compose.override.yml` that
+   with `SITE_URL` pointing to `PUBLIC_BASE_URL`, API URLs pointing to
+   `PUBLIC_BASE_URL/supabase`, and the password-reset redirect allow-list
+   pointing to `PUBLIC_BASE_URL/reset-password`. Adds a `docker-compose.override.yml` that
    binds Kong / Studio / Postgres to `127.0.0.1` only.
 3. Brings the stack up (`docker compose up -d`) and waits for Kong.
 4. Applies `supabase/migrations/*.sql` via `psql`, tracked in
@@ -76,6 +77,21 @@ First run: ~5–10 min. Re-runs are safe (secrets persisted, migrations tracked)
    previous version), symlinks into `/etc/nginx/sites-enabled/`, reloads nginx.
 9. `ufw` allows 22 + 80 only.
 10. Prints a summary with URLs, credentials, and next steps.
+
+### Updating an existing server domain
+
+Always pass the public portal URL when deploying after a hostname change. This
+updates the authentication link host and restarts the auth service before the
+latest functions are installed:
+
+```bash
+cd /opt/Ramky_Applications/PROD/VMS/source
+sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
+  bash scripts/selfhost/deploy-latest.sh --skip-migrations --skip-frontend
+```
+
+DEV uses the same command with its own URL. Do not reuse the production URL in
+DEV or the DEV URL in production.
 
 ## 4. After setup
 

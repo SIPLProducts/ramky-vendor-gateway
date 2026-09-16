@@ -1,22 +1,75 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "npm:zod@3.23.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const RequestSchema = z.object({
+  email: z.string().trim().email().max(320),
+  redirectTo: z.string().url().optional(),
+});
+
+const jsonResponse = (body: unknown, status = 200) => new Response(
+  JSON.stringify(body),
+  { status, headers: { "Content-Type": "application/json", ...corsHeaders } },
+);
+
+const getTrustedResetUrl = (req: Request, redirectTo?: string): URL | null => {
+  if (!redirectTo) return null;
+
+  const candidate = new URL(redirectTo);
+  if (!['http:', 'https:'].includes(candidate.protocol)) return null;
+
+  // On self-hosted installations the app and /supabase API share one host.
+  // Only normalize links back to that host; never trust an arbitrary origin
+  // supplied in the request body, because recovery links contain credentials.
+  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const requestHost = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
+  if (!requestHost || candidate.host.toLowerCase() !== requestHost.toLowerCase()) return null;
+
+  const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  if (forwardedProto === 'http' || forwardedProto === 'https') {
+    candidate.protocol = `${forwardedProto}:`;
+  }
+  candidate.pathname = '/reset-password';
+  candidate.search = '';
+  candidate.hash = '';
+  return candidate;
+};
+
+const normalizeActionLink = (rawActionLink: string, resetUrl: URL | null): string => {
+  if (!resetUrl) return rawActionLink;
+
+  const actionUrl = new URL(rawActionLink);
+  actionUrl.protocol = resetUrl.protocol;
+  actionUrl.host = resetUrl.host;
+  if (actionUrl.pathname.startsWith('/auth/v1/')) {
+    actionUrl.pathname = `/supabase${actionUrl.pathname}`;
+  }
+  actionUrl.searchParams.set('redirect_to', resetUrl.toString());
+  return actionUrl.toString();
+};
+
+const escapeHtml = (value: string) => value
+  .replaceAll('&', '&amp;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#39;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;');
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { email, redirectTo } = await req.json();
-    if (!email || typeof email !== "string") {
-      return new Response(JSON.stringify({ success: false, error: "Email is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+    const parsed = RequestSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return jsonResponse({ success: false, error: parsed.error.flatten().fieldErrors }, 400);
     }
+    const { email, redirectTo } = parsed.data;
+    const trustedResetUrl = getTrustedResetUrl(req, redirectTo);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -26,7 +79,7 @@ serve(async (req) => {
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: redirectTo || undefined },
+      options: { redirectTo: trustedResetUrl?.toString() || redirectTo },
     });
 
     // To avoid email enumeration, treat user-not-found as success (silent no-op).
@@ -34,18 +87,17 @@ serve(async (req) => {
       const msg = String(linkError.message ?? "");
       if (/not.?found/i.test(msg) || /no user/i.test(msg)) {
         console.log(`[send-password-reset] silent no-op for ${email}: ${msg}`);
-        return new Response(JSON.stringify({ success: true }), {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
+        return jsonResponse({ success: true });
       }
       throw linkError;
     }
 
-    const actionLink = (linkData as any)?.properties?.action_link as string | undefined;
-    if (!actionLink) {
+    const rawActionLink = (linkData as any)?.properties?.action_link as string | undefined;
+    if (!rawActionLink) {
       throw new Error("Failed to generate reset link");
     }
+    const actionLink = normalizeActionLink(rawActionLink, trustedResetUrl);
+    const safeActionLink = escapeHtml(actionLink);
 
     const subject = "Reset your Ramky Vyapaar Portal password";
     const html = `
@@ -54,14 +106,14 @@ serve(async (req) => {
         <p>Hi,</p>
         <p>We received a request to reset the password for your Ramky Vyapaar Portal account.</p>
         <p style="margin: 24px 0;">
-          <a href="${actionLink}"
+          <a href="${safeActionLink}"
              style="background:#195B9B;color:#fff;text-decoration:none;padding:12px 20px;border-radius:6px;display:inline-block;font-weight:600;">
             Reset Password
           </a>
         </p>
         <p style="font-size: 12px; color: #6B7280;">
           If the button doesn't work, copy and paste this link into your browser:<br/>
-          <a href="${actionLink}" style="color:#195B9B; word-break:break-all;">${actionLink}</a>
+          <a href="${safeActionLink}" style="color:#195B9B; word-break:break-all;">${safeActionLink}</a>
         </p>
         <p style="font-size: 12px; color: #6B7280;">
           This link will expire shortly. If you did not request this, please ignore this email.
@@ -80,10 +132,7 @@ serve(async (req) => {
       throw new Error((sendData as any)?.error ?? "Failed to send reset email");
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return jsonResponse({ success: true });
   } catch (error: any) {
     console.error("send-password-reset error:", error);
     return new Response(
