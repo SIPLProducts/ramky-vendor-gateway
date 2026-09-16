@@ -23,10 +23,8 @@ const getTrustedResetUrl = (req: Request, redirectTo?: string): URL | null => {
   const candidate = new URL(redirectTo);
   if (!['http:', 'https:'].includes(candidate.protocol)) return null;
 
-  // The browser Origin is authoritative for hosted deployments, where the
-  // edge-function host differs from the app host. Self-hosted installations
-  // can fall back to the forwarded request host. Never trust an arbitrary URL
-  // from the body because recovery links contain credentials.
+  // The browser Origin confirms the request came from the same portal URL.
+  // GoTrue still enforces its configured redirect allow-list.
   const requestOrigin = req.headers.get('origin');
   if (requestOrigin) {
     const originUrl = new URL(requestOrigin);
@@ -44,7 +42,18 @@ const getTrustedResetUrl = (req: Request, redirectTo?: string): URL | null => {
   return candidate;
 };
 
-const normalizeActionLink = (rawActionLink: string, resetUrl: URL | null): string => {
+const isSameHostRequest = (req: Request, resetUrl: URL | null): boolean => {
+  if (!resetUrl) return false;
+  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const requestHost = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
+  return requestHost?.toLowerCase() === resetUrl.host.toLowerCase();
+};
+
+const normalizeActionLink = (rawActionLink: string, resetUrl: URL | null, sameHostRequest: boolean): string => {
+  // Only rewrite the verification endpoint for self-hosted installations,
+  // where the portal and /supabase gateway share the same public host.
+  // Hosted functions keep the authentication service's signed action URL.
+  if (!sameHostRequest) return rawActionLink;
   if (!resetUrl) return rawActionLink;
 
   const actionUrl = new URL(rawActionLink);
@@ -101,7 +110,7 @@ serve(async (req) => {
     if (!rawActionLink) {
       throw new Error("Failed to generate reset link");
     }
-    const actionLink = normalizeActionLink(rawActionLink, trustedResetUrl);
+    const actionLink = normalizeActionLink(rawActionLink, trustedResetUrl, isSameHostRequest(req, trustedResetUrl));
     const safeActionLink = escapeHtml(actionLink);
 
     const subject = "Reset your Ramky Vyapaar Portal password";
