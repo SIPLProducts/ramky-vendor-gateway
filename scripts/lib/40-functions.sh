@@ -86,6 +86,13 @@ verify_function_entrypoint "kyc-api-execute"
 verify_function_entrypoint "log-login-attempt"
 verify_function_entrypoint "fetch-tenants-from-sap"
 
+if grep -q "password-reset-direct-portal-v2" "$FN_DST/send-password-reset/index.ts"; then
+  echo "  send-password-reset direct portal link guard found"
+else
+  echo "ERROR: current send-password-reset direct portal link guard is missing from $FN_DST" >&2
+  exit 1
+fi
+
 # --- Syntax gate: a function that cannot be parsed makes edge-runtime fail at
 # boot with "InvalidWorkerCreation: ... The module's source code could not be
 # parsed". Catch that here, before the container is recreated.
