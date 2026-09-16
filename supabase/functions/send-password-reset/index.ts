@@ -38,41 +38,26 @@ const getTrustedResetUrl = (req: Request, redirectTo?: string): URL | null => {
   return candidate;
 };
 
-const isSameHostRequest = (req: Request, resetUrl: URL | null): boolean => {
-  if (!resetUrl) return false;
-  const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const requestHost = forwardedHost || req.headers.get('host')?.split(',')[0]?.trim();
-  return requestHost?.toLowerCase() === resetUrl.host.toLowerCase();
-};
-
-const normalizeActionLink = (rawActionLink: string, resetUrl: URL | null, sameHostRequest: boolean): string => {
-  // Only rewrite the verification endpoint for self-hosted installations,
-  // where the portal and /supabase gateway share the same public host.
-  // Hosted functions keep the authentication service's signed action URL.
-  if (!sameHostRequest) return rawActionLink;
-  if (!resetUrl) return rawActionLink;
-
-  const actionUrl = new URL(rawActionLink);
-  actionUrl.protocol = resetUrl.protocol;
-  actionUrl.host = resetUrl.host;
-  if (actionUrl.pathname.startsWith('/auth/v1/')) {
-    actionUrl.pathname = `/supabase${actionUrl.pathname}`;
-  }
-  actionUrl.searchParams.set('redirect_to', resetUrl.toString());
-  return actionUrl.toString();
-};
-
 const buildPortalRecoveryLink = (
   properties: Record<string, unknown>,
-  resetUrl: URL | null,
-  fallbackActionLink: string,
-): string => {
-  if (!resetUrl) return fallbackActionLink;
-
-  const hashedToken = typeof properties.hashed_token === 'string'
+  resetUrl: URL,
+): string | null => {
+  // password-reset-direct-portal-v2
+  // Older self-hosted auth releases expose the recovery hash only inside
+  // action_link. Extract it, but never reuse that link's configured hostname.
+  let hashedToken = typeof properties.hashed_token === 'string'
     ? properties.hashed_token
     : null;
-  if (!hashedToken) return fallbackActionLink;
+  if (!hashedToken && typeof properties.action_link === 'string') {
+    try {
+      const generatedUrl = new URL(properties.action_link);
+      hashedToken = generatedUrl.searchParams.get('token_hash')
+        || generatedUrl.searchParams.get('token');
+    } catch {
+      return null;
+    }
+  }
+  if (!hashedToken) return null;
 
   const portalUrl = new URL(resetUrl.toString());
   portalUrl.searchParams.set('token_hash', hashedToken);
@@ -97,6 +82,9 @@ serve(async (req) => {
     }
     const { email, redirectTo } = parsed.data;
     const trustedResetUrl = getTrustedResetUrl(req, redirectTo);
+    if (!trustedResetUrl) {
+      return jsonResponse({ success: false, error: "Reset destination does not match this portal" }, 400);
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -107,7 +95,7 @@ serve(async (req) => {
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "recovery",
       email,
-      options: { redirectTo: trustedResetUrl?.toString() || redirectTo },
+      options: { redirectTo: trustedResetUrl.toString() },
     });
 
     // To avoid email enumeration, treat user-not-found as success (silent no-op).
@@ -127,19 +115,15 @@ serve(async (req) => {
     if (!rawActionLink) {
       throw new Error("Failed to generate reset link");
     }
-    const fallbackActionLink = normalizeActionLink(
-      rawActionLink,
-      trustedResetUrl,
-      isSameHostRequest(req, trustedResetUrl),
-    );
-    // Prefer the official hashed token and verify it inside the portal. This
-    // avoids GoTrue's redirect fallback and raw-token incompatibilities on
-    // self-hosted installations while keeping older versions compatible.
+    // Always verify inside the requesting portal. Never expose the auth
+    // service's action_link because its configured hostname may be stale.
     const actionLink = buildPortalRecoveryLink(
       properties || {},
       trustedResetUrl,
-      fallbackActionLink,
     );
+    if (!actionLink) {
+      throw new Error("Authentication service did not return a usable recovery token");
+    }
     const safeActionLink = escapeHtml(actionLink);
 
     const subject = "Reset your Ramky Vyapaar Portal password";

@@ -193,6 +193,10 @@ if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
   verify_function_entrypoint "upload-vendor-document"
   verify_function_entrypoint "kyc-api-execute"
   verify_function_entrypoint "log-login-attempt"
+  echo ">> Verifying password-reset direct portal link guard"
+  grep -q "password-reset-direct-portal-v2" "$FN_DST/send-password-reset/index.ts" \
+    && echo "   password-reset direct portal link guard found" \
+    || { echo "ERROR: current send-password-reset link guard missing from deployed functions"; exit 1; }
   echo ">> Verifying WHOLDTAX final-boundary fix in deployed functions"
   grep -R "wholdtax-final-boundary-v2" "$FN_DST/sync-vendor-to-sap" "$FN_DST/sync-vendors-to-sap-bulk" >/dev/null \
     && echo "   WHOLDTAX fix marker found" \
