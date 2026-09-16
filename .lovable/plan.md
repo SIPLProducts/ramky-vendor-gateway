@@ -7,6 +7,7 @@
 - The sender already trims the username and removes spaces from the saved password, so spaces copied from Google's grouped app-password display are handled.
 - Quality and Production show the same sender mailbox, `ramky.vyapaar@ramky.com`. If the same invalid or revoked credential was saved in both environments, both will fail identically.
 - The response does not distinguish between a wrong/revoked app password and a Google Workspace policy that blocks app-password SMTP. That distinction must be checked against the Gmail rejection details and the mailbox settings.
+- A normal Google account password cannot be added as a fallback. Gmail no longer accepts normal passwords for SMTP basic authentication, and attempting both would weaken security without fixing the rejection.
 
 ## Resolution plan
 
@@ -14,6 +15,7 @@
    - Confirm 2-Step Verification is enabled for `ramky.vyapaar@ramky.com`.
    - Confirm the Google Workspace administrator allows App Passwords for this account.
    - Generate a new Mail app password for this mailbox. Do not use the normal Google password.
+   - Keep one password field for the app password only; do not attempt the normal account password automatically.
 
 2. **Replace the saved credential separately in both environments**
    - In Quality, enter the new app password, save the configuration, then send a test.
