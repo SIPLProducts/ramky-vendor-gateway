@@ -43,6 +43,26 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
+    /* Vendor registration opening screen */
+    --registration-backdrop: 211 84% 94%;
+    --registration-panel: 205 100% 20%;
+    --registration-panel-foreground: 0 0% 100%;
+    --registration-panel-border: 201 83% 28%;
+    --registration-panel-muted: 205 86% 24%;
+    --registration-panel-muted-foreground: 204 52% 86%;
+    --registration-indicator: 205 82% 14%;
+    --registration-accent: 193 90% 48%;
+    --registration-accent-foreground: 0 0% 100%;
+    --registration-option: 210 31% 96%;
+    --registration-option-foreground: 207 72% 18%;
+    --registration-option-border: 208 22% 84%;
+    --registration-icon: 207 25% 88%;
+    --registration-radio: 210 17% 79%;
+    --registration-button: 210 31% 97%;
+    --registration-button-hover: 206 34% 91%;
+    --registration-button-foreground: 205 100% 29%;
+    --registration-button-border: 209 25% 82%;
+
     --border: 214 20% 90%;
     --input: 214 20% 88%;
     --ring: 160 70% 38%;
@@ -76,6 +96,8 @@
     --shadow-lg: 0 12px 24px -6px hsl(215 25% 15% / 0.08), 0 4px 8px -4px hsl(215 25% 15% / 0.05);
     --shadow-card: 0 1px 2px 0 hsl(215 25% 15% / 0.04), 0 1px 3px 0 hsl(215 25% 15% / 0.05);
     --shadow-glow: 0 0 0 4px hsl(160 70% 38% / 0.15);
+    --shadow-registration-panel: 0 24px 50px -16px hsl(205 100% 12% / 0.42);
+    --shadow-registration-glow: 0 0 0 2px hsl(var(--registration-accent) / 0.24), 0 5px 18px hsl(var(--registration-accent) / 0.18);
 
 
     /* Motion */

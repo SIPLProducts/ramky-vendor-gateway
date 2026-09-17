@@ -116,8 +116,8 @@ export default {
         elegant: "var(--shadow-md)",
         elevated: "var(--shadow-lg)",
         glow: "var(--shadow-glow)",
-        "registration-panel": "0 24px 50px -16px hsl(205 100% 12% / 0.42)",
-        "registration-glow": "0 0 0 2px hsl(var(--registration-accent) / 0.24), 0 5px 18px hsl(var(--registration-accent) / 0.18)",
+        "registration-panel": "var(--shadow-registration-panel)",
+        "registration-glow": "var(--shadow-registration-glow)",
       },
       transitionTimingFunction: {
         base: "cubic-bezier(0.4, 0, 0.2, 1)",

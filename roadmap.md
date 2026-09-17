@@ -6,3 +6,4 @@
 - [x] Remove the legacy authentication-host fallback from password-reset emails.
 - [x] Support older self-hosted authentication responses without exposing their configured hostname.
 - [x] Stop deployments when the current direct-portal password-reset function is missing.
+- [x] Match the vendor registration opening screen to the supplied split-screen reference and use the uploaded Ramky collage.
