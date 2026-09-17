@@ -1,37 +1,35 @@
-# Fix SMTP Authentication in Quality and Production
+# Match the Vendor Registration Main Screen Reference
 
-## Confirmed diagnosis
+## Goal
+Recreate the first reference screen for the initial vendor-type selection, using the uploaded `WhatsApp Image 2026-09-17 at 11.30.29 AM (1).jpeg` as the actual left-side image.
 
-- Both environments successfully reach `smtp.gmail.com` on port `587` using TLS.
-- Gmail returns an authentication rejection (`535` / bad credentials) before attempting delivery. The recipient, subject, HTML, CC list, and portal URL are not causing this failure.
-- The sender already trims the username and removes spaces from the saved password, so spaces copied from Google's grouped app-password display are handled.
-- Quality and Production show the same sender mailbox, `ramky.vyapaar@ramky.com`. If the same invalid or revoked credential was saved in both environments, both will fail identically.
-- The response does not distinguish between a wrong/revoked app password and a Google Workspace policy that blocks app-password SMTP. That distinction must be checked against the Gmail rejection details and the mailbox settings.
-- A normal Google account password cannot be added as a fallback. Gmail no longer accepts normal passwords for SMTP basic authentication, and attempting both would weaken security without fixing the rejection.
+## Changes
+1. **Create the split-screen opening view**
+   - Remove the current registration header and watermark treatment from the vendor-type selection screen only.
+   - Use a full-height two-panel layout matching the reference: the uploaded Ramky collage fills the large left panel, while a pale blue area fills the right panel.
+   - Keep the collage fully covering its panel without stretching, with its central Ramky logo clearly visible.
 
-## Resolution plan
+2. **Match the vendor-type panel**
+   - Place a compact dark-blue selection panel in the right area, vertically centered.
+   - Match the reference hierarchy: small decorative indicator, white “Select Vendor Type” title, Domestic and International rows, and centered Continue button.
+   - Add the building and globe icons, selected cyan outline/check state, and unselected radio state shown in the reference.
+   - Preserve the existing selection and Continue behavior without changing registration logic.
 
-1. **Confirm the Gmail account requirement**
-   - Confirm 2-Step Verification is enabled for `ramky.vyapaar@ramky.com`.
-   - Confirm the Google Workspace administrator allows App Passwords for this account.
-   - Generate a new Mail app password for this mailbox. Do not use the normal Google password.
-   - Keep one password field for the app password only; do not attempt the normal account password automatically.
+3. **Use the supplied image as an app asset**
+   - Store the uploaded original through the project asset service and reference it from the registration screen.
+   - Do not use the first screenshot itself as page artwork; it remains the visual layout reference.
 
-2. **Replace the saved credential separately in both environments**
-   - In Quality, enter the new app password, save the configuration, then send a test.
-   - In Production, enter the same new app password only if both environments intentionally use the same mailbox; otherwise use Production's own mailbox credential.
-   - Leaving the password field empty keeps the currently rejected password, so a new value must be entered before saving.
+4. **Responsive behavior**
+   - On desktop, retain the wide image-left/card-right composition.
+   - On smaller screens, keep the selection panel readable and usable while showing the supplied image as the supporting visual without overflow or cropped controls.
 
-3. **Improve diagnosis in the application**
-   - Make the test action read and display the safe Gmail response category and code without exposing the password.
-   - Distinguish invalid credentials, app-password policy restrictions, connection timeouts, and recipient rejection.
-   - Keep the existing friendly instructions for Gmail authentication failures.
+5. **Verification**
+   - Check desktop and mobile layouts against the supplied reference.
+   - Verify both vendor choices, selected states, and Continue navigation still work.
+   - Confirm the latest build has no errors.
 
-4. **Verify both environments**
-   - Send one test from Quality and one from Production.
-   - Confirm Gmail accepts the authenticated sender and the recipient receives both messages.
-   - Confirm normal password-reset and buyer-notification emails also use the corrected no-reply configuration.
-
-## Expected result
-
-Quality and Production authenticate successfully with Gmail. If a newly generated app password is still rejected, the confirmed blocker is the Google Workspace account policy, which must be enabled by the organization's Google administrator rather than changed in portal code.
+## Technical scope
+- Presentation changes only in the initial vendor-type gate inside `VendorRegistration.tsx` and `VendorTypeSelector.tsx`.
+- Add semantic styling tokens/utilities in `src/index.css` or the existing theme configuration as needed.
+- Add one asset pointer for the uploaded collage.
+- No changes to vendor data, validation, approvals, or later registration steps.
