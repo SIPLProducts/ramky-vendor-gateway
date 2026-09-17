@@ -27,7 +27,7 @@ import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo-transparent.png';
-import registrationCollage from '@/assets/ramky-registration-collage.jpeg.asset.json';
+import registrationCollage from '@/assets/ramky-registration-collage.jpeg';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1657,7 +1657,7 @@ export default function VendorRegistration() {
       <main className="min-h-screen overflow-hidden bg-registration-backdrop lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
         <section className="relative h-[42vh] min-h-[260px] overflow-hidden lg:h-screen lg:min-h-0" aria-label="Ramky Group businesses">
           <img
-            src={registrationCollage.url}
+            src={registrationCollage}
             alt="Ramky Group infrastructure, real estate, industrial and water treatment projects"
             className="h-full w-full object-cover object-center"
           />
