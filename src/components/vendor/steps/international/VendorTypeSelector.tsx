@@ -1,6 +1,7 @@
-import { Check } from 'lucide-react';
+import { Building2, Check, Circle, Globe2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VendorOriginType } from '@/types/vendor';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   value: VendorOriginType;
@@ -11,9 +12,10 @@ interface Props {
 const OPTIONS: {
   value: VendorOriginType;
   title: string;
+  icon: typeof Building2;
 }[] = [
-  { value: 'domestic', title: 'Domestic Vendor' },
-  { value: 'international', title: 'International Vendor' },
+  { value: 'domestic', title: 'Domestic Vendor', icon: Building2 },
+  { value: 'international', title: 'International Vendor', icon: Globe2 },
 ];
 
 export function VendorTypeSelector({ value, onChange, disabled }: Props) {
@@ -23,32 +25,38 @@ export function VendorTypeSelector({ value, onChange, disabled }: Props) {
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
           return (
-            <button
+            <Button
               key={opt.value}
               type="button"
+              variant="outline"
               role="radio"
               aria-checked={selected}
               disabled={disabled}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'group relative w-full overflow-hidden rounded-xl',
-                'bg-white border border-slate-200 shadow-sm transition-all duration-200',
-                'hover:border-slate-300 hover:shadow-md',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-green',
-                'flex items-center justify-center gap-2 px-4 py-3.5',
-                selected && 'border-brand-green ring-1 ring-brand-green',
+                'group relative h-14 w-full overflow-hidden rounded-lg px-4',
+                'bg-registration-option border-registration-option-border text-registration-option-foreground shadow-sm transition-all duration-200',
+                'hover:bg-registration-option hover:border-registration-accent hover:shadow-md',
+                'focus-visible:ring-registration-accent focus-visible:ring-offset-registration-panel',
+                'grid grid-cols-[24px_1fr_24px] items-center gap-3',
+                selected && 'border-registration-accent ring-1 ring-registration-accent shadow-registration-glow',
                 disabled && 'opacity-60 cursor-not-allowed',
               )}
             >
-              <h4 className="text-sm font-semibold text-slate-900 leading-tight text-center">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-registration-icon text-registration-panel">
+                <opt.icon className="h-3.5 w-3.5" />
+              </span>
+              <span className="text-sm font-semibold leading-tight text-center">
                 {opt.title}
-              </h4>
-              {selected && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-6 w-6 rounded-full bg-brand-green text-white shadow-sm">
+              </span>
+              {selected ? (
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-registration-accent text-registration-accent-foreground shadow-sm">
                   <Check className="h-3.5 w-3.5" />
                 </span>
+              ) : (
+                <Circle className="h-6 w-6 text-registration-radio" strokeWidth={1.25} />
               )}
-            </button>
+            </Button>
           );
         })}
 

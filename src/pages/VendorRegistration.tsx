@@ -27,6 +27,7 @@ import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRi
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import ramkyLogo from '@/assets/ramky-logo-transparent.png';
+import registrationCollage from '@/assets/ramky-registration-collage.jpeg.asset.json';
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
@@ -1653,58 +1654,52 @@ export default function VendorRegistration() {
       setCurrentStep(1);
     };
     return (
-      <div className="ramky-brand-bg h-screen overflow-hidden flex flex-col">
-        <header className="h-16 shrink-0 border-b bg-white px-4 sm:px-6 grid grid-cols-3 items-center sticky top-0 z-50">
-          <div />
-          <div className="flex justify-center">
-            {isTokenMode ? (
-              <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
-            ) : (
-              <Link to="/" className="flex items-center">
-                <span className="text-lg sm:text-2xl font-bold text-foreground whitespace-nowrap">Vyapaar Portal</span>
-              </Link>
+      <main className="min-h-screen overflow-hidden bg-registration-backdrop lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
+        <section className="relative h-[42vh] min-h-[260px] overflow-hidden lg:h-screen lg:min-h-0" aria-label="Ramky Group businesses">
+          <img
+            src={registrationCollage.url}
+            alt="Ramky Group infrastructure, real estate, industrial and water treatment projects"
+            className="h-full w-full object-cover object-center"
+          />
+        </section>
+
+        <section className="flex min-h-[58vh] items-center justify-center px-5 py-10 lg:min-h-screen lg:px-8">
+          <div className="w-full max-w-[360px] rounded-2xl border border-registration-panel-border bg-registration-panel p-6 text-registration-panel-foreground shadow-registration-panel sm:p-7">
+            <div className="mb-5 h-3 w-7 rounded-full bg-registration-indicator p-0.5" aria-hidden="true">
+              <span className="block h-2 w-2 rounded-full bg-registration-accent" />
+            </div>
+
+            <h1 className="mb-5 text-xl font-bold leading-tight sm:text-2xl">Select Vendor Type</h1>
+
+            {isTokenMode && invitationEmail && (
+              <div className="mb-4 rounded-lg border border-registration-panel-border bg-registration-panel-muted p-2.5">
+                <p className="break-all text-xs text-registration-panel-muted-foreground">
+                  <span className="font-semibold text-registration-panel-foreground">Invited Email:</span> {invitationEmail}
+                </p>
+              </div>
             )}
-          </div>
-          <div className="flex items-center justify-end">
-            <img src={ramkyLogo} alt="Ramky" className="h-10 w-auto object-contain" />
-          </div>
-        </header>
-        <main className="h-[calc(100vh-4rem)] min-h-0 flex items-center justify-end p-1.5 sm:p-2 sm:pr-8 lg:pr-16 overflow-hidden">
-          <div className="relative w-[min(92vw,340px)] rounded-[14px] bg-white border border-slate-200 shadow-xl flex flex-col">
-            <div className="relative p-5 space-y-4 flex flex-col overflow-hidden min-w-0">
 
-              {isTokenMode && invitationEmail && (
-                <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg shrink-0 min-w-0">
-                  <p className="text-xs text-slate-700 break-all">
-                    <span className="font-medium text-slate-900">Invited Email:</span> {invitationEmail}
-                  </p>
-                </div>
-              )}
-              <div className="shrink-0">
-                <h1 className="text-base font-semibold text-slate-900 leading-tight">Select Vendor Type</h1>
-              </div>
+            <VendorTypeSelector
+              value={pendingChoiceType}
+              onChange={setPendingChoiceType}
+              disabled={isSubmitting}
+            />
 
-              <VendorTypeSelector
-                value={pendingChoiceType}
-                onChange={setPendingChoiceType}
+            <div className="flex justify-center pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={confirmChoice}
                 disabled={isSubmitting}
-              />
-              <div className="flex justify-center pt-1 shrink-0">
-                <Button type="button" onClick={confirmChoice} disabled={isSubmitting} className="min-w-[160px] h-11 text-sm font-semibold">
-                  Continue
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
+                className="h-11 min-w-[180px] border-registration-button-border bg-registration-button text-registration-button-foreground font-bold uppercase tracking-normal hover:bg-registration-button-hover hover:text-registration-button-foreground"
+              >
+                Continue
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
             </div>
           </div>
-
-        </main>
-
-
-
-
-
-      </div>
+        </section>
+      </main>
     );
   }
 
