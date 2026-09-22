@@ -5,27 +5,25 @@ Restore the Production database administration screen and apply the missing CEO 
 
 ## Steps on the Production Server
 
-1. Confirm that `/opt/Ramky_Applications/PROD/VMS/scripts` is the **complete latest project folder**, not only a collection of shell scripts. It must contain all four entries:
+1. The listing confirms `/opt/Ramky_Applications/PROD/VMS/scripts/selfhost` contains only deployment scripts. Run the database repair directly from this current folder:
+
+```bash
+sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
+  bash ./repair-production-db-auth.sh --repair
+```
+
+2. Separately locate or copy the **complete latest project folder**. It must contain all four entries:
    - `package.json`
    - `src/`
    - `supabase/`
    - `drizzle/`
 
-2. From the complete project folder, run the guarded Production database-password repair:
-
-```bash
-cd /opt/Ramky_Applications/PROD/VMS/scripts
-
-sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
-  bash scripts/selfhost/repair-production-db-auth.sh --repair
-```
-
-3. If the repair finishes with `Database login repaired and verified`, run the complete Production deployment from the same project folder:
+3. If the repair finishes with `Database login repaired and verified`, change to the complete project folder and run the Production deployment. Replace `/path/to/latest-project` below with its actual path:
 
 ```bash
 sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
   APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
-  SOURCE_DIR=/opt/Ramky_Applications/PROD/VMS/scripts \
+  SOURCE_DIR=/path/to/latest-project \
   bash scripts/selfhost/deploy-latest.sh
 ```
 
@@ -39,7 +37,8 @@ sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
 
 ## Stop Conditions
 
-- If step 1 shows that `package.json`, `src`, `supabase`, or `drizzle` is missing, stop. Copy or check out the complete latest project into a separate source folder before running the deployment.
+- Do not use `/opt/Ramky_Applications/PROD/VMS/scripts` as `SOURCE_DIR`; the displayed contents confirm it is not the complete project.
+- If `package.json`, `src`, `supabase`, or `drizzle` is missing from the intended source folder, stop. Copy or check out the complete latest project before running deployment.
 - If the repair reports that `.env` and `.env.secrets` disagree, stop and retain the output; do not reset secrets.
 - If either command reports an error, do not continue to the next command.
 
