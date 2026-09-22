@@ -12,22 +12,21 @@ sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
   bash ./repair-production-db-auth.sh --repair
 ```
 
-2. Separately locate or copy the **complete latest project folder**. It must contain all four entries:
-   - `package.json`
-   - `src/`
-   - `supabase/`
-   - `drizzle/`
-
-3. If the repair finishes with `Database login repaired and verified`, change to the complete project folder and run the Production deployment. Replace `/path/to/latest-project` below with its actual path:
+2. Copy the migration file from the latest project package into Production's migration folder:
 
 ```bash
-sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
-  APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
-  SOURCE_DIR=/path/to/latest-project \
-  bash scripts/selfhost/deploy-latest.sh
+sudo cp /path/to/latest-project/drizzle/migrations/0001_add_ceo_office_skip_to_approval_flows.sql \
+  /opt/Ramky_Applications/PROD/VMS/backend/migrations/20260922065300_add_ceo_office_skip_to_approval_flows.sql
 ```
 
-4. Do not use `--skip-migrations`; the missing `skip_ceo_office` column must be applied before the new frontend is activated.
+3. Apply the copied migration with Production's installed migration runner:
+
+```bash
+sudo APP_ROOT=/opt/Ramky_Applications/PROD/VMS \
+  bash /opt/Ramky_Applications/PROD/VMS/run-migrations.sh
+```
+
+4. Confirm the runner reports the CEO Office migration as applied with `failed=0`. The migration also reloads the API schema cache.
 
 5. Verify after deployment:
    - Production database administration loads schemas, tables, and users.
@@ -37,8 +36,8 @@ sudo PUBLIC_BASE_URL=https://vyapaar.ramky.com \
 
 ## Stop Conditions
 
-- Do not use `/opt/Ramky_Applications/PROD/VMS/scripts` as `SOURCE_DIR`; the displayed contents confirm it is not the complete project.
-- If `package.json`, `src`, `supabase`, or `drizzle` is missing from the intended source folder, stop. Copy or check out the complete latest project before running deployment.
+- Do not run `deploy-latest.sh` from `/opt/Ramky_Applications/PROD/VMS/scripts`; the displayed folder contains deployment scripts but not the migration source it requires.
+- Do not manually type only `ADD COLUMN`. Use the complete supplied migration because it also updates CEO Office routing and reloads the schema cache.
 - If the repair reports that `.env` and `.env.secrets` disagree, stop and retain the output; do not reset secrets.
 - If either command reports an error, do not continue to the next command.
 
