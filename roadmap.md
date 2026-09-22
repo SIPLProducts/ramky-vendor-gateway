@@ -8,3 +8,5 @@
 - [x] Stop deployments when the current direct-portal password-reset function is missing.
 - [x] Match the vendor registration opening screen to the supplied split-screen reference and use the uploaded Ramky collage.
 - [x] Add CEO Office skip functionality to the Approval Matrix and approval routing.
+- [x] Add a safe Production database-authentication repair and deployment drift protection.
+- [x] Add and enforce the missing self-hosted CEO Office skip migration.

@@ -21,6 +21,13 @@ mkdir -p volumes/db/data volumes/storage volumes/functions volumes/logs
 
 SECRETS_FILE="$BACKEND_DIR/.env.secrets"
 
+if [[ $RESET_SECRETS -eq 1 && -d "$BACKEND_DIR/volumes/db/data" &&
+      -n "$(ls -A "$BACKEND_DIR/volumes/db/data" 2>/dev/null)" ]]; then
+  echo "ERROR: --reset-secrets is blocked because an existing database volume was found." >&2
+  echo "Resetting POSTGRES_PASSWORD would disconnect services from the persisted database." >&2
+  exit 1
+fi
+
 mint_jwt() {
   local role="$1" secret="$2"
   python3 - "$role" "$secret" <<'PY'
@@ -81,6 +88,17 @@ EOF
   chmod 600 "$SECRETS_FILE"
 fi
 export ANON_KEY SERVICE_ROLE_KEY DASHBOARD_USERNAME DASHBOARD_PASSWORD
+
+if [[ -f "$BACKEND_DIR/.env" ]]; then
+  existing_postgres_password=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$BACKEND_DIR/.env" | tail -n 1)
+  existing_postgres_password="${existing_postgres_password#\'}"
+  existing_postgres_password="${existing_postgres_password%\'}"
+  if [[ -n "$existing_postgres_password" && "$existing_postgres_password" != "$POSTGRES_PASSWORD" ]]; then
+    echo "ERROR: POSTGRES_PASSWORD differs between .env and .env.secrets." >&2
+    echo "Run scripts/selfhost/repair-production-db-auth.sh; refusing to overwrite the mismatch." >&2
+    exit 1
+  fi
+fi
 
 log "Writing $BACKEND_DIR/.env"
 ENV_FILE="$BACKEND_DIR/.env"
