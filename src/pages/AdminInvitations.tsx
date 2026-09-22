@@ -478,7 +478,7 @@ export default function AdminInvitations() {
   ): Promise<{ ok: boolean }> => {
     const { data, error } = await supabase
       .from('buyer_approval_flows')
-      .select('id, scm_manager_user_id, scm_head_user_id, finance_1_user_id, finance_2_user_id, ceo_office_user_id, skip_scm_manager, skip_scm_head, skip_finance_1, skip_finance_2')
+      .select('id, scm_manager_user_id, scm_head_user_id, finance_1_user_id, finance_2_user_id, ceo_office_user_id, skip_scm_manager, skip_scm_head, skip_finance_1, skip_finance_2, skip_ceo_office')
       .eq('buyer_user_id', buyerUserId)
       .maybeSingle();
     if (error) throw error;
@@ -488,7 +488,7 @@ export default function AdminInvitations() {
       (!!data.scm_head_user_id && !data.skip_scm_head) ||
       (!!data.finance_1_user_id && !data.skip_finance_1) ||
       (!!data.finance_2_user_id && !data.skip_finance_2) ||
-      !!data.ceo_office_user_id;
+      (!!data.ceo_office_user_id && !data.skip_ceo_office);
     return { ok: hasAnyApprover };
   };
 

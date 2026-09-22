@@ -26,6 +26,7 @@ interface FlowState {
   skip_scm_head: boolean;
   skip_finance_1: boolean;
   skip_finance_2: boolean;
+  skip_ceo_office: boolean;
 }
 
 const EMPTY_FLOW: FlowState = {
@@ -38,6 +39,7 @@ const EMPTY_FLOW: FlowState = {
   skip_scm_head: false,
   skip_finance_1: false,
   skip_finance_2: false,
+  skip_ceo_office: false,
 };
 
 const STAGE_DEFS: Array<{
@@ -52,7 +54,7 @@ const STAGE_DEFS: Array<{
   { stage: 'SCM_HEAD', label: 'SCM Head', userKey: 'scm_head_user_id', skipKey: 'skip_scm_head', roleNames: ['SCM Head'] },
   { stage: 'FINANCE_1', label: 'Finance 1', userKey: 'finance_1_user_id', skipKey: 'skip_finance_1', roleNames: ['Finance 1', 'Finance Approval'] },
   { stage: 'FINANCE_2', label: 'Finance 2', userKey: 'finance_2_user_id', skipKey: 'skip_finance_2', roleNames: ['Finance 2', 'Finance Approval'] },
-  { stage: 'CEO_OFFICE', label: 'CEO Office', userKey: 'ceo_office_user_id', skipKey: null, roleNames: ['CEO Office'], helper: 'Runs only for MSME-registered domestic vendors.' },
+  { stage: 'CEO_OFFICE', label: 'CEO Office', userKey: 'ceo_office_user_id', skipKey: 'skip_ceo_office', roleNames: ['CEO Office'], helper: 'Runs only for MSME-registered domestic vendors unless skipped.' },
 ];
 
 interface Props { tenantId?: string | null }
@@ -167,6 +169,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
             skip_scm_head: f.skip_scm_head,
             skip_finance_1: f.skip_finance_1,
             skip_finance_2: f.skip_finance_2,
+            skip_ceo_office: f.skip_ceo_office,
           },
         })),
       );
@@ -227,6 +230,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
           skip_scm_head: data.skip_scm_head,
           skip_finance_1: data.skip_finance_1,
           skip_finance_2: data.skip_finance_2,
+          skip_ceo_office: data.skip_ceo_office,
         });
       } else {
         setExistingFlowId(null);
@@ -414,7 +418,9 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                         <div className="flex items-center gap-2">
                           <Switch
                             checked={skipped}
-                            onCheckedChange={(v) => updateFlow({ [def.skipKey!]: v } as any)}
+                          onCheckedChange={(v) => {
+                            if (def.skipKey) updateFlow({ [def.skipKey]: v } as Partial<FlowState>);
+                          }}
                           />
                           <span className="text-xs text-muted-foreground">Skip</span>
                         </div>
@@ -468,7 +474,7 @@ export function ApprovalMatrixConfig({ tenantId: filterTenantId = null }: Props 
                       <TableCell>{cell(f.flow.scm_head_user_id, f.flow.skip_scm_head)}</TableCell>
                       <TableCell>{cell(f.flow.finance_1_user_id, f.flow.skip_finance_1)}</TableCell>
                       <TableCell>{cell(f.flow.finance_2_user_id, f.flow.skip_finance_2)}</TableCell>
-                      <TableCell>{cell(f.flow.ceo_office_user_id, false)}</TableCell>
+                      <TableCell>{cell(f.flow.ceo_office_user_id, f.flow.skip_ceo_office)}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

@@ -19,7 +19,7 @@ const STAGE_TO_SKIP_COL: Record<string, string | null> = {
   SCM_HEAD: 'skip_scm_head',
   FINANCE_1: 'skip_finance_1',
   FINANCE_2: 'skip_finance_2',
-  CEO_OFFICE: null,
+  CEO_OFFICE: 'skip_ceo_office',
 };
 
 const STAGE_LABEL: Record<string, string> = {
