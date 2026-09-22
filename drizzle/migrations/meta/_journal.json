@@ -8,6 +8,13 @@
       "when": 1790053394899,
       "tag": "0000_add_ceo_office_skip_to_approval_flows",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790060013812,
+      "tag": "0001_add_ceo_office_skip_to_approval_flows",
+      "breakpoints": true
     }
   ]
 }
