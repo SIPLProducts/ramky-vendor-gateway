@@ -202,6 +202,10 @@ PY
 rand_hex() { openssl rand -hex "${1:-32}"; }
 rand_b64() { openssl rand -base64 "${1:-48}" | tr -d '\n=+/' | cut -c1-"${2:-32}"; }
 
+if [[ $RESET_SECRETS -eq 1 && -d "$BACKEND_DIR/volumes/db/data" &&
+      -n "$(ls -A "$BACKEND_DIR/volumes/db/data" 2>/dev/null)" ]]; then
+  die "--reset-secrets is blocked because an existing database volume was found. Use the guarded database-auth repair instead."
+fi
 if [[ $RESET_SECRETS -eq 1 && -f "$SECRETS_FILE" ]]; then
   mv "$SECRETS_FILE" "${SECRETS_FILE}.bak.$(date +%s)"
 fi
@@ -238,6 +242,15 @@ LOGFLARE_PRIVATE_ACCESS_TOKEN='$LOGFLARE_PRIVATE_ACCESS_TOKEN'
 POOLER_TENANT_ID='$POOLER_TENANT_ID'
 EOF
   chmod 600 "$SECRETS_FILE"
+fi
+
+if [[ -f "$BACKEND_DIR/.env" ]]; then
+  existing_postgres_password=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$BACKEND_DIR/.env" | tail -n 1)
+  existing_postgres_password="${existing_postgres_password#\'}"
+  existing_postgres_password="${existing_postgres_password%\'}"
+  if [[ -n "$existing_postgres_password" && "$existing_postgres_password" != "$POSTGRES_PASSWORD" ]]; then
+    die "POSTGRES_PASSWORD differs between .env and .env.secrets. Run scripts/selfhost/repair-production-db-auth.sh; refusing to overwrite it."
+  fi
 fi
 
 # ---------- 4. backend/.env ----------
