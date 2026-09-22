@@ -384,6 +384,7 @@ export type Database = {
           id: string
           scm_head_user_id: string | null
           scm_manager_user_id: string | null
+          skip_ceo_office: boolean
           skip_finance_1: boolean
           skip_finance_2: boolean
           skip_scm_head: boolean
@@ -401,6 +402,7 @@ export type Database = {
           id?: string
           scm_head_user_id?: string | null
           scm_manager_user_id?: string | null
+          skip_ceo_office?: boolean
           skip_finance_1?: boolean
           skip_finance_2?: boolean
           skip_scm_head?: boolean
@@ -418,6 +420,7 @@ export type Database = {
           id?: string
           scm_head_user_id?: string | null
           scm_manager_user_id?: string | null
+          skip_ceo_office?: boolean
           skip_finance_1?: boolean
           skip_finance_2?: boolean
           skip_scm_head?: boolean
