@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790053394899,
+      "tag": "0000_add_ceo_office_skip_to_approval_flows",
+      "breakpoints": true
+    }
+  ]
+}
