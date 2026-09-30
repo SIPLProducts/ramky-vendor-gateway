@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { invokeFunctionJson } from "../_shared/invoke-function.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -199,12 +200,17 @@ serve(async (req) => {
       );
     }
 
-    // Real mode - would use Resend API here
-    // const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    // if (!RESEND_API_KEY) {
-    //   throw new Error('RESEND_API_KEY not configured');
-    // }
-    // ... actual email sending logic
+    const sendResult = await invokeFunctionJson('send-smtp-email', {
+      to: vendorEmail,
+      subject: statusInfo.subject,
+      html: emailHtml,
+    });
+    if (!sendResult.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: sendResult.error ?? 'Vendor notification could not be delivered' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     return new Response(
       JSON.stringify({

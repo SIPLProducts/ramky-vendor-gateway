@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { invokeFunctionJson } from '../_shared/invoke-function.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,20 +120,38 @@ Deno.serve(async (req) => {
         await admin.from('audit_logs').insert({
           action: 'vendor_buyer_rejected', user_id: userId, vendor_id: progress.vendor_id, details: { comments },
         });
+        let vendorEmailSent = false;
+        let vendorEmailError: string | null = null;
         try {
           const { data: vendorRow } = await admin
             .from('vendors').select('legal_name, primary_email, registered_email').eq('id', progress.vendor_id).single();
           const vendorEmail = vendorRow?.primary_email || vendorRow?.registered_email;
           if (vendorEmail) {
-            await admin.functions.invoke('send-status-notification', {
-              body: {
-                vendorId: progress.vendor_id, newStatus: 'returned_to_vendor', previousStatus: 'buyer_review',
-                vendorEmail, vendorName: vendorRow?.legal_name ?? 'Vendor', comments: comments ?? '', simulationMode: false,
-              },
+            const notification = await invokeFunctionJson('send-status-notification', {
+              vendorId: progress.vendor_id, newStatus: 'returned_to_vendor', previousStatus: 'buyer_review',
+              vendorEmail, vendorName: vendorRow?.legal_name ?? 'Vendor', comments: comments ?? '', simulationMode: false,
             });
+            vendorEmailSent = notification.ok;
+            vendorEmailError = notification.error;
+          } else {
+            vendorEmailError = 'Vendor email not found.';
           }
-        } catch (e) { console.warn('send-status-notification failed', e); }
-        return new Response(JSON.stringify({ ok: true, vendor_status: 'returned_to_vendor' }), {
+        } catch (e) {
+          vendorEmailError = e instanceof Error ? e.message : String(e);
+          console.warn('send-status-notification failed', e);
+        }
+        await admin.from('audit_logs').insert({
+          action: vendorEmailSent ? 'vendor_notified_buyer_rejection' : 'vendor_buyer_rejection_email_failed',
+          user_id: userId,
+          vendor_id: progress.vendor_id,
+          details: { email_error: vendorEmailError },
+        });
+        return new Response(JSON.stringify({
+          ok: true,
+          vendor_status: 'returned_to_vendor',
+          email_sent: vendorEmailSent,
+          email_error: vendorEmailSent ? null : vendorEmailError,
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -197,13 +216,11 @@ Deno.serve(async (req) => {
                 <p style="margin-top:16px;font-size:13px;color:#374151">For any queries, please contact <a href="mailto:vyapaarsupport@ramky.com" style="color:#1e3a5f;text-decoration:none;font-weight:600">vyapaarsupport@ramky.com</a>.</p>
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
               </div>`;
-            const { data: emailResp, error: emailInvokeErr } = await admin.functions.invoke('send-smtp-email', {
-              body: { to: buyerEmail, subject: 'Vendor Application Rejected', html },
+            const emailResult = await invokeFunctionJson('send-smtp-email', {
+              to: buyerEmail, subject: 'Vendor Application Rejected', html,
             });
-            if (emailInvokeErr) {
-              emailError = emailInvokeErr.message ?? 'SMTP invoke failed';
-            } else if (emailResp && (emailResp as any).success === false) {
-              emailError = (emailResp as any).error ?? 'SMTP send failed';
+            if (!emailResult.ok) {
+              emailError = emailResult.error ?? 'SMTP send failed';
             } else {
               emailSent = true;
             }

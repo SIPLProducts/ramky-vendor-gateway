@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { invokeFunctionJson } from "../_shared/invoke-function.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -315,16 +316,19 @@ serve(async (req) => {
 
     // Reply-To is taken from the No-Reply Email Configuration (portal_config.smtp_reply_to)
     // by send-smtp-email when suppressReplyTo is not set.
-    const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-smtp-email", {
-      body: {
-        to: recipientEmails.join(", "),
-        subject,
-        html,
-      },
+    const sendResult = await invokeFunctionJson<{ success?: boolean; error?: string }>("send-smtp-email", {
+      to: recipientEmails,
+      subject,
+      html,
     });
-    if (sendErr) throw sendErr;
-    if ((sendData as any)?.success === false) {
-      throw new Error((sendData as any)?.error ?? "send-smtp-email failed");
+    if (!sendResult.ok) {
+      await logFailure("smtp_send_failed", { error: sendResult.error, recipients: recipientEmails });
+      return new Response(JSON.stringify({
+        success: false,
+        error: sendResult.error ?? "Buyer notification could not be delivered.",
+        vendorIdentity,
+        inviter: { name: recipientFullName || null, email: recipientEmails[0] || null },
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     try {
@@ -350,7 +354,7 @@ serve(async (req) => {
   } catch (err: any) {
     console.error("notify-vendor-submission error:", err);
     return new Response(JSON.stringify({ success: false, error: err?.message ?? String(err) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

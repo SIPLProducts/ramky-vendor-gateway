@@ -12,3 +12,4 @@
 - [x] Add and enforce the missing self-hosted CEO Office skip migration.
 - [x] Remove Credit Period Expected and standardize Material Group/Vendor Category requirements.
 - [x] Stop vendor emails on registration submission and SAP Sync while preserving buyer notifications.
+- [x] Restore buyer registration and downstream rejection emails, and preserve buyer-rejection emails to vendors.
