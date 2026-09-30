@@ -580,9 +580,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       turnover_year3: formData.financial.turnoverYear3
         ? parseFloat(formData.financial.turnoverYear3.replace(/,/g, ''))
         : null,
-      credit_period_expected: formData.financial.creditPeriodExpected
-        ? parseInt(formData.financial.creditPeriodExpected)
-        : null,
       major_customer1: formData.financial.majorCustomer1 || null,
       major_customer2: formData.financial.majorCustomer2 || null,
       major_customer3: formData.financial.majorCustomer3 || null,
@@ -789,7 +786,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         turnoverYear1: nonNegativeNumberString(vendor.turnover_year1),
         turnoverYear2: nonNegativeNumberString(vendor.turnover_year2),
         turnoverYear3: nonNegativeNumberString(vendor.turnover_year3),
-        creditPeriodExpected: nonNegativeNumberString(vendor.credit_period_expected),
         majorCustomer1: vendor.major_customer1 || '',
         majorCustomer2: vendor.major_customer2 || '',
         majorCustomer3: vendor.major_customer3 || '',

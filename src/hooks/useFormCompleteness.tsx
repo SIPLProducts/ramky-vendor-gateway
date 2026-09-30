@@ -81,7 +81,7 @@ export function useFormCompleteness(
       // Step 5 — Financial & Infrastructure
       {
         step: 5,
-        ...score([f.turnoverYear1, f.creditPeriodExpected, i.rawMaterialsUsed || i.productionCapacity]),
+        ...score([f.turnoverYear1, i.rawMaterialsUsed || i.productionCapacity]),
       },
       // Step 6 — Review (always 100% by definition once reached)
       { step: 6, filled: 1, total: 1, percent: 100 },

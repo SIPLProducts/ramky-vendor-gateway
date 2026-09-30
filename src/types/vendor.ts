@@ -252,7 +252,6 @@ export interface FinancialDetails {
   turnoverYear1: string;
   turnoverYear2: string;
   turnoverYear3: string;
-  creditPeriodExpected: string;
   
   majorCustomer1: string;
   majorCustomer2: string;

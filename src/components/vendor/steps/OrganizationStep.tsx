@@ -45,8 +45,8 @@ const schema = z.object({
   ownershipType: z.string().min(1, 'Ownership type is required'),
   state: z.string().min(1, 'State is required'),
   accountingGroup: z.enum(['Import', 'Domestic']).optional(),
-  // SAP Classification — now captured on SAP Sync screen (not in registration)
-  materialGroupVendor: z.array(z.string()).optional().default([]),
+  // SAP Classification — required whenever this section is shown.
+  materialGroupVendor: z.array(z.string()).min(1, 'Material Group for Vendors is required'),
   vendorCategory: z.array(z.string()).optional().default([]),
   vendorLocation: z.array(z.string()).optional().default([]),
   identificationSource: z.array(z.string()).optional().default([]),
@@ -522,9 +522,11 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
             render={({ field }) => (
               <ClassificationField
                 label="Material Group for Vendors"
+                required
                 masterType="material_group_vendor"
                 value={field.value || []}
                 onChange={field.onChange}
+                errorText={errors.materialGroupVendor?.message}
                 selectPlaceholder="Select material groups"
               />
             )}

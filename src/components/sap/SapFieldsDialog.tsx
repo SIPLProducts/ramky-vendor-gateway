@@ -404,6 +404,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                   <h5 className="text-sm font-medium text-primary">Vendor_Details</h5>
                   <SapF4MultiSelectField
                     label="Material Group for Vendors"
+                    required
                     masterType="material_group_vendor"
                     value={form.classify.MGV || []}
                     onChange={(v) => setClassify('MGV', v)}
@@ -465,7 +466,10 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           </Button>
           <Button
             onClick={() => {
-              const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
+               const missing = REQUIRED_KEYS.filter(k => !String((form as any)[k] ?? '').trim());
+               if (classifyMode === 'details' && (form.classify.MGV?.length || 0) === 0) {
+                 missing.push('classify.MGV' as keyof SapFieldOverrides);
+               }
               setMissingFields(missing as string[]);
               if (missing.length === 0) {
                 const cat = String(form.reg_msme_cat || '').toLowerCase().trim();
@@ -733,7 +737,7 @@ export function SapF4SelectField({
 }
 
 export function SapF4MultiSelectField({
-  label, masterType, value, onChange, liveItems, placeholder, properCaseLabels,
+  label, masterType, value, onChange, liveItems, placeholder, properCaseLabels, required,
 }: {
   label: string;
   masterType: string;
@@ -742,6 +746,7 @@ export function SapF4MultiSelectField({
   liveItems?: any[] | null;
   placeholder?: string;
   properCaseLabels?: boolean;
+  required?: boolean;
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems) && liveItems.length > 0;
@@ -772,7 +777,9 @@ export function SapF4MultiSelectField({
 
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </Label>
       <MultiSelect
         options={options}
         selected={value || []}
