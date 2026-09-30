@@ -84,10 +84,6 @@ const faqs = [
         q: 'Why is bank account verification required?',
         a: 'Bank verification ensures that payments are made to the correct account. We verify your account number and IFSC code against official records.',
       },
-      {
-        q: 'What credit periods are available?',
-        a: 'Credit periods are negotiated during registration. Common options include 30, 45, 60, or 90 days, subject to approval.',
-      },
     ],
   },
   {

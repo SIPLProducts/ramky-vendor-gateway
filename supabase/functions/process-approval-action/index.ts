@@ -263,6 +263,11 @@ Deno.serve(async (req) => {
     }
 
     // APPROVE
+    if (isBuyerRow && (!classification || !Array.isArray(classification.material_group_vendors) || classification.material_group_vendors.length === 0)) {
+      return new Response(JSON.stringify({ error: 'Material Group for Vendors is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // If buyer provided classification, persist it before routing forward.
     if (isBuyerRow && classification && (
       Array.isArray(classification.material_group_vendors) || Array.isArray(classification.vendor_categories)

@@ -582,7 +582,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               />
               <ClassificationField
                 label="Vendor Category"
-                required
                 masterType="vendor_category"
                 value={buyerClassification.vendorCategory}
                 onChange={(v) => setBuyerClassification((p) => ({ ...p, vendorCategory: v }))}
@@ -609,10 +608,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               disabled={
                 submitting ||
                 !comments.trim() ||
-                (isBuyer && actionItem?.action === 'approve' && (
-                  buyerClassification.materialGroupVendor.length === 0 ||
-                  buyerClassification.vendorCategory.length === 0
-                ))
+                (isBuyer && actionItem?.action === 'approve' &&
+                  buyerClassification.materialGroupVendor.length === 0)
               }
               variant="outline"
               className={
@@ -679,7 +676,6 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               />
               <ClassificationField
                 label="Vendor Category"
-                required
                 masterType="vendor_category"
                 value={rejectedClassification.vendorCategory}
                 onChange={(v) => setRejectedClassification((p) => ({ ...p, vendorCategory: v }))}
@@ -705,10 +701,8 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               disabled={
                 rejectedSubmitting ||
                 rejectedRemarks.trim().length === 0 ||
-                (isBuyer && rejectedAction?.action === 'approve' && (
-                  rejectedClassification.materialGroupVendor.length === 0 ||
-                  rejectedClassification.vendorCategory.length === 0
-                ))
+                (isBuyer && rejectedAction?.action === 'approve' &&
+                  rejectedClassification.materialGroupVendor.length === 0)
               }
             >
               {rejectedSubmitting

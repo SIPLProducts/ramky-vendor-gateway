@@ -56,14 +56,6 @@ const formatTurnover = (value?: string | number | null) => {
   return '-';
 };
 
-const formatCreditPeriod = (value?: string | number | null) => {
-  if (value === 0 || value) {
-    const numericValue = Number(String(value).replace(/,/g, ''));
-    return Number.isFinite(numericValue) && numericValue >= 0 ? `${numericValue} days` : '-';
-  }
-  return '-';
-};
-
 export function ReviewStep({ data, onSubmit, onEditStep, onDeclarationChange }: ReviewStepProps) {
   const [selfDeclared, setSelfDeclared] = useState(data.declaration?.selfDeclared || false);
   const [termsAccepted, setTermsAccepted] = useState(data.declaration?.termsAccepted || false);

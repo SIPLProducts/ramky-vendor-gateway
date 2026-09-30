@@ -165,7 +165,6 @@ export const BUILT_IN_FIELDS: Record<string, BuiltInField[]> = {
     { field_name: 'turnoverYear1',           display_label: 'Turnover (Year 1)',             field_type: 'number', is_mandatory: false, group: 'Financial' },
     { field_name: 'turnoverYear2',           display_label: 'Turnover (Year 2)',             field_type: 'number', is_mandatory: false, group: 'Financial' },
     { field_name: 'turnoverYear3',           display_label: 'Turnover (Year 3)',             field_type: 'number', is_mandatory: false, group: 'Financial' },
-    { field_name: 'creditPeriodExpected',    display_label: 'Expected Credit Period (Days)', field_type: 'number', is_mandatory: false, group: 'Financial' },
     { field_name: 'financialDocsFile',       display_label: 'Audited Financial Statements (file)', field_type: 'file', is_mandatory: false, group: 'Financial' },
     { field_name: 'majorCustomer1',          display_label: 'Major Customer 1',              field_type: 'text', is_mandatory: false, group: 'Customers' },
     { field_name: 'majorCustomer2',          display_label: 'Major Customer 2',              field_type: 'text', is_mandatory: false, group: 'Customers' },

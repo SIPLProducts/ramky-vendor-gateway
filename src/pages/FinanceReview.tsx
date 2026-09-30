@@ -418,7 +418,6 @@ export default function FinanceReview() {
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">IFSC</span><span className="font-mono bg-muted px-2 py-0.5 rounded">{selectedVendor.ifsc_code || 'N/A'}</span></div>
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Branch</span><span>{selectedVendor.branch_name || 'N/A'}</span></div>
                       <div className="flex justify-between py-2 border-b"><span className="text-muted-foreground">Account Type</span><span className="capitalize">{selectedVendor.account_type || 'N/A'}</span></div>
-                      <div className="flex justify-between py-2"><span className="text-muted-foreground">Credit Period</span><span>{selectedVendor.credit_period_expected ? `${selectedVendor.credit_period_expected} Days` : 'N/A'}</span></div>
                     </CardContent>
                   </Card>
                 </div>

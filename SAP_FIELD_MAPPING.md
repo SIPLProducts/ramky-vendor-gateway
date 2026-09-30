@@ -113,7 +113,6 @@ The following fields are available in the vendors table but not currently mapped
 - ownership_type
 - product_categories
 - turnover_year1, turnover_year2, turnover_year3
-- credit_period_expected
 - major_customer1, major_customer2, major_customer3
 
 ## SAP Response Format

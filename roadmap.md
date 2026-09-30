@@ -10,3 +10,4 @@
 - [x] Add CEO Office skip functionality to the Approval Matrix and approval routing.
 - [x] Add a safe Production database-authentication repair and deployment drift protection.
 - [x] Add and enforce the missing self-hosted CEO Office skip migration.
+- [x] Remove Credit Period Expected and standardize Material Group/Vendor Category requirements.

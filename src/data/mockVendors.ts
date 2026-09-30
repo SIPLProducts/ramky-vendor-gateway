@@ -124,7 +124,6 @@ const createMockFormData = (): VendorFormData => ({
     turnoverYear1: '50000000',
     turnoverYear2: '45000000',
     turnoverYear3: '40000000',
-    creditPeriodExpected: '45',
     majorCustomer1: 'L&T',
     majorCustomer2: 'NCC',
     majorCustomer3: '',

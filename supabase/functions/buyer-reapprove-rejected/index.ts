@@ -68,6 +68,12 @@ Deno.serve(async (req) => {
     const fromStage = vendor.last_rejection_stage ?? null;
     const nowIso = new Date().toISOString();
 
+    if (!classification || !Array.isArray(classification.material_group_vendors) || classification.material_group_vendors.length === 0) {
+      return new Response(JSON.stringify({ error: 'Material Group for Vendors is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // If buyer provided classification, persist it before re-routing forward.
     if (classification && (
       Array.isArray(classification.material_group_vendors) || Array.isArray(classification.vendor_categories)

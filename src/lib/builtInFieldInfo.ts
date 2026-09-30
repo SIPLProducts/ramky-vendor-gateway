@@ -357,10 +357,6 @@ export const BUILT_IN_FIELD_INFO: Record<string, BuiltInFieldInfo> = {
   },
   turnoverYear2: { usage: 'Annual turnover — previous year.', importance: ['Trend analysis for financial scoring'] },
   turnoverYear3: { usage: 'Annual turnover — 3 years prior.', importance: ['Trend analysis for financial scoring'] },
-  creditPeriodExpected: {
-    usage: 'Credit period the vendor expects (in days).',
-    importance: ['Negotiation input for procurement', 'Compared against MSME 45-day rule'],
-  },
   financialDocsFile: {
     usage: 'Audited financial statements (last 3 years).',
     importance: ['Evidence for financial-strength scoring', 'Required above turnover thresholds'],
