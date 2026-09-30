@@ -166,21 +166,23 @@ verify_kyc_database_access() {
 }
 
 verify_kyc_function_health() {
-  local anon_key provider response
+  local anon_key provider response attempt
   anon_key=$(sed -n 's/^ANON_KEY=//p' "$ENV_FILE" | tail -1)
   [[ -n "$anon_key" ]] || { echo "ERROR: ANON_KEY is missing from $ENV_FILE; cannot verify KYC function." >&2; exit 1; }
 
   for provider in GST_OCR PAN_OCR BANK_OCR; do
-    response=$(curl --silent --show-error --fail-with-body \
-      --connect-timeout 10 --max-time 30 \
-      -H "apikey: $anon_key" \
-      -H "Authorization: Bearer $anon_key" \
-      -H "Content-Type: application/json" \
-      --data "{\"providerName\":\"$provider\",\"healthCheck\":true}" \
-      "${PUBLIC_BASE_URL%/}/supabase/functions/v1/kyc-api-execute") || {
-        echo "ERROR: $provider KYC health request failed." >&2
-        exit 1
-      }
+    response=""
+    for attempt in 1 2 3 4 5; do
+      response=$(curl --silent --show-error --fail-with-body \
+        --connect-timeout 10 --max-time 30 \
+        -H "apikey: $anon_key" \
+        -H "Authorization: Bearer $anon_key" \
+        -H "Content-Type: application/json" \
+        --data "{\"providerName\":\"$provider\",\"healthCheck\":true}" \
+        "${PUBLIC_BASE_URL%/}/supabase/functions/v1/kyc-api-execute" 2>/dev/null) && break
+      sleep 2
+    done
+    [[ -n "$response" ]] || { echo "ERROR: $provider KYC health request failed after five attempts." >&2; exit 1; }
     if [[ "$response" != *'"healthcheck":true'* || "$response" != *'"ok":true'* ]]; then
       echo "ERROR: $provider is not readable by the deployed KYC function." >&2
       echo "Safe response: $(printf '%s' "$response" | sed -E 's/(credential_value|token|apikey|authorization)"?[^,}]*/\1":"[redacted]"/Ig')" >&2
