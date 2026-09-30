@@ -413,7 +413,7 @@ export function ComplianceStep({
             onOcrResultChange={setPanTabResult}
             onComprehensiveResult={({ status, aadhaarLinked }) => {
               setValue('panStatus' as any, status ?? null);
-              setValue('panAadhaarLinked' as any, aadhaarLinked ?? null);
+              setValue('panAadhaarLinked' as any, aadhaarLinked === true);
               setValue('panComprehensiveVerifiedAt' as any, new Date().toISOString());
             }}
           />

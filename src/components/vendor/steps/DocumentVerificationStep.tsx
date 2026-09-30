@@ -890,6 +890,9 @@ export function DocumentVerificationStep({
           message: r.message || "PAN validation failed. Please upload a clearer PAN card and try again.",
         };
       }
+      // A successful PAN response always produces a definite stored value:
+      // only explicit true remains true; false or missing/null becomes false.
+      const aadhaarLinked = comprehensive.aadhaarLinked === true;
       const apiName = String(
         (r.data as any)?.full_name ||
         (r.data as any)?.name ||
@@ -925,7 +928,7 @@ export function DocumentVerificationStep({
           holder_name: holderName,
           full_name: holderName,
           status: comprehensive.status,
-          aadhaar_linked: comprehensive.aadhaarLinked,
+          aadhaar_linked: aadhaarLinked,
         };
         if (vendorId) {
           try {
@@ -933,8 +936,9 @@ export function DocumentVerificationStep({
               pan_holder_name: holderName || null,
             };
             if (comprehensive.status != null) panPatch.pan_status = comprehensive.status;
-            if (comprehensive.aadhaarLinked != null) panPatch.pan_aadhaar_linked = comprehensive.aadhaarLinked;
-            await supabase.from('vendors').update(panPatch).eq('id', vendorId);
+            panPatch.pan_aadhaar_linked = aadhaarLinked;
+            const { error } = await supabase.from('vendors').update(panPatch).eq('id', vendorId);
+            if (error) throw error;
           } catch (e) {
             console.warn('[PAN Comprehensive] persist failed', e);
           }
@@ -947,7 +951,7 @@ export function DocumentVerificationStep({
             source: "GST cross-check",
             status: "valid",
             panStatus: comprehensive.status,
-            aadhaarLinked: comprehensive.aadhaarLinked,
+            aadhaarLinked,
             panComprehensiveVerifiedAt: new Date().toISOString(),
             panMatchMessage: "PAN verified against GST registry.",
           },
@@ -964,8 +968,9 @@ export function DocumentVerificationStep({
             pan_holder_name: holderName || null,
           };
           if (comprehensive.status != null) panPatch.pan_status = comprehensive.status;
-          if (comprehensive.aadhaarLinked != null) panPatch.pan_aadhaar_linked = comprehensive.aadhaarLinked;
-          await supabase.from('vendors').update(panPatch).eq('id', vendorId);
+          panPatch.pan_aadhaar_linked = aadhaarLinked;
+          const { error } = await supabase.from('vendors').update(panPatch).eq('id', vendorId);
+          if (error) throw error;
         } catch (e) {
           console.warn('[PAN Comprehensive] persist failed', e);
         }
@@ -976,7 +981,7 @@ export function DocumentVerificationStep({
         holder_name: holderName,
         full_name: holderName,
         status: comprehensive.status,
-        aadhaar_linked: comprehensive.aadhaarLinked,
+        aadhaar_linked: aadhaarLinked,
       };
       return {
         ok: true as const,
@@ -986,7 +991,7 @@ export function DocumentVerificationStep({
           source: "PAN verification",
           status: "valid",
           panStatus: comprehensive.status,
-          aadhaarLinked: comprehensive.aadhaarLinked,
+          aadhaarLinked,
           panComprehensiveVerifiedAt: new Date().toISOString(),
           panMatchMessage: "PAN details validated successfully from PAN verification.",
         },
