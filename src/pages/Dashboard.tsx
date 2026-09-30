@@ -45,6 +45,7 @@ import { formatVendorName } from '@/lib/textCase';
 type VendorRow = {
   id: string;
   reference_number: string | null;
+  sap_vendor_code: string | null;
   legal_name: string | null;
   trade_name: string | null;
   account_holder_name: string | null;
@@ -148,7 +149,7 @@ export default function Dashboard() {
 
       let q = supabase
         .from('vendors')
-        .select('id, reference_number, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
+        .select('id, reference_number, sap_vendor_code, legal_name, trade_name, account_holder_name, gstin, primary_email, registered_email, status, created_at, tenant_id')
         .order('created_at', { ascending: false });
 
       if (fromIso) q = q.gte('created_at', fromIso);
@@ -252,6 +253,7 @@ export default function Dashboard() {
   const handleExport = () => {
     const rows = filteredVendors.map((v) => ({
       'Reference Number': v.reference_number ?? '',
+      'SAP Vendor Code': v.sap_vendor_code ?? '',
       'Invited By': v.invited_by ? `${v.invited_by.name ?? ''}${v.invited_by.email ? ` <${v.invited_by.email}>` : ''}`.trim() : '',
       'Vendor Name': pickVendorDisplayName(v) || '',
       'Vendor Email': v.display_email ?? '',
@@ -435,6 +437,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>
+                  <TableHead>SAP Vendor Code</TableHead>
                   <TableHead>Invited By</TableHead>
                   <TableHead>Vendor Name</TableHead>
                   <TableHead>Vendor Email</TableHead>
@@ -447,7 +450,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-full" />
                         </TableCell>
@@ -456,7 +459,7 @@ export default function Dashboard() {
                   ))
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                       {statusFilter === 'all' ? 'No vendor applications in this date range.' : 'No vendor applications match this filter.'}
                     </TableCell>
                   </TableRow>
@@ -467,6 +470,9 @@ export default function Dashboard() {
                         <Link to={`/vendors/${v.id}`} className="hover:text-primary transition-colors">
                           {v.reference_number ?? v.id.slice(0, 8)}
                         </Link>
+                      </TableCell>
+                      <TableCell className="font-mono text-[13px]">
+                        {v.sap_vendor_code || '—'}
                       </TableCell>
                       <TableCell>
                         {v.invited_by ? (
