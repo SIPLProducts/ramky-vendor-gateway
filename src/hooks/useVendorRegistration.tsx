@@ -52,6 +52,28 @@ const asPersistedFile = (doc?: any): PersistedDocumentFile | null => {
   } as PersistedDocumentFile;
 };
 
+const gstFilingRowsFromDetails = (details: unknown): unknown[] => {
+  if (!details || typeof details !== 'object') return [];
+  const filingStatus = (details as { filing_status?: unknown }).filing_status;
+  if (!Array.isArray(filingStatus)) return [];
+  if (filingStatus.length > 0 && Array.isArray(filingStatus[0])) {
+    return filingStatus[0] as unknown[];
+  }
+  return filingStatus;
+};
+
+const mergeGstValidationHistory = (rows: Array<{ details: unknown }> | null | undefined) => {
+  const latestDetails = rows?.[0]?.details;
+  const latest = latestDetails && typeof latestDetails === 'object'
+    ? latestDetails as Record<string, unknown>
+    : {};
+  const filingRows = rows
+    ?.map((row) => gstFilingRowsFromDetails(row.details))
+    .find((candidate) => candidate.length > 0) ?? [];
+
+  return filingRows.length > 0 ? { ...latest, filing_status: filingRows } : latest;
+};
+
 
 // Extended vendor record type to include all new fields
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -210,18 +232,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           console.warn('Failed to hydrate vendor documents:', docsError);
         }
 
-        // Hydrate the latest GST validation row so the persisted filing status
-        // (last 3 months) is available when opening the vendor for edit.
-        const { data: gstVal, error: gstValError } = await supabase
+        // Keep the newest GST verification details, but recover filing status
+        // from validation history when a newer row did not include those rows.
+        const { data: gstHistory, error: gstValError } = await supabase
           .from('vendor_validations')
           .select('details')
           .eq('vendor_id', data.id)
           .eq('validation_type', 'gst')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!gstValError && gstVal) {
-          (data as any).__gst_validation_details = (gstVal as any).details ?? null;
+          .order('created_at', { ascending: false });
+        if (!gstValError && gstHistory?.length) {
+          (data as any).__gst_validation_details = mergeGstValidationHistory(gstHistory);
+        } else if (gstValError) {
+          console.warn('Failed to hydrate GST validation history:', gstValError);
         }
       }
 
@@ -749,10 +771,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         iecCertificateFile: null,
         swiftIbanProofFile: null,
         gstFilingStatus: (() => {
-          const raw = (vendor as any).__gst_validation_details?.filing_status;
-          if (!raw) return [];
-          if (Array.isArray(raw) && raw.length > 0 && Array.isArray(raw[0])) return raw[0];
-          return Array.isArray(raw) ? raw : [];
+          return gstFilingRowsFromDetails((vendor as any).__gst_validation_details);
         })(),
       },
       bank: {
