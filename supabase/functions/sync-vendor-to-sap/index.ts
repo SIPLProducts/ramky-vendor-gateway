@@ -841,25 +841,7 @@ serve(async (req) => {
             ? (tenantCode ? `${tenantName} (${tenantCode})` : tenantName)
             : null;
 
-          // Also send the same SAP-success email to the vendor's registered email.
-          let vendorEmail: string | null = null;
-          try {
-            vendorEmail = ((vendor as any)?.primary_email || "").trim() || null;
-            if (!vendorEmail && (vendor as any)?.invitation_id) {
-              const { data: inv } = await supabase
-                .from("vendor_invitations")
-                .select("email")
-                .eq("id", (vendor as any).invitation_id)
-                .maybeSingle();
-              vendorEmail = ((inv as any)?.email || "").trim() || null;
-            }
-          } catch (_) { /* ignore */ }
-
-          const recipients: string[] = [];
-          if (buyerEmail) recipients.push(buyerEmail);
-          if (vendorEmail && vendorEmail.toLowerCase() !== (buyerEmail || "").toLowerCase()) {
-            recipients.push(vendorEmail);
-          }
+          const recipients: string[] = buyerEmail ? [buyerEmail] : [];
 
           if (recipients.length > 0) {
             const legal = vendor.legal_name || vendor.trade_name || "Vendor";
@@ -911,7 +893,6 @@ serve(async (req) => {
                     vendor_id: vendorId,
                     buyer_user_id: buyerUserId,
                     buyer_email: buyerEmail,
-                    vendor_email: vendorEmail,
                     recipients,
                     sap_vendor_code: sapVendorCode,
                     tenant_id: (vendor as any)?.tenant_id ?? null,
