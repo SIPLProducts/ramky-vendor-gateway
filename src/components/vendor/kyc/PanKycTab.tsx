@@ -164,13 +164,11 @@ export function PanKycTab(props: PanKycTabProps) {
         });
         if (cr?.ok && cr.data) {
           const rawStatus = parsePanStatus(cr);
-          const aadhaarLinked = parseAadhaarLinked(cr);
-          // Skip if provider returned no definitive values — preserve prior state/DB.
-          if (rawStatus == null && aadhaarLinked == null) return;
+          const aadhaarLinked = parseAadhaarLinked(cr) === true;
 
           const patch: Partial<PanTabResult> = {};
           if (rawStatus != null) patch.panStatus = rawStatus;
-          if (aadhaarLinked != null) patch.aadhaarLinked = aadhaarLinked;
+          patch.aadhaarLinked = aadhaarLinked;
           updateResult(patch);
           props.onComprehensiveResult?.({ status: rawStatus, aadhaarLinked });
 
@@ -180,7 +178,7 @@ export function PanKycTab(props: PanKycTabProps) {
               pan_comprehensive_verified_at: new Date().toISOString(),
             };
             if (rawStatus != null) dbPatch.pan_status = rawStatus;
-            if (aadhaarLinked != null) dbPatch.pan_aadhaar_linked = aadhaarLinked;
+            dbPatch.pan_aadhaar_linked = aadhaarLinked;
             supabase
               .from('vendors')
               .update(dbPatch)
@@ -340,7 +338,7 @@ export function PanKycTab(props: PanKycTabProps) {
           if (!cr.ok || !cr.data) return { ok: false, message: cr.message || cr.message_code || 'PAN verification failed' };
 
           const rawStatus = parsePanStatus(cr);
-          const aadhaarLinkedVal = parseAadhaarLinked(cr);
+          const aadhaarLinkedVal = parseAadhaarLinked(cr) === true;
           const extractedName = pickStr(cr.data.full_name || cr.data.name || cr.data.holder_name).trim();
 
           const panOk = props.gstPanNumber ? panMatch(pan, props.gstPanNumber) : true;
@@ -375,7 +373,7 @@ export function PanKycTab(props: PanKycTabProps) {
               pan_comprehensive_verified_at: new Date().toISOString(),
             };
             if (rawStatus != null) dbPatch.pan_status = rawStatus;
-            if (aadhaarLinkedVal != null) dbPatch.pan_aadhaar_linked = aadhaarLinkedVal;
+            dbPatch.pan_aadhaar_linked = aadhaarLinkedVal;
             supabase.from('vendors').update(dbPatch).eq('id', props.vendorId)
               .then(({ error }) => { if (error) console.warn('[PanKycTab] persist failed', error); });
           }
