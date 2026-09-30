@@ -64,6 +64,7 @@ const REQUIRED_LABELS: Record<string, string> = {
   fdgrv: 'Planning Group',
   vkorg: 'Purchase Org',
   waers: 'Currency',
+  'classify.MGV': 'Material Group for Vendors',
 };
 
 export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmitting }: Props) {

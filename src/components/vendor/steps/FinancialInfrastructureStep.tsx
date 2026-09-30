@@ -25,24 +25,17 @@ import { getLastThreeCompletedIndianFyStartYears, formatIndianFy } from '@/lib/i
 const [fy1Start, fy2Start, fy3Start] = getLastThreeCompletedIndianFyStartYears();
 
 const NEGATIVE_MSG = 'Please enter a valid amount. You can enter the amount either in Lakhs (e.g., 0.9) or in Rupees (e.g., 90000). Negative values are not allowed.';
-const CREDIT_PERIOD_NEGATIVE_MSG = 'Negative values are not allowed.';
 
 const nonNegNumericString = z
   .string()
   .optional()
   .refine((v) => !v || (/^\d+(\.\d*)?$/.test(v) && Number(v) >= 0), { message: NEGATIVE_MSG });
 
-const nonNegCreditPeriodString = z
-  .string()
-  .optional()
-  .refine((v) => !v || (/^\d+(\.\d*)?$/.test(v) && Number(v) >= 0), { message: CREDIT_PERIOD_NEGATIVE_MSG });
-
 const schema = z.object({
   // Financial
   turnoverYear1: nonNegNumericString,
   turnoverYear2: nonNegNumericString,
   turnoverYear3: nonNegNumericString,
-  creditPeriodExpected: nonNegCreditPeriodString,
   majorCustomer1: z.string().optional(),
   majorCustomer2: z.string().optional(),
   majorCustomer3: z.string().optional(),
@@ -97,7 +90,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
     turnoverYear1: financialData.turnoverYear1?.trim().startsWith('-') ? '' : financialData.turnoverYear1,
     turnoverYear2: financialData.turnoverYear2?.trim().startsWith('-') ? '' : financialData.turnoverYear2,
     turnoverYear3: financialData.turnoverYear3?.trim().startsWith('-') ? '' : financialData.turnoverYear3,
-    creditPeriodExpected: financialData.creditPeriodExpected?.trim().startsWith('-') ? '' : financialData.creditPeriodExpected,
     ...infrastructureData,
     ...qhseData,
   };
@@ -147,10 +139,7 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
     return normalized;
   };
 
-  const getNegativeMessage = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') =>
-    name === 'creditPeriodExpected' ? CREDIT_PERIOD_NEGATIVE_MSG : NEGATIVE_MSG;
-
-  const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3' | 'creditPeriodExpected') => ({
+  const numericFieldProps = (name: 'turnoverYear1' | 'turnoverYear2' | 'turnoverYear3') => ({
     type: 'text' as const,
     min: 0,
     inputMode: 'decimal' as const,
@@ -161,7 +150,7 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
       const text = e.clipboardData.getData('text');
       if (text && isNegativeAmount(text)) {
         e.preventDefault();
-        setAmountErrors((previous) => ({ ...previous, [name]: getNegativeMessage(name) }));
+        setAmountErrors((previous) => ({ ...previous, [name]: NEGATIVE_MSG }));
         setValue(name, '', { shouldValidate: false, shouldDirty: true });
         emitFinancialLiveUpdate({ [name]: '' } as Partial<FinancialDetails>);
       }
@@ -170,7 +159,7 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
       const raw = e.target.value;
       const isNegative = isNegativeAmount(raw);
       const nextValue = isNegative ? '' : sanitizeNonNegNumeric(raw);
-      setAmountErrors((previous) => ({ ...previous, [name]: isNegative ? getNegativeMessage(name) : undefined }));
+      setAmountErrors((previous) => ({ ...previous, [name]: isNegative ? NEGATIVE_MSG : undefined }));
       setValue(name, nextValue, { shouldValidate: false, shouldDirty: true });
       emitFinancialLiveUpdate({ [name]: nextValue } as Partial<FinancialDetails>);
     },
@@ -181,7 +170,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
       turnoverYear1: formData.turnoverYear1 || '',
       turnoverYear2: formData.turnoverYear2 || '',
       turnoverYear3: formData.turnoverYear3 || '',
-      creditPeriodExpected: formData.creditPeriodExpected || '',
       majorCustomer1: formData.majorCustomer1 || '',
       majorCustomer2: formData.majorCustomer2 || '',
       majorCustomer3: formData.majorCustomer3 || '',
@@ -270,13 +258,6 @@ export function FinancialInfrastructureStep({ financialData, infrastructureData,
               {amountErrors.turnoverYear3 && <p className="text-xs text-destructive">{amountErrors.turnoverYear3}</p>}
             </div>
           </div>
-          {false && (
-          <div className="grid gap-1.5">
-            <Label htmlFor="creditPeriodExpected">Expected Credit Period (Days)</Label>
-            <Input id="creditPeriodExpected" {...numericFieldProps('creditPeriodExpected')} placeholder="e.g., 30, 45, 60" />
-            {amountErrors.creditPeriodExpected && <p className="text-xs text-destructive">{CREDIT_PERIOD_NEGATIVE_MSG}</p>}
-          </div>
-          )}
           <FileUpload label="Upload Audited Financial Statements (CA Certified)" accept=".pdf" documentType="financial_docs" onFileSelect={setFinancialDocsFile} currentFile={financialDocsFile} />
         </div>
       </div>
