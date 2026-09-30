@@ -14,3 +14,4 @@
 - [x] Stop vendor emails on registration submission and SAP Sync while preserving buyer notifications.
 - [x] Restore buyer registration and downstream rejection emails, and preserve buyer-rejection emails to vendors.
 - [x] Permanently preserve KYC provider grants, expose safe lookup failures, and add self-hosted OCR readiness checks.
+- [x] Restore GST filing history and saved self-declarations when reopening vendor registration for editing.

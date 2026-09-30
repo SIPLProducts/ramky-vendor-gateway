@@ -4,3 +4,4 @@
 - Enforce Material Group for Vendors in both user interfaces and server-side buyer approval functions; Vendor Category remains optional.
 - Use the shared checked function-invocation helper for server-side email calls so nested failures retain their safe response message.
 - Treat KYC provider absence separately from backend lookup failures, and verify service-role provider access during self-hosted deployment so configuration errors cannot masquerade as missing providers.
+- Hydrate GST filing status from validation history during vendor edits while preserving the newest verification details, because newer validation rows may omit filing data.
