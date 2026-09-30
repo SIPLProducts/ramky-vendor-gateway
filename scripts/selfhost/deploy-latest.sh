@@ -150,6 +150,46 @@ verify_ceo_skip_schema() {
   echo "   CEO Office skip schema verified"
 }
 
+verify_kyc_database_access() {
+  local provider_count grant_count
+  provider_count=$(docker compose -f "$COMPOSE_FILE" exec -T db \
+    psql -U supabase_admin -d postgres -tAc \
+    "SELECT count(*) FROM public.api_providers WHERE provider_name IN ('GST_OCR','PAN_OCR','BANK_OCR') AND is_enabled IS TRUE" \
+    2>/dev/null | tr -d '[:space:]')
+  grant_count=$(docker compose -f "$COMPOSE_FILE" exec -T db \
+    psql -U supabase_admin -d postgres -tAc \
+    "SELECT count(*) FROM (VALUES ('api_providers'),('api_credentials')) AS required(table_name) WHERE has_table_privilege('service_role', format('public.%I', table_name), 'SELECT')" \
+    2>/dev/null | tr -d '[:space:]')
+  [[ "$provider_count" == "3" ]] || { echo "ERROR: expected enabled GST_OCR, PAN_OCR, and BANK_OCR provider rows; found $provider_count." >&2; exit 1; }
+  [[ "$grant_count" == "2" ]] || { echo "ERROR: service_role cannot read both KYC configuration tables. Run migrations first." >&2; exit 1; }
+  echo "   KYC/OCR provider rows and database grants verified"
+}
+
+verify_kyc_function_health() {
+  local anon_key provider response
+  anon_key=$(sed -n 's/^ANON_KEY=//p' "$ENV_FILE" | tail -1)
+  [[ -n "$anon_key" ]] || { echo "ERROR: ANON_KEY is missing from $ENV_FILE; cannot verify KYC function." >&2; exit 1; }
+
+  for provider in GST_OCR PAN_OCR BANK_OCR; do
+    response=$(curl --silent --show-error --fail-with-body \
+      --connect-timeout 10 --max-time 30 \
+      -H "apikey: $anon_key" \
+      -H "Authorization: Bearer $anon_key" \
+      -H "Content-Type: application/json" \
+      --data "{\"providerName\":\"$provider\",\"healthCheck\":true}" \
+      "${PUBLIC_BASE_URL%/}/supabase/functions/v1/kyc-api-execute") || {
+        echo "ERROR: $provider KYC health request failed." >&2
+        exit 1
+      }
+    if [[ "$response" != *'"healthcheck":true'* || "$response" != *'"ok":true'* ]]; then
+      echo "ERROR: $provider is not readable by the deployed KYC function." >&2
+      echo "Safe response: $(printf '%s' "$response" | sed -E 's/(credential_value|token|apikey|authorization)"?[^,}]*/\1":"[redacted]"/Ig')" >&2
+      exit 1
+    fi
+    echo "   $provider function health verified"
+  done
+}
+
 echo "=========================================================="
 echo " VMS self-host deploy   $(date -Is)"
 echo " Source repo : $SOURCE_DIR"
@@ -191,6 +231,13 @@ if [[ $SKIP_MIG -eq 0 && -d "$SOURCE_DIR/supabase/migrations" ]]; then
     echo "ERROR: required CEO Office skip migration is missing from the source checkout." >&2
     exit 1
   fi
+  KYC_GRANTS_MIGRATION="$SOURCE_DIR/drizzle/migrations/0002_ensure_kyc_service_role_grants.sql"
+  if [[ -f "$KYC_GRANTS_MIGRATION" ]]; then
+    cp -f "$KYC_GRANTS_MIGRATION" "$MIG_DIR/20260930104000_ensure_kyc_service_role_grants.sql"
+  else
+    echo "ERROR: required KYC service-role grants migration is missing from the source checkout." >&2
+    exit 1
+  fi
 
   RUNNER="$APP_ROOT/run-migrations.sh"
   # Always refresh the runner so deployment fixes are not hidden by an older copy.
@@ -201,6 +248,8 @@ fi
 
 echo ">> Verifying required approval-flow schema"
 verify_ceo_skip_schema
+echo ">> Verifying KYC/OCR database readiness"
+verify_kyc_database_access
 
 # ---------- 2. Edge functions ----------
 if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
@@ -228,6 +277,8 @@ if [[ $SKIP_FN -eq 0 && -d "$SOURCE_DIR/supabase/functions" ]]; then
     || { echo "ERROR: WHOLDTAX fix marker missing from deployed functions"; exit 1; }
   echo ">> Recreating functions container so edge-runtime reloads function entrypoints"
   docker compose -f "$COMPOSE_FILE" up -d --force-recreate functions || docker compose -f "$COMPOSE_FILE" restart functions
+  echo ">> Verifying deployed KYC/OCR provider access"
+  verify_kyc_function_health
 fi
 
 # ---------- 3. Frontend ----------
