@@ -7,6 +7,7 @@
 // confirm/retry.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { requireAuthenticatedUser, authErrorResponse } from '../_shared/auth.ts';
+import { invokeFunctionJson } from '../_shared/invoke-function.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -120,13 +121,11 @@ Deno.serve(async (req) => {
               <p style="margin-top:16px;font-size:13px;color:#374151">For any queries, please contact <a href="mailto:vyapaarsupport@ramky.com" style="color:#1e3a5f;text-decoration:none;font-weight:600">vyapaarsupport@ramky.com</a>.</p>
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
             </div>`;
-          const { data: emailResp, error: emailInvokeErr } = await admin.functions.invoke('send-smtp-email', {
-            body: { to: buyerEmail, subject: 'Vendor Application Rejected', html },
+          const emailResult = await invokeFunctionJson('send-smtp-email', {
+            to: buyerEmail, subject: 'Vendor Application Rejected', html,
           });
-          if (emailInvokeErr) {
-            emailError = emailInvokeErr.message ?? 'SMTP invoke failed';
-          } else if (emailResp && (emailResp as any).success === false) {
-            emailError = (emailResp as any).error ?? 'SMTP send failed';
+          if (!emailResult.ok) {
+            emailError = emailResult.error ?? 'SMTP send failed';
           } else {
             emailSent = true;
           }

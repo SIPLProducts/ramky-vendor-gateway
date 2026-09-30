@@ -6,6 +6,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
+import { invokeFunctionJson } from "../_shared/invoke-function.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -207,13 +208,11 @@ serve(async (req) => {
               <p style="color:#6b7280;font-size:12px;margin-top:24px">This is an automated notification from the Ramky Vyapaar Portal.</p>
             </div>`;
 
-          const { data: emailResp, error: emailInvokeErr } = await supabase.functions.invoke("send-smtp-email", {
-            body: { to: buyerEmail, subject: headline, html },
+          const emailResult = await invokeFunctionJson("send-smtp-email", {
+            to: buyerEmail, subject: headline, html,
           });
-          if (emailInvokeErr) {
-            emailError = emailInvokeErr.message ?? "SMTP invoke failed";
-          } else if (emailResp && (emailResp as any).success === false) {
-            emailError = (emailResp as any).error ?? "SMTP send failed";
+          if (!emailResult.ok) {
+            emailError = emailResult.error ?? "SMTP send failed";
           } else {
             emailSent = true;
           }
