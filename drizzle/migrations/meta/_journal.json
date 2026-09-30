@@ -15,6 +15,13 @@
       "when": 1790060013812,
       "tag": "0001_add_ceo_office_skip_to_approval_flows",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790764823397,
+      "tag": "0002_ensure_kyc_service_role_grants",
+      "breakpoints": true
     }
   ]
 }

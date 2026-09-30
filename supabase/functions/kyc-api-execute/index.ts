@@ -84,37 +84,106 @@ function normalizeBankPayload(filled: any, input: Record<string, any> | undefine
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerName, input, fileBase64, fileMimeType, fileName } = await req.json();
-    if (!providerName) {
+    const { providerName, input, fileBase64, fileMimeType, fileName, healthCheck } = await req.json();
+    if (typeof providerName !== "string" || providerName.trim().length === 0 || providerName.length > 100) {
       return new Response(JSON.stringify({ found: false, ok: false, message: "providerName required" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const backendUrl = Deno.env.get("SUPABASE_URL")?.trim();
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+    if (!backendUrl || !serviceRoleKey) {
+      const missing = [!backendUrl ? "SUPABASE_URL" : null, !serviceRoleKey ? "SUPABASE_SERVICE_ROLE_KEY" : null]
+        .filter(Boolean)
+        .join(",");
+      console.error(`[kyc-api-execute] configuration_error missing=${missing}`);
+      return new Response(JSON.stringify({
+        found: false,
+        ok: false,
+        success: false,
+        message: "KYC service configuration is unavailable. Please contact the administrator.",
+        message_code: "kyc_service_configuration_error",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const supa = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      backendUrl,
+      serviceRoleKey,
     );
 
-    const { data: provider } = await supa
+    const { data: provider, error: providerError } = await supa
       .from("api_providers")
       .select("*")
-      .eq("provider_name", providerName)
+      .eq("provider_name", providerName.trim())
       .eq("is_enabled", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    if (providerError) {
+      console.error(
+        `[kyc-api-execute] provider_lookup_failed provider=${providerName.trim()} code=${providerError.code || "unknown"} status=${providerError.details ? "details_available" : "no_details"}`,
+      );
+      return new Response(JSON.stringify({
+        found: false,
+        ok: false,
+        success: false,
+        message: "KYC provider settings could not be read. Please contact the administrator.",
+        message_code: "provider_lookup_failed",
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (!provider) {
-      return new Response(JSON.stringify({ found: false, ok: false, message: "No active provider configured" }),
+      console.warn(`[kyc-api-execute] provider_not_configured provider=${providerName.trim()}`);
+      return new Response(JSON.stringify({
+        found: false,
+        ok: false,
+        success: false,
+        message: "No active provider configured",
+        message_code: "provider_not_configured",
+      }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { data: cred } = await supa
+    const { data: cred, error: credentialError } = await supa
       .from("api_credentials")
       .select("credential_value")
       .eq("api_provider_id", provider.id)
       .eq("credential_name", "API_TOKEN")
       .maybeSingle();
+
+    if (credentialError) {
+      console.error(
+        `[kyc-api-execute] credential_lookup_failed provider=${provider.provider_name} code=${credentialError.code || "unknown"}`,
+      );
+      return new Response(JSON.stringify({
+        found: true,
+        ok: false,
+        success: false,
+        message: "KYC provider credentials could not be read. Please contact the administrator.",
+        message_code: "provider_credential_lookup_failed",
+        provider_name: provider.provider_name,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Deployment/readiness probe: prove that this running function can read
+    // both provider configuration and its credential row without contacting
+    // the external KYC service or exposing any sensitive values.
+    if (healthCheck === true) {
+      const credentialRequired = provider.auth_type !== "NONE";
+      const credentialConfigured = Boolean(cred?.credential_value);
+      const ok = !credentialRequired || credentialConfigured;
+      console.log(`[kyc-api-execute] healthcheck provider=${provider.provider_name} ok=${ok}`);
+      return new Response(JSON.stringify({
+        found: true,
+        ok,
+        success: ok,
+        healthcheck: true,
+        message: ok ? "KYC provider is ready" : "KYC provider credential is not configured",
+        message_code: ok ? "provider_ready" : "provider_credential_missing",
+        provider_name: provider.provider_name,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const url = `${provider.base_url}${provider.endpoint_path}`;
     const headers: Record<string, string> = {};
