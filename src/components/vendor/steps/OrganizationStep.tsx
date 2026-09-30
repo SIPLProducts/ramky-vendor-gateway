@@ -138,7 +138,9 @@ export function OrganizationStep({ data, statutoryData, vendorId, tenantId, show
     reset,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(showClassification
+      ? schema
+      : schema.extend({ materialGroupVendor: z.array(z.string()).optional().default([]) })),
     defaultValues: formValues,
     values: formValues,
     resetOptions: { keepDirtyValues: true, keepDirty: true },

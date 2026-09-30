@@ -406,6 +406,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                   <SapF4MultiSelectField
                     label="Material Group for Vendors"
                     required
+                    invalid={missingFields.includes('classify.MGV')}
                     masterType="material_group_vendor"
                     value={form.classify.MGV || []}
                     onChange={(v) => setClassify('MGV', v)}
@@ -738,7 +739,7 @@ export function SapF4SelectField({
 }
 
 export function SapF4MultiSelectField({
-  label, masterType, value, onChange, liveItems, placeholder, properCaseLabels, required,
+  label, masterType, value, onChange, liveItems, placeholder, properCaseLabels, required, invalid,
 }: {
   label: string;
   masterType: string;
@@ -748,6 +749,7 @@ export function SapF4MultiSelectField({
   placeholder?: string;
   properCaseLabels?: boolean;
   required?: boolean;
+  invalid?: boolean;
 }) {
   const map = F4_FIELD_MAP[masterType];
   const isLive = Array.isArray(liveItems) && liveItems.length > 0;
@@ -786,7 +788,9 @@ export function SapF4MultiSelectField({
         selected={value || []}
         onChange={onChange}
         placeholder={placeholder || 'Select…'}
+        className={invalid ? 'border-destructive' : ''}
       />
+      {invalid && <p className="text-[11px] text-destructive">{label} is required.</p>}
       <p className="text-[11px] text-muted-foreground">
         {isLoading
           ? 'Loading F4 values…'
