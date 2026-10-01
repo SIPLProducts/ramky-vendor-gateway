@@ -1241,8 +1241,12 @@ export function DocumentVerificationStep({
     afterVerifiedOcrName: () => string | undefined,
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
   ) => {
+    const failCurrentTab = (message: string) => {
+      setDoc({ status: "failed", errorMessage: message });
+      publishKycFailure(kind, message);
+    };
     if (file.size > 5 * 1024 * 1024) {
-      setDoc({ status: "failed", errorMessage: "File must be under 5 MB" });
+      failCurrentTab("File must be under 5 MB");
       return;
     }
     setDoc({ status: "uploading", fileName: file.name, fileSize: file.size, file });
@@ -1255,12 +1259,10 @@ export function DocumentVerificationStep({
     if (!ocrRes.success || !ocrRes.extracted) {
       const errMsg = ocrRes.error || "Could not read document";
       const providerIssue = isProviderConfigError(ocrRes.error);
-      setDoc({
-        status: "failed",
-        errorMessage: providerIssue
-          ? `${errMsg} — the document couldn't be sent to the verification service. Please re-upload the document (or try a clear image) and retry.`
-          : errMsg,
-      });
+      const failureMessage = providerIssue
+        ? `${errMsg} — the document couldn't be sent to the verification service. Please re-upload the document (or try a clear image) and retry.`
+        : errMsg;
+      failCurrentTab(failureMessage);
       if (providerIssue) {
         // Not an OCR read failure — do not offer manual entry.
         return;
@@ -1284,7 +1286,7 @@ export function DocumentVerificationStep({
 
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
-      setDoc({ status: "failed", errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      failCurrentTab("Couldn't read clearly — please upload a sharper scan.");
       if (kind === "cheque") {
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
@@ -1313,7 +1315,7 @@ export function DocumentVerificationStep({
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      setDoc({ status: "failed", errorMessage: msg });
+      failCurrentTab(msg);
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
@@ -1350,7 +1352,7 @@ export function DocumentVerificationStep({
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", errorMessage: extraErr });
+      failCurrentTab(extraErr);
       return;
     }
     // Merge normalized API fields over OCR so missing/incorrect OCR values are
@@ -2317,6 +2319,42 @@ export function DocumentVerificationStep({
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
   }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, panCrossCheckError, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, dependentCrossErrors, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
+
+  function publishKycFailure(kind: OcrDocumentType, message: string) {
+    const section = kind === "cheque" ? "bank" : kind;
+    if (section !== "gst" && section !== "pan" && section !== "msme" && section !== "bank") return;
+
+    const failed = buildOutput();
+    failed.clearedKycSections = Array.from(new Set([...(failed.clearedKycSections || []), section]));
+    failed.kycFailureMessages = { ...(failed.kycFailureMessages || {}), [section]: message };
+
+    if (section === "gst") {
+      delete failed.gst;
+      failed.gstCertificateFile = null;
+      failed.gstSelfDeclarationFile = null;
+    } else if (section === "pan") {
+      delete failed.pan;
+      failed.panCardFile = null;
+      failed.panStatus = null;
+      failed.panAadhaarLinked = null;
+      failed.panComprehensiveVerifiedAt = null;
+      failed.panHolderName = null;
+    } else if (section === "msme") {
+      delete failed.msme;
+      failed.msmeCertificateFile = null;
+      failed.msmeSelfDeclarationFile = null;
+    } else {
+      delete failed.bank;
+      delete failed.bank2;
+      failed.cancelledChequeFile = null;
+      failed.cancelledChequeFile2 = null;
+    }
+
+    // Publish synchronously instead of waiting for React's next state/effect
+    // cycle. Save Draft can therefore never capture the old verified details
+    // or the rejected replacement while the failure render is still pending.
+    onStageChangeRef.current?.(failed);
+  }
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
