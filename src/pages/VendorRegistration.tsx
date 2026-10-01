@@ -1217,8 +1217,22 @@ export default function VendorRegistration() {
     setFormData((prev) => {
       const next = mergeVerifiedDataIntoForm(prev, data);
       // Avoid no-op updates that would re-trigger autosave
-      const prevKey = JSON.stringify({ o: prev.organization, a: prev.address, s: prev.statutory, b: prev.bank });
-      const nextKey = JSON.stringify({ o: next.organization, a: next.address, s: next.statutory, b: next.bank });
+      const prevKey = JSON.stringify({
+        o: prev.organization,
+        a: prev.address,
+        s: prev.statutory,
+        b: prev.bank,
+        clear: prev.kycClearSections,
+        failures: prev.kycFailureMessages,
+      });
+      const nextKey = JSON.stringify({
+        o: next.organization,
+        a: next.address,
+        s: next.statutory,
+        b: next.bank,
+        clear: next.kycClearSections,
+        failures: next.kycFailureMessages,
+      });
       return prevKey === nextKey ? prev : next;
     });
   };
