@@ -779,15 +779,22 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
     const latestKycValidations = ((existingVendor as any).__latest_kyc_validations || {}) as Record<string, any>;
+    const hasAcceptedKycData: Record<KycSection, boolean> = {
+      gst: !!vendor.gstin,
+      pan: !!vendor.pan,
+      msme: !!vendor.msme_number,
+      bank: !!(vendor.account_number && vendor.ifsc_code),
+    };
     const failedKycSections = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
       const validation = latestKycValidations[section];
       return validation?.status === 'failed' &&
+        !hasAcceptedKycData[section] &&
         (validation?.details?.cleared_tab === section || validation?.details?.requires_review === true);
     });
     const failedKycSet = new Set(failedKycSections);
     const preservedKycFailures = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
       const validation = latestKycValidations[section];
-      return validation?.status === 'failed' && validation?.details?.preserved_existing === true;
+      return validation?.status === 'failed' && hasAcceptedKycData[section];
     });
     const kycFailureMessages = Object.fromEntries(
       [...failedKycSections, ...preservedKycFailures].map((section) => [

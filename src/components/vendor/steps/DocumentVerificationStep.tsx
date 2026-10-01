@@ -120,7 +120,7 @@ function buildHolderNameSuccessMessage(labels: string[]): string {
 }
 
 export interface VerifiedDocumentData {
-  /** A failed replacement clears only these tabs in the parent draft. */
+  /** Tabs with no previously accepted document after a failed first verification. */
   clearedKycSections?: Array<"gst" | "pan" | "msme" | "bank">;
   /** Safe failure messages persisted for reviewer visibility. */
   kycFailureMessages?: Partial<Record<"gst" | "pan" | "msme" | "bank", string>>;
