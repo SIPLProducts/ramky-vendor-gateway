@@ -1529,7 +1529,7 @@ export function DocumentVerificationStep({
           if (ocrAddress) setEditablePrincipalPlace(ocrAddress);
         }
         // Chain GST_FILING right after GSTIN validation succeeds.
-        if (prev.status === "verified" && prev.ocrData?.gstin) {
+        if (prev.status === "verified" && !prev.errorMessage && prev.ocrData?.gstin) {
           setGstFilingRows([]);
           setGstFilingChecked(false);
           setGstCompliance(null);
@@ -2315,8 +2315,8 @@ export function DocumentVerificationStep({
       };
     }
     // Lift uploaded files so the parent can persist them in the draft.
-    // Only verified replacements are persisted. A failed replacement clears
-    // its own tab and never replaces the previously accepted document.
+    // Only verified replacements are persisted. A failed replacement keeps
+    // the previously accepted document and values unchanged.
     out.gstCertificateFile =
       isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
     out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
