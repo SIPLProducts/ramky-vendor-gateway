@@ -1166,6 +1166,9 @@ export default function VendorRegistration() {
       },
     };
 
+    // `clearedKycSections` is reserved for a first verification failure where
+    // no accepted snapshot exists. Replacement failures carry only a failure
+    // message, so the saved values and files remain visible across reloads.
     if (cleared.has('gst')) {
       next.statutory = {
         ...next.statutory,

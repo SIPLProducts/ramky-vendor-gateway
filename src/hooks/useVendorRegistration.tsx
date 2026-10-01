@@ -1088,16 +1088,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         is_msme_registered: false,
       } : {};
 
-      // Remember which KYC sections already have verified data so reopening a
-      // draft shows them as Verified instead of re-running OCR / validation.
-      // Only 'passed' flags are written — never downgrade an existing status.
+      // Keep the accepted values, but let the latest failed attempt own the
+      // displayed verification status until a later attempt passes.
       const clearedSections = new Set<KycSection>(formData.kycClearSections || []);
+      const failedSections = new Set<KycSection>(
+        Object.keys(formData.kycFailureMessages || {}) as KycSection[],
+      );
       const draftVerificationStatuses: Record<string, string> = {};
       if (formData.statutory?.gstin) draftVerificationStatuses.gst_verification_status = 'passed';
       if (formData.statutory?.pan) draftVerificationStatuses.pan_verification_status = 'passed';
       if (formData.statutory?.msmeNumber) draftVerificationStatuses.msme_verification_status = 'passed';
       if (formData.bank?.accountNumber && formData.bank?.ifscCode) draftVerificationStatuses.bank_verification_status = 'passed';
-      clearedSections.forEach((section) => {
+      failedSections.forEach((section) => {
         draftVerificationStatuses[`${section}_verification_status`] = 'failed';
       });
 
@@ -1108,8 +1110,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
-      // Failed sections must also be empty when the first draft save creates
-      // the vendor row; otherwise stale form values can survive a reload.
+      // Only a first-time failure with no accepted snapshot clears an empty tab.
+      // Replacement failures retain the existing vendor values and document.
       clearedSections.forEach((section) => Object.assign(vendorData, CLEARED_KYC_VALUES[section]));
       // When the vendor is registering via an invitation, the invitation's company
       // is the source of truth for approval routing. Always force it so the vendor
