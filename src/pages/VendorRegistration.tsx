@@ -812,9 +812,12 @@ export default function VendorRegistration() {
             const bk = existingFormData.bank;
             const hasAnyKyc = !!(st?.gstin || st?.pan || st?.msmeNumber || bk?.accountNumber
               || st?.gstCertificateFile || st?.panCardFile || st?.msmeCertificateFile || bk?.cancelledChequeFile
-              || st?.isGstRegistered === false || st?.isMsmeRegistered === false);
+              || st?.isGstRegistered === false || st?.isMsmeRegistered === false
+              || existingFormData.kycClearSections?.length);
             if (hasAnyKyc) {
               step1Seed = {
+                clearedKycSections: existingFormData.kycClearSections || [],
+                kycFailureMessages: existingFormData.kycFailureMessages || {},
                 isGstRegistered: existingFormData.statutory?.isGstRegistered ?? (existingFormData.statutory?.gstin ? true : null),
                 isMsmeRegistered: existingFormData.statutory?.isMsmeRegistered ?? (existingFormData.statutory?.msmeNumber ? true : null),
                 pan: existingFormData.statutory?.pan

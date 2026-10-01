@@ -17,4 +17,4 @@
 - [x] Restore GST filing history and saved self-declarations when reopening vendor registration for editing.
 - [x] Persist PAN–Aadhaar linkage as a definite boolean after every successful PAN Comprehensive response.
 - [x] Isolate GST, PAN, MSME, and Bank replacements while preserving other tabs and re-running non-destructive cross-checks.
-- [x] Clear only the affected GST, PAN, MSME, or Bank tab after a failed replacement, prevent stale autosaves from restoring its PDF/data after reload, and block progression until it verifies again.
+- [x] Clear only the affected GST, PAN, MSME, or Bank tab after a failed replacement, restore its newest failed status/message after refresh or reopening, prevent stale PDFs/data from returning, and block progression until it verifies again.
