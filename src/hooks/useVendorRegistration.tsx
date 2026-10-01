@@ -432,7 +432,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   };
 
   // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
-  const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
+  const uploadAllDocuments = async (
+    formData: VendorFormData,
+    vendorIdForUpload: string,
+    blockedKycSections: Set<KycSection> = new Set<KycSection>(),
+  ) => {
     if (uploadInFlight.current) {
       try { await uploadInFlight.current; } catch { /* swallow prior error */ }
     }
@@ -452,7 +456,14 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         { file: formData.international?.documents?.swiftIbanFile ?? null, type: 'swift_iban_details' },
       ];
 
+      const blockedDocumentTypes = new Set(
+        [...blockedKycSections].flatMap((section) => DOCUMENT_TYPES_BY_KYC_SECTION[section]),
+      );
+
       for (const doc of documentsToUpload) {
+        // A rejected KYC replacement must never enter permanent storage, even
+        // when an older autosave captured the File before validation finished.
+        if (blockedDocumentTypes.has(doc.type)) continue;
         if (!doc.file) continue;
         if ((doc.file as PersistedDocumentFile).__persistedDocument) continue;
 
@@ -1043,6 +1054,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         status: 'draft' as const,
         ...(invitation?.email && !userId ? { primary_email: invitation.email } : {}),
       };
+      // Failed sections must also be empty when the first draft save creates
+      // the vendor row; otherwise stale form values can survive a reload.
+      clearedSections.forEach((section) => Object.assign(vendorData, CLEARED_KYC_VALUES[section]));
       // When the vendor is registering via an invitation, the invitation's company
       // is the source of truth for approval routing. Always force it so the vendor
       // cannot accidentally pick a different Buyer Company that has no approval matrix.
@@ -1143,12 +1157,14 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           resolved = reread ?? { id: vendorId };
         }
 
+        // Drain any earlier upload first, while explicitly blocking failed KYC
+        // files from this save. Clear last so a stale in-flight upload cannot
+        // recreate the rejected document after deletion.
+        await uploadAllDocuments(formData, resolved.id, clearedSections);
         if (clearedSections.size > 0) {
           await clearFailedKycDocuments(resolved.id, clearedSections);
           await persistFailedKycValidations(resolved.id, formData);
         }
-        // Upload documents after vendor is saved
-        await uploadAllDocuments(formData, resolved.id);
         savedVendor = resolved;
       } else {
 
@@ -1184,8 +1200,13 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           }
         }
 
-        // Upload documents after vendor is created
-        await uploadAllDocuments(formData, data.id);
+        // Upload only accepted documents. Persist the failed state even when
+        // this is the first draft save for the vendor.
+        await uploadAllDocuments(formData, data.id, clearedSections);
+        if (clearedSections.size > 0) {
+          await clearFailedKycDocuments(data.id, clearedSections);
+          await persistFailedKycValidations(data.id, formData);
+        }
         savedVendor = data;
       }
 
