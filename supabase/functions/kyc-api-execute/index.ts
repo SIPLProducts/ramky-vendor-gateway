@@ -265,13 +265,18 @@ serve(async (req) => {
         }
       }
       if (provider.provider_name === "PAN") {
-        // Always derive PAN payload from runtime input — never trust a saved
-        // template that may contain a hardcoded sample PAN like "ABDCS6352G".
+        // Preserve configured optional PAN fields while always deriving the
+        // identity value from runtime input. This lets administrators add
+        // provider options such as `masked_aadhaar_variant` without allowing
+        // a hardcoded sample PAN in the saved template to replace the real PAN.
         const rawPan =
           input?.id_number ?? input?.pan_number ?? input?.pan ??
           (filled && typeof filled === "object" ? (filled as any).id_number : "") ?? "";
         const idNumber = String(rawPan).toUpperCase().replace(/\s+/g, "").trim();
-        filled = { id_number: idNumber };
+        const configuredFields = filled && typeof filled === "object" && !Array.isArray(filled)
+          ? filled as Record<string, any>
+          : {};
+        filled = { ...configuredFields, id_number: idNumber };
       }
       if (provider.provider_name === "BANK") {
         const normalized = normalizeBankPayload(filled, input);
