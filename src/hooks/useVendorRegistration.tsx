@@ -245,6 +245,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else if (gstValError) {
           console.warn('Failed to hydrate GST validation history:', gstValError);
         }
+
+        // Restore the latest persisted KYC outcome independently for every tab.
+        // A failed replacement is authoritative on reopen even if legacy values
+        // or an older document survived a previous interrupted autosave.
+        const { data: kycHistory, error: kycHistoryError } = await supabase
+          .from('vendor_validations')
+          .select('validation_type, status, message, details, created_at')
+          .eq('vendor_id', data.id)
+          .in('validation_type', ['gst', 'pan', 'msme', 'bank'])
+          .order('created_at', { ascending: false });
+        if (!kycHistoryError) {
+          const latestByType: Record<string, any> = {};
+          for (const validation of kycHistory || []) {
+            const type = String(validation.validation_type || '');
+            if (!latestByType[type]) latestByType[type] = validation;
+          }
+          (data as any).__latest_kyc_validations = latestByType;
+        } else {
+          console.warn('Failed to hydrate latest KYC validation states:', kycHistoryError);
+        }
       }
 
       // Initialize vendorId and vendorStatus from existing vendor
@@ -755,9 +775,27 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const existingFormData = useMemo<VendorFormData | null>(() => {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
+    const latestKycValidations = ((existingVendor as any).__latest_kyc_validations || {}) as Record<string, any>;
+    const failedKycSections = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
+      const validation = latestKycValidations[section];
+      return validation?.status === 'failed' &&
+        (validation?.details?.cleared_tab === section || validation?.details?.requires_review === true);
+    });
+    const failedKycSet = new Set(failedKycSections);
+    const kycFailureMessages = Object.fromEntries(
+      failedKycSections.map((section) => [
+        section,
+        latestKycValidations[section]?.message || `${section.toUpperCase()} verification failed. Requires Review.`,
+      ]),
+    );
     const docsByType = new Map<string, any>();
     ((vendor as any).vendor_documents || []).forEach((doc: any) => docsByType.set(doc.document_type, doc));
-    const persisted = (type: DocumentType) => asPersistedFile(docsByType.get(type));
+    const persisted = (type: DocumentType) => {
+      const section = Object.entries(DOCUMENT_TYPES_BY_KYC_SECTION)
+        .find(([, types]) => types.includes(type))?.[0] as KycSection | undefined;
+      if (section && failedKycSet.has(section)) return null;
+      return asPersistedFile(docsByType.get(type));
+    };
 
     return {
       vendorType: ((vendor as any).vendor_type as 'domestic' | 'international') || 'domestic',
@@ -841,7 +879,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       },
       statutory: {
         firmRegistrationNo: vendor.firm_registration_no || '',
-        pan: vendor.pan || '',
+        pan: failedKycSet.has('pan') ? '' : (vendor.pan || ''),
         panHolderName: (vendor as any).pan_holder_name ?? '',
         panStatus: (vendor as any).pan_status ?? null,
         panAadhaarLinked: (vendor as any).pan_aadhaar_linked ?? null,
