@@ -1246,11 +1246,18 @@ export function DocumentVerificationStep({
   const runDocFlow = async (
     kind: OcrDocumentType,
     file: File,
-    setDoc: (d: DocState) => void,
+    setDoc: React.Dispatch<React.SetStateAction<DocState>>,
     afterVerifiedOcrName: () => string | undefined,
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
+    acceptedDoc?: DocState,
   ) => {
     const failCurrentTab = (message: string) => {
+      // A rejected replacement is only an unsuccessful attempt. Keep the
+      // previously accepted document and extracted values authoritative.
+      if (acceptedDoc?.status === "verified") {
+        setDoc({ ...acceptedDoc, errorMessage: message });
+        return;
+      }
       setDoc({ status: "failed", errorMessage: message });
       publishKycFailure(kind, message);
     };
@@ -1505,14 +1512,8 @@ export function DocumentVerificationStep({
   };
 
   const handleGstUpload = (file: File) => {
-    // Reset filing-status state for the new upload
-    setGstFilingRows([]);
-    setGstFilingChecked(false);
-    setGstCompliance(null);
-    // Clear stale address up front so a previous upload's value can never
-    // bleed through if the new registry response is missing the field.
-    setEditablePrincipalPlace("");
-    return runDocFlow("gst", file, setGstDoc, () => gstDoc.ocrData?.legal_name).then(() => {
+    const acceptedDoc = gstDoc;
+    return runDocFlow("gst", file, setGstDoc, () => acceptedDoc.ocrData?.legal_name, undefined, acceptedDoc).then(() => {
       setGstDoc((prev) => {
         // Registry response is the source of truth — always overwrite the
         // editable Principal Place of Business with the API-returned address
@@ -1529,6 +1530,9 @@ export function DocumentVerificationStep({
         }
         // Chain GST_FILING right after GSTIN validation succeeds.
         if (prev.status === "verified" && prev.ocrData?.gstin) {
+          setGstFilingRows([]);
+          setGstFilingChecked(false);
+          setGstCompliance(null);
           void runGstFilingStatusCheck(prev.ocrData);
         }
         return prev;
@@ -1537,6 +1541,7 @@ export function DocumentVerificationStep({
   };
 
   const handlePanUpload = (file: File) => {
+    const acceptedDoc = panDoc;
     setPanCrossCheckError(null);
     return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
@@ -1549,18 +1554,18 @@ export function DocumentVerificationStep({
         const panOcr = String(ocr.pan_number || "").toUpperCase();
         if (panFromGst.length === 10 && panOcr && panFromGst !== panOcr) {
           const src = apiPan ? "GST registry" : "GSTIN";
-          setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`);
           return `PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`;
         }
       }
       setPanCrossCheckError(null);
       return null;
-    });
+    }, acceptedDoc);
   };
 
   const handleMsmeUpload = (file: File) => {
+    const acceptedDoc = msmeDoc;
     setDependentCrossErrors((prev) => ({ ...prev, msme: null }));
-    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName, undefined, acceptedDoc);
   };
 
   // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
@@ -1661,15 +1666,11 @@ export function DocumentVerificationStep({
   };
 
   const handleBankUpload = (file: File) => {
+    const acceptedDoc = bankDoc;
     chequeTargetRef.current = "primary";
     lastBankFileRef.current = file;
-    // Clear any previously fetched/auto-filled bank data so a fresh upload
-    // never inherits stale branch / address values from the prior cheque.
-    setBankDoc(idleDoc);
     setDependentCrossErrors((prev) => ({ ...prev, bank: null }));
-    setBankBranchAutoFilled(false);
-    if (!bankAddressTouchedRef.current) setBankBranchAddress("");
-    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName, undefined, acceptedDoc).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
@@ -1720,11 +1721,10 @@ export function DocumentVerificationStep({
 
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
+    const acceptedDoc = bankDoc2;
     chequeTargetRef.current = "secondary";
     lastBankFile2Ref.current = file;
-    setBankDoc2(idleDoc);
-    setBankBranchAutoFilled2(false);
-    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName, undefined, acceptedDoc).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
         const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
@@ -3608,7 +3608,7 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
         />
       )}
 
-      {isFailed && doc.errorMessage && (
+      {doc.errorMessage && (
         <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{doc.errorMessage}</span>
