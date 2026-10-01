@@ -494,6 +494,7 @@ export function DocumentVerificationStep({
         jurisdiction_state: initialData.gst.jurisdictionState,
       },
       nameMatchScore: initialData.gst.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.gst,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.gstCertificateFile),
     };
@@ -557,6 +558,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.pan,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.panCardFile),
     };
@@ -595,6 +597,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.msme.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.msme,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.msmeCertificateFile),
     };
@@ -625,6 +628,7 @@ export function DocumentVerificationStep({
           account_holder_name: initialData.bank.apiName || initialData.bank.accountHolderName,
         },
       },
+      errorMessage: initialData.kycFailureMessages?.bank,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile),
     };
