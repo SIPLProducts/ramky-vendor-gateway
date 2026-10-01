@@ -245,6 +245,26 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         } else if (gstValError) {
           console.warn('Failed to hydrate GST validation history:', gstValError);
         }
+
+        // Restore the latest persisted KYC outcome independently for every tab.
+        // A failed replacement is authoritative on reopen even if legacy values
+        // or an older document survived a previous interrupted autosave.
+        const { data: kycHistory, error: kycHistoryError } = await supabase
+          .from('vendor_validations')
+          .select('validation_type, status, message, details, created_at')
+          .eq('vendor_id', data.id)
+          .in('validation_type', ['gst', 'pan', 'msme', 'bank'])
+          .order('created_at', { ascending: false });
+        if (!kycHistoryError) {
+          const latestByType: Record<string, any> = {};
+          for (const validation of kycHistory || []) {
+            const type = String(validation.validation_type || '');
+            if (!latestByType[type]) latestByType[type] = validation;
+          }
+          (data as any).__latest_kyc_validations = latestByType;
+        } else {
+          console.warn('Failed to hydrate latest KYC validation states:', kycHistoryError);
+        }
       }
 
       // Initialize vendorId and vendorStatus from existing vendor
@@ -755,9 +775,27 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const existingFormData = useMemo<VendorFormData | null>(() => {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
+    const latestKycValidations = ((existingVendor as any).__latest_kyc_validations || {}) as Record<string, any>;
+    const failedKycSections = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
+      const validation = latestKycValidations[section];
+      return validation?.status === 'failed' &&
+        (validation?.details?.cleared_tab === section || validation?.details?.requires_review === true);
+    });
+    const failedKycSet = new Set(failedKycSections);
+    const kycFailureMessages = Object.fromEntries(
+      failedKycSections.map((section) => [
+        section,
+        latestKycValidations[section]?.message || `${section.toUpperCase()} verification failed. Requires Review.`,
+      ]),
+    );
     const docsByType = new Map<string, any>();
     ((vendor as any).vendor_documents || []).forEach((doc: any) => docsByType.set(doc.document_type, doc));
-    const persisted = (type: DocumentType) => asPersistedFile(docsByType.get(type));
+    const persisted = (type: DocumentType) => {
+      const section = Object.entries(DOCUMENT_TYPES_BY_KYC_SECTION)
+        .find(([, types]) => types.includes(type))?.[0] as KycSection | undefined;
+      if (section && failedKycSet.has(section)) return null;
+      return asPersistedFile(docsByType.get(type));
+    };
 
     return {
       vendorType: ((vendor as any).vendor_type as 'domestic' | 'international') || 'domestic',
@@ -841,31 +879,31 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       },
       statutory: {
         firmRegistrationNo: vendor.firm_registration_no || '',
-        pan: vendor.pan || '',
-        panHolderName: (vendor as any).pan_holder_name ?? '',
-        panStatus: (vendor as any).pan_status ?? null,
-        panAadhaarLinked: (vendor as any).pan_aadhaar_linked ?? null,
-        panComprehensiveVerifiedAt: (vendor as any).pan_comprehensive_verified_at ?? null,
+        pan: failedKycSet.has('pan') ? '' : (vendor.pan || ''),
+        panHolderName: failedKycSet.has('pan') ? '' : ((vendor as any).pan_holder_name ?? ''),
+        panStatus: failedKycSet.has('pan') ? null : ((vendor as any).pan_status ?? null),
+        panAadhaarLinked: failedKycSet.has('pan') ? null : ((vendor as any).pan_aadhaar_linked ?? null),
+        panComprehensiveVerifiedAt: failedKycSet.has('pan') ? null : ((vendor as any).pan_comprehensive_verified_at ?? null),
         pfNumber: vendor.pf_number || '',
         esiNumber: vendor.esi_number || '',
         isGstRegistered: vendor.is_gst_registered ?? true,
-        gstin: vendor.gstin || '',
-        gstDeclarationReason: vendor.gst_declaration_reason || '',
+        gstin: failedKycSet.has('gst') ? '' : (vendor.gstin || ''),
+        gstDeclarationReason: failedKycSet.has('gst') ? '' : (vendor.gst_declaration_reason || ''),
         gstSelfDeclarationFile: persisted('gst_self_declaration'),
-        gstConstitutionOfBusiness: vendor.gst_constitution_of_business || '',
-        gstPrincipalPlaceOfBusiness: vendor.gst_principal_place_of_business || '',
-        gstAdditionalPlaces: vendor.gst_additional_places || [],
-        gstRegistrationDate: vendor.gst_registration_date || '',
-        gstStatus: vendor.gst_status || '',
-        gstTaxpayerType: vendor.gst_taxpayer_type || '',
-        gstBusinessNature: vendor.gst_business_nature || [],
-        gstJurisdictionCentre: vendor.gst_jurisdiction_centre || '',
-        gstJurisdictionState: vendor.gst_jurisdiction_state || '',
+        gstConstitutionOfBusiness: failedKycSet.has('gst') ? '' : (vendor.gst_constitution_of_business || ''),
+        gstPrincipalPlaceOfBusiness: failedKycSet.has('gst') ? '' : (vendor.gst_principal_place_of_business || ''),
+        gstAdditionalPlaces: failedKycSet.has('gst') ? [] : (vendor.gst_additional_places || []),
+        gstRegistrationDate: failedKycSet.has('gst') ? '' : (vendor.gst_registration_date || ''),
+        gstStatus: failedKycSet.has('gst') ? '' : (vendor.gst_status || ''),
+        gstTaxpayerType: failedKycSet.has('gst') ? '' : (vendor.gst_taxpayer_type || ''),
+        gstBusinessNature: failedKycSet.has('gst') ? [] : (vendor.gst_business_nature || []),
+        gstJurisdictionCentre: failedKycSet.has('gst') ? '' : (vendor.gst_jurisdiction_centre || ''),
+        gstJurisdictionState: failedKycSet.has('gst') ? '' : (vendor.gst_jurisdiction_state || ''),
         isMsmeRegistered: vendor.is_msme_registered ?? false,
-        msmeNumber: vendor.msme_number || '',
-        msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
-        msmeEnterpriseName: (vendor as VendorRecord & { msme_enterprise_name?: string }).msme_enterprise_name || '',
-        msmeMajorActivity: (vendor as VendorRecord & { msme_major_activity?: string }).msme_major_activity || '',
+        msmeNumber: failedKycSet.has('msme') ? '' : (vendor.msme_number || ''),
+        msmeCategory: failedKycSet.has('msme') ? '' : ((vendor.msme_category as 'micro' | 'small' | 'medium' | '') || ''),
+        msmeEnterpriseName: failedKycSet.has('msme') ? '' : ((vendor as VendorRecord & { msme_enterprise_name?: string }).msme_enterprise_name || ''),
+        msmeMajorActivity: failedKycSet.has('msme') ? '' : ((vendor as VendorRecord & { msme_major_activity?: string }).msme_major_activity || ''),
         labourPermitNo: vendor.labour_permit_no || '',
         iecNo: vendor.iec_no || '',
         swiftIbanCode: (vendor as VendorRecord & { swift_iban_code?: string }).swift_iban_code || '',
@@ -878,7 +916,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         panCardFile: persisted('pan_card'),
         msmeCertificateFile: persisted('msme_certificate'),
         msmeSelfDeclarationFile: persisted('msme_self_declaration'),
-        msmeDeclarationReason: vendor.msme_declaration_reason || '',
+        msmeDeclarationReason: failedKycSet.has('msme') ? '' : (vendor.msme_declaration_reason || ''),
         iecCertificateFile: null,
         swiftIbanProofFile: null,
         gstFilingStatus: (() => {
@@ -886,18 +924,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         })(),
       },
       bank: {
-        bankName: vendor.bank_name || '',
-        branchName: vendor.bank_branch_name || '',
-        accountNumber: vendor.account_number || '',
-        confirmAccountNumber: vendor.account_number || '',
+        bankName: failedKycSet.has('bank') ? '' : (vendor.bank_name || ''),
+        branchName: failedKycSet.has('bank') ? '' : (vendor.bank_branch_name || ''),
+        accountNumber: failedKycSet.has('bank') ? '' : (vendor.account_number || ''),
+        confirmAccountNumber: failedKycSet.has('bank') ? '' : (vendor.account_number || ''),
         accountType: (vendor.account_type as 'current' | 'savings' | 'cash_credit' | 'others') || 'current',
         accountTypeOther: '',
-        ifscCode: vendor.ifsc_code || '',
-        micrCode: vendor.micr_code || '',
-        bankAddress: vendor.bank_address || '',
-        accountHolderName: (vendor as VendorRecord & { account_holder_name?: string }).account_holder_name || '',
+        ifscCode: failedKycSet.has('bank') ? '' : (vendor.ifsc_code || ''),
+        micrCode: failedKycSet.has('bank') ? '' : (vendor.micr_code || ''),
+        bankAddress: failedKycSet.has('bank') ? '' : (vendor.bank_address || ''),
+        accountHolderName: failedKycSet.has('bank') ? '' : ((vendor as VendorRecord & { account_holder_name?: string }).account_holder_name || ''),
         cancelledChequeFile: persisted('cancelled_cheque'),
-        secondary: vendor.account_number_2
+        secondary: !failedKycSet.has('bank') && vendor.account_number_2
           ? {
               enabled: true,
               bankName: vendor.bank_name_2 || '',
@@ -955,6 +993,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         selfDeclared: vendor.self_declared ?? false,
         termsAccepted: vendor.terms_accepted ?? false,
       },
+      kycClearSections: failedKycSections,
+      kycFailureMessages,
       international: (vendor as any).international_data ? {
         documents: { registrationCopyFile: null, swiftIbanFile: null },
         company: {

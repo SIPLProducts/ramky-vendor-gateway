@@ -447,10 +447,16 @@ export function DocumentVerificationStep({
   );
 
   // Stage 1: GST
+  const initialFailedSections = new Set(initialData?.clearedKycSections || []);
+  const failedDocState = (section: "gst" | "pan" | "msme" | "bank"): DocState => ({
+    status: "failed",
+    errorMessage: initialData?.kycFailureMessages?.[section] || `${section.toUpperCase()} verification failed. Requires Review.`,
+  });
   const [isGstRegistered, setIsGstRegistered] = useState<boolean | null>(
     initialData?.isGstRegistered ?? (initialData?.gst ? true : null),
   );
   const [gstDoc, setGstDoc] = useState<DocState>(() => {
+    if (initialFailedSections.has("gst")) return failedDocState("gst");
     if (!initialData?.gst) return idleDoc;
     const data = {
       gstin: initialData.gst.gstin,
@@ -526,6 +532,7 @@ export function DocumentVerificationStep({
 
   // Stage 2: PAN
   const [panDoc, setPanDoc] = useState<DocState>(() => {
+    if (initialFailedSections.has("pan")) return failedDocState("pan");
     if (!initialData?.pan) return idleDoc;
     const data = {
       pan_number: initialData.pan.number,
@@ -566,6 +573,7 @@ export function DocumentVerificationStep({
     initialData?.isMsmeRegistered ?? (initialData?.msme ? true : null),
   );
   const [msmeDoc, setMsmeDoc] = useState<DocState>(() => {
+    if (initialFailedSections.has("msme")) return failedDocState("msme");
     if (!initialData?.msme) return idleDoc;
     const data = {
       udyam_number: initialData.msme.udyamNumber,
@@ -594,6 +602,7 @@ export function DocumentVerificationStep({
 
   // Stage 4: Bank
   const [bankDoc, setBankDoc] = useState<DocState>(() => {
+    if (initialFailedSections.has("bank")) return failedDocState("bank");
     if (!initialData?.bank) return idleDoc;
     const data = {
       account_number: initialData.bank.accountNumber,
