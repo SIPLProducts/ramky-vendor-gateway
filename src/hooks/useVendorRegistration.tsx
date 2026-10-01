@@ -382,13 +382,14 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     const sections = formData.kycClearSections || [];
     for (const section of sections) {
       const message = failures[section] || `${section.toUpperCase()} verification failed. Requires Review.`;
-      await supabase.from('vendor_validations').insert({
+      const { error } = await supabase.from('vendor_validations').insert({
         vendor_id: vendorIdForFailure,
         validation_type: section,
         status: 'failed',
         message,
         details: { requires_review: true, cleared_tab: section },
       });
+      if (error) throw error;
     }
   };
 
