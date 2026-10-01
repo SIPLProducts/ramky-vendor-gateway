@@ -1595,9 +1595,14 @@ export function DocumentVerificationStep({
       setMsmeManualError("Please enter your Udyam number.");
       return;
     }
+    const acceptedDoc = msmeDoc.status === "verified" ? msmeDoc : undefined;
+    const failManualMsme = (message: string) => {
+      setMsmeDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
+      publishKycFailure("msme", message, !!acceptedDoc);
+    };
     setMsmeManualError(null);
     setMsmeManualBusy(true);
-    setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
+    setMsmeDoc((prev) => ({ ...prev, status: "verifying", errorMessage: undefined }));
     try {
       const r = await callProvider({
         providerName: "MSME",
@@ -1607,13 +1612,13 @@ export function DocumentVerificationStep({
       if (!r.found) {
         const msg = "MSME validation provider is not configured. Add it in KYC & Validation API Settings.";
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg });
+        failManualMsme(msg);
         return;
       }
       if (!r.ok || !r.data) {
         const msg = r.message || "Udyam validation failed. Please check the number and try again.";
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg });
+        failManualMsme(msg);
         return;
       }
       const d = r.data as Record<string, any>;
@@ -1646,7 +1651,7 @@ export function DocumentVerificationStep({
       if (apiName && !evalRes.skipped && !evalRes.passed) {
         const msg = formatCrossMatchFailure("Enterprise Name", evalRes.best);
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
+        failManualMsme(msg);
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
         return;
@@ -1664,10 +1669,11 @@ export function DocumentVerificationStep({
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
+      persistKycOutcome("msme", "passed", "MSME verification completed successfully.");
     } catch (e: any) {
       const msg = e?.message || "Udyam validation failed unexpectedly.";
       setMsmeManualError(msg);
-      setMsmeDoc({ status: "failed", errorMessage: msg });
+      failManualMsme(msg);
     } finally {
       setMsmeManualBusy(false);
     }
@@ -1826,6 +1832,12 @@ export function DocumentVerificationStep({
     setBankPopup((p) => ({ ...p, submitting: true, error: "" }));
     const target = bankPopup.target;
     const setDoc = target === "secondary" ? setBankDoc2 : setBankDoc;
+    const currentDoc = target === "secondary" ? bankDoc2 : bankDoc;
+    const acceptedDoc = currentDoc.status === "verified" ? currentDoc : undefined;
+    const failManualBank = (message: string) => {
+      setDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
+      publishKycFailure("cheque", message, !!acceptedDoc);
+    };
     setDoc((prev) => ({
       ...prev,
       status: "verifying",
@@ -1843,7 +1855,7 @@ export function DocumentVerificationStep({
           submitting: false,
           error: r.message || "Bank verification failed. Please re-check the details and try again.",
         }));
-        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: r.message || "Bank verification failed" }));
+        failManualBank(r.message || "Bank verification failed");
         return;
       }
       const d = r.data as Record<string, any>;
@@ -1877,7 +1889,7 @@ export function DocumentVerificationStep({
           if (!evalRes.passed) {
             const msg = formatCrossMatchFailure("Account Holder Name", evalRes.best);
             setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-            setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+            failManualBank(msg);
             return;
           }
           holderNameStatus = "passed";
@@ -1921,6 +1933,7 @@ export function DocumentVerificationStep({
         nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
         verifiedAt: Date.now(),
       });
+      persistKycOutcome("cheque", "passed", "Bank verification completed successfully.");
       // Push branch address into the editable Bank Address field if untouched.
       if (target === "secondary") {
         if (!bankAddressTouchedRef2.current && branchAddress) setBankBranchAddress2(branchAddress);
@@ -1931,7 +1944,7 @@ export function DocumentVerificationStep({
     } catch (e: any) {
       const msg = e?.message || "Bank verification failed unexpectedly.";
       setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-      setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+      failManualBank(msg);
     }
   };
 
