@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect, createContext, useContext } from "react";
 import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil, PlusCircle, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -214,6 +214,8 @@ interface DocState {
   verifiedAt?: number;
   ocrModel?: string;
 }
+
+const VerificationFailureContext = createContext(false);
 
 const idleDoc: DocState = { status: "idle" };
 
@@ -1260,10 +1262,11 @@ export function DocumentVerificationStep({
       // previously accepted document and extracted values authoritative.
       if (acceptedDoc?.status === "verified") {
         setDoc({ ...acceptedDoc, errorMessage: message });
+        publishKycFailure(kind, message, true);
         return;
       }
       setDoc({ status: "failed", errorMessage: message });
-      publishKycFailure(kind, message);
+      publishKycFailure(kind, message, false);
     };
     if (file.size > 5 * 1024 * 1024) {
       failCurrentTab("File must be under 5 MB");
@@ -1396,6 +1399,7 @@ export function DocumentVerificationStep({
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
     });
+    persistKycOutcome(kind, "passed", "Verification completed successfully.");
   };
 
   // Mutate a single OCR field on a verified doc — used by EditableOcrField for manual corrections.
@@ -1591,9 +1595,14 @@ export function DocumentVerificationStep({
       setMsmeManualError("Please enter your Udyam number.");
       return;
     }
+    const acceptedDoc = msmeDoc.status === "verified" ? msmeDoc : undefined;
+    const failManualMsme = (message: string) => {
+      setMsmeDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
+      publishKycFailure("msme", message, !!acceptedDoc);
+    };
     setMsmeManualError(null);
     setMsmeManualBusy(true);
-    setMsmeDoc({ status: "verifying", fileName: undefined, fileSize: undefined });
+    setMsmeDoc((prev) => ({ ...prev, status: "verifying", errorMessage: undefined }));
     try {
       const r = await callProvider({
         providerName: "MSME",
@@ -1603,13 +1612,13 @@ export function DocumentVerificationStep({
       if (!r.found) {
         const msg = "MSME validation provider is not configured. Add it in KYC & Validation API Settings.";
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg });
+        failManualMsme(msg);
         return;
       }
       if (!r.ok || !r.data) {
         const msg = r.message || "Udyam validation failed. Please check the number and try again.";
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg });
+        failManualMsme(msg);
         return;
       }
       const d = r.data as Record<string, any>;
@@ -1642,7 +1651,7 @@ export function DocumentVerificationStep({
       if (apiName && !evalRes.skipped && !evalRes.passed) {
         const msg = formatCrossMatchFailure("Enterprise Name", evalRes.best);
         setMsmeManualError(msg);
-        setMsmeDoc({ status: "failed", errorMessage: msg, ocrData: ocrShape });
+        failManualMsme(msg);
         setMismatchDialog({ open: true, title: "Enterprise Name mismatch", message: msg });
         setActiveTab("msme");
         return;
@@ -1660,10 +1669,11 @@ export function DocumentVerificationStep({
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
+      persistKycOutcome("msme", "passed", "MSME verification completed successfully.");
     } catch (e: any) {
       const msg = e?.message || "Udyam validation failed unexpectedly.";
       setMsmeManualError(msg);
-      setMsmeDoc({ status: "failed", errorMessage: msg });
+      failManualMsme(msg);
     } finally {
       setMsmeManualBusy(false);
     }
@@ -1774,6 +1784,7 @@ export function DocumentVerificationStep({
       verifiedAt: Date.now(),
       ocrModel: prev.ocrModel,
     }));
+    persistKycOutcome("gst", "passed", "GST verification completed successfully.");
     const apiAddress =
       (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
     if (apiAddress) setEditablePrincipalPlace(apiAddress);
@@ -1804,6 +1815,7 @@ export function DocumentVerificationStep({
       ocrModel: prev.ocrModel,
     }));
     setPanCrossCheckError(null);
+    persistKycOutcome("pan", "passed", "PAN verification completed successfully.");
     return { ok: true };
   };
 
@@ -1822,6 +1834,12 @@ export function DocumentVerificationStep({
     setBankPopup((p) => ({ ...p, submitting: true, error: "" }));
     const target = bankPopup.target;
     const setDoc = target === "secondary" ? setBankDoc2 : setBankDoc;
+    const currentDoc = target === "secondary" ? bankDoc2 : bankDoc;
+    const acceptedDoc = currentDoc.status === "verified" ? currentDoc : undefined;
+    const failManualBank = (message: string) => {
+      setDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
+      publishKycFailure("cheque", message, !!acceptedDoc);
+    };
     setDoc((prev) => ({
       ...prev,
       status: "verifying",
@@ -1839,7 +1857,7 @@ export function DocumentVerificationStep({
           submitting: false,
           error: r.message || "Bank verification failed. Please re-check the details and try again.",
         }));
-        setDoc((prev) => ({ ...prev, status: "failed", errorMessage: r.message || "Bank verification failed" }));
+        failManualBank(r.message || "Bank verification failed");
         return;
       }
       const d = r.data as Record<string, any>;
@@ -1873,7 +1891,7 @@ export function DocumentVerificationStep({
           if (!evalRes.passed) {
             const msg = formatCrossMatchFailure("Account Holder Name", evalRes.best);
             setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-            setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+            failManualBank(msg);
             return;
           }
           holderNameStatus = "passed";
@@ -1917,6 +1935,7 @@ export function DocumentVerificationStep({
         nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
         verifiedAt: Date.now(),
       });
+      persistKycOutcome("cheque", "passed", "Bank verification completed successfully.");
       // Push branch address into the editable Bank Address field if untouched.
       if (target === "secondary") {
         if (!bankAddressTouchedRef2.current && branchAddress) setBankBranchAddress2(branchAddress);
@@ -1927,7 +1946,7 @@ export function DocumentVerificationStep({
     } catch (e: any) {
       const msg = e?.message || "Bank verification failed unexpectedly.";
       setBankPopup((p) => ({ ...p, submitting: false, error: msg }));
-      setDoc((prev) => ({ ...prev, status: "failed", errorMessage: msg }));
+      failManualBank(msg);
     }
   };
 
@@ -2343,30 +2362,48 @@ export function DocumentVerificationStep({
     return out;
   }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, panCrossCheckError, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, dependentCrossErrors, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
 
-  function publishKycFailure(kind: OcrDocumentType, message: string) {
+  function persistKycOutcome(kind: OcrDocumentType, status: "passed" | "failed", message: string) {
+    if (!vendorId) return;
+    const validationType = kind === "cheque" ? "bank" : kind;
+    if (validationType !== "gst" && validationType !== "pan" && validationType !== "msme" && validationType !== "bank") return;
+    void supabase.from("vendor_validations").insert({
+      vendor_id: vendorId,
+      validation_type: validationType,
+      status,
+      message,
+      details: status === "failed"
+        ? { requires_review: true, preserved_existing: true, failed_replacement_tab: validationType }
+        : { replacement_verified: true },
+    });
+    void supabase.from("vendors").update({ [`${validationType}_verification_status`]: status }).eq("id", vendorId);
+  }
+
+  function publishKycFailure(kind: OcrDocumentType, message: string, preserveExisting: boolean) {
     const section = kind === "cheque" ? "bank" : kind;
     if (section !== "gst" && section !== "pan" && section !== "msme" && section !== "bank") return;
 
     const failed = buildOutput();
-    failed.clearedKycSections = Array.from(new Set([...(failed.clearedKycSections || []), section]));
+    failed.clearedKycSections = preserveExisting
+      ? (failed.clearedKycSections || []).filter((item) => item !== section)
+      : Array.from(new Set([...(failed.clearedKycSections || []), section]));
     failed.kycFailureMessages = { ...(failed.kycFailureMessages || {}), [section]: message };
 
-    if (section === "gst") {
+    if (!preserveExisting && section === "gst") {
       delete failed.gst;
       failed.gstCertificateFile = null;
       failed.gstSelfDeclarationFile = null;
-    } else if (section === "pan") {
+    } else if (!preserveExisting && section === "pan") {
       delete failed.pan;
       failed.panCardFile = null;
       failed.panStatus = null;
       failed.panAadhaarLinked = null;
       failed.panComprehensiveVerifiedAt = null;
       failed.panHolderName = null;
-    } else if (section === "msme") {
+    } else if (!preserveExisting && section === "msme") {
       delete failed.msme;
       failed.msmeCertificateFile = null;
       failed.msmeSelfDeclarationFile = null;
-    } else {
+    } else if (!preserveExisting) {
       delete failed.bank;
       delete failed.bank2;
       failed.cancelledChequeFile = null;
@@ -2377,6 +2414,7 @@ export function DocumentVerificationStep({
     // cycle. Save Draft can therefore never capture the old verified details
     // or the rejected replacement while the failure render is still pending.
     onStageChangeRef.current?.(failed);
+    persistKycOutcome(kind, "failed", message);
   }
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
@@ -2411,10 +2449,10 @@ export function DocumentVerificationStep({
     bank: stage3Done || bankDoc.status !== "idle",
   };
   const tabStatus: Record<TabKey, StageStatus> = {
-    gst: gstDoc.status === "failed" ? "failed" : stage1Done ? "verified" : isGstRegistered !== null ? "in-progress" : "pending",
-    pan: panDoc.status === "failed" || !!panCrossCheckError ? "failed" : stage2Done ? "verified" : panDoc.status !== "idle" ? "in-progress" : "pending",
-    msme: msmeDoc.status === "failed" || !!dependentCrossErrors.msme ? "failed" : stage3Done ? "verified" : isMsmeRegistered !== null ? "in-progress" : "pending",
-    bank: bankDoc.status === "failed" || !!dependentCrossErrors.bank || !!dependentCrossErrors.bank2 ? "failed" : stage4Done ? "verified" : bankDoc.status !== "idle" ? "in-progress" : "pending",
+    gst: gstDoc.status === "failed" || !!gstDoc.errorMessage ? "failed" : stage1Done ? "verified" : isGstRegistered !== null ? "in-progress" : "pending",
+    pan: panDoc.status === "failed" || !!panDoc.errorMessage || !!panCrossCheckError ? "failed" : stage2Done ? "verified" : panDoc.status !== "idle" ? "in-progress" : "pending",
+    msme: msmeDoc.status === "failed" || !!msmeDoc.errorMessage || !!dependentCrossErrors.msme ? "failed" : stage3Done ? "verified" : isMsmeRegistered !== null ? "in-progress" : "pending",
+    bank: bankDoc.status === "failed" || !!bankDoc.errorMessage || !!bankDoc2.errorMessage || !!dependentCrossErrors.bank || !!dependentCrossErrors.bank2 ? "failed" : stage4Done ? "verified" : bankDoc.status !== "idle" ? "in-progress" : "pending",
   };
 
   return (
@@ -3582,8 +3620,9 @@ interface DocSplitRowProps {
 function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, verifiedFields }: DocSplitRowProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isBusy = doc.status === "uploading" || doc.status === "preparing" || doc.status === "ocr" || doc.status === "verifying";
-  const isVerified = doc.status === "verified";
-  const isFailed = doc.status === "failed";
+  const hasAcceptedData = doc.status === "verified";
+  const isFailed = doc.status === "failed" || !!doc.errorMessage;
+  const isVerified = hasAcceptedData && !isFailed;
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -3629,7 +3668,11 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
         </div>
       )}
 
-      {isVerified && verifiedFields}
+      {hasAcceptedData && (
+        <VerificationFailureContext.Provider value={isFailed}>
+          {verifiedFields}
+        </VerificationFailureContext.Provider>
+      )}
 
       <input
         ref={inputRef}
@@ -4113,14 +4156,15 @@ function EditableOcrField({
   /** Optional cross-check message rendered as an (i) popover inside the input. */
   trailingInfo?: { message: string; ok: boolean } | null;
 }) {
+  const verificationFailed = useContext(VerificationFailureContext);
   const current = value ?? "";
   const original = originalValue ?? "";
   const isEdited = !readOnly && current.trim() !== original.trim() && original.length > 0;
   const apiVal = (verifiedValue ?? "").toString();
   const hasApi = apiVal.trim().length > 0 && current.trim().length > 0;
-  const matchesApi = hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
+  const matchesApi = !verificationFailed && hasApi && normalizeForCompare(current) === normalizeForCompare(apiVal);
   const mismatchApi = !readOnly && hasApi && !matchesApi;
-  const hasTrailingInfo = !!(trailingInfo && trailingInfo.message);
+  const hasTrailingInfo = !verificationFailed && !!(trailingInfo && trailingInfo.message);
   const hasBadge = matchesApi || isEdited || mismatchApi;
   const adornmentCount = (hasBadge ? 1 : 0) + (hasTrailingInfo ? 1 : 0);
   const padRight = adornmentCount === 2 ? "pr-16" : adornmentCount === 1 ? "pr-9" : "";
