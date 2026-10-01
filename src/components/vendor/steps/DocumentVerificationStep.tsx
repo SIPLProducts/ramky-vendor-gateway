@@ -1423,28 +1423,6 @@ export function DocumentVerificationStep({
   // ---------- Same-tab reset helpers ----------
   // A replacement may reset only its own tab. Dependent documents remain saved;
   // the live cross-check effects below mark mismatches for review.
-  const resetBankCascade = useCallback(() => {
-    setBankDoc(idleDoc);
-    setBankDoc2(idleDoc);
-    lastBankFileRef.current = null;
-    lastBankFile2Ref.current = null;
-    setBankPopup((p) => ({ ...p, open: false }));
-  }, []);
-
-  const resetMsmeCascade = useCallback(() => {
-    setMsmeDoc(idleDoc);
-    setMsmeManualNumber("");
-    setMsmeManualError(null);
-    setMsmeDeclarationFile(null);
-    setMsmeDeclarationReason("");
-    setIsMsmeRegistered(null);
-  }, []);
-
-  const resetPanCascade = useCallback(() => {
-    setPanDoc(idleDoc);
-    setPanCrossCheckError(null);
-  }, []);
-
   const resetGstAux = useCallback(() => {
     setGstDeclarationFile(null);
     setGstDeclarationReason("");
@@ -2084,11 +2062,22 @@ export function DocumentVerificationStep({
     bankDoc2.ocrData?.account_holder_name,
   ]);
 
+  const lastPersistedCrossCheckRef = useRef("");
   useEffect(() => {
     if (!vendorId) return;
     const messages = [panCrossCheckError, dependentCrossErrors.msme, dependentCrossErrors.bank, dependentCrossErrors.bank2].filter(Boolean) as string[];
+    const verifiedNames = [
+      gstDoc.status === "verified" ? gstDoc.ocrData?.legal_name : null,
+      panDoc.status === "verified" ? (panDoc.ocrData?.holder_name || panDoc.ocrData?.full_name) : null,
+      msmeDoc.status === "verified" ? msmeDoc.ocrData?.enterprise_name : null,
+      bankDoc.status === "verified" ? bankDoc.ocrData?.account_holder_name : null,
+    ].filter((value) => typeof value === "string" && value.trim().length > 0);
+    if (verifiedNames.length < 2 && messages.length === 0) return;
     const status = messages.length ? "failed" : "passed";
     const message = messages.length ? messages.join(" ") : "Cross-document checks passed.";
+    const signature = JSON.stringify({ vendorId, status, message });
+    if (lastPersistedCrossCheckRef.current === signature) return;
+    lastPersistedCrossCheckRef.current = signature;
     void supabase.from("vendors").update({ name_match_verification_status: status }).eq("id", vendorId);
     void supabase.from("vendor_validations").insert({
       vendor_id: vendorId,
@@ -2097,7 +2086,20 @@ export function DocumentVerificationStep({
       message,
       details: { messages, requires_review: messages.length > 0 },
     });
-  }, [vendorId, panCrossCheckError, dependentCrossErrors]);
+  }, [
+    vendorId,
+    panCrossCheckError,
+    dependentCrossErrors,
+    gstDoc.status,
+    gstDoc.ocrData?.legal_name,
+    panDoc.status,
+    panDoc.ocrData?.holder_name,
+    panDoc.ocrData?.full_name,
+    msmeDoc.status,
+    msmeDoc.ocrData?.enterprise_name,
+    bankDoc.status,
+    bankDoc.ocrData?.account_holder_name,
+  ]);
 
   // Re-compute name-match scores live as user corrects names.
   useEffect(() => {
@@ -2318,9 +2320,9 @@ export function DocumentVerificationStep({
 
   const tabUnlock: Record<TabKey, boolean> = {
     gst: true,
-    pan: stage1Done,
-    msme: stage2Done,
-    bank: stage3Done,
+    pan: stage1Done || panDoc.status !== "idle",
+    msme: stage2Done || msmeDoc.status !== "idle" || isMsmeRegistered !== null,
+    bank: stage3Done || bankDoc.status !== "idle",
   };
   const tabStatus: Record<TabKey, StageStatus> = {
     gst: gstDoc.status === "failed" ? "failed" : stage1Done ? "verified" : isGstRegistered !== null ? "in-progress" : "pending",
@@ -2774,6 +2776,14 @@ export function DocumentVerificationStep({
 
                 {isMsmeRegistered === true && (
                   <div className="space-y-4">
+                      {dependentCrossErrors.msme && (
+                        <Alert className="border-destructive/30 bg-destructive/5">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                          <AlertDescription className="text-destructive">
+                            Requires Review: {dependentCrossErrors.msme} Your saved MSME data and document were preserved.
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     
                       <div className="space-y-2">
                         <Label className="text-xs font-medium text-muted-foreground">
@@ -2996,6 +3006,14 @@ export function DocumentVerificationStep({
               status={tabStatus.bank}
               verifiedAt={bankDoc.verifiedAt}
             >
+              {(dependentCrossErrors.bank || dependentCrossErrors.bank2) && (
+                <Alert className="mb-4 border-destructive/30 bg-destructive/5">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <AlertDescription className="text-destructive">
+                    Requires Review: {dependentCrossErrors.bank || dependentCrossErrors.bank2} Your saved bank data and documents were preserved.
+                  </AlertDescription>
+                </Alert>
+              )}
               <DocSplitRow
                 uploadLabel="Cancelled Cheque"
                 accept=".pdf,.jpg,.jpeg,.png"
