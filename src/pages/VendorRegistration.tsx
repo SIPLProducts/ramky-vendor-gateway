@@ -1057,70 +1057,24 @@ export default function VendorRegistration() {
     // only happens after the vendor enabled it in Step 1).
     const wantsSecondary = prev.bank.secondary?.enabled === true || !!data.bank2;
 
-    // GST cascade — clear ALL GST-derived fields whenever the GST "identity"
-    // changes so no previous vendor's data ever bleeds into the new response.
-    // Every scenario that must trigger a full reset:
-    //   - New / replaced GST certificate (different verified GSTIN)
-    //   - GST toggle flipped Yes → No or No → Yes
-    //   - Non-GST manual Legal Name / Address changed
-    const prevGstin = (prev.statutory.gstin || '').toUpperCase();
-    const newGstin = (data.gst?.gstin || '').toUpperCase();
-    const toggleChanged = data.isGstRegistered !== undefined && prev.statutory.isGstRegistered !== data.isGstRegistered;
-    const manualLegalChanged = !gstYes && (data.manualLegalName || '') !== '' && (data.manualLegalName || '') !== (prev.organization.legalName || '');
-    const manualAddrChanged = !gstYes && (data.manualAddress?.address || '') !== '' && (data.manualAddress?.address || '') !== (prev.address.registeredAddress || '');
-    const gstChanged = prevGstin !== newGstin || toggleChanged || manualLegalChanged || manualAddrChanged;
-
-    // On any GST identity change, clear derived fields to blank BEFORE applying
-    // the new values so Vendor A's data never leaks into Vendor B's form when
-    // a different GST is uploaded without refreshing the page.
-    const orgLegalBase = gstChanged ? '' : prev.organization.legalName;
-    const orgTradeBase = gstChanged ? '' : prev.organization.tradeName;
-    const orgStateBase = gstChanged ? '' : prev.organization.state;
-    const orgIndustryBase = gstChanged ? '' : prev.organization.industryType;
-    const orgOrgTypeBase = gstChanged ? '' : prev.organization.organizationType;
-    const orgOwnershipBase = gstChanged ? '' : prev.organization.ownershipType;
-    const addrLineBase = gstChanged ? '' : prev.address.registeredAddress;
-    const addrLine2Base = gstChanged ? '' : prev.address.registeredAddressLine2;
-    const addrLine3Base = gstChanged ? '' : prev.address.registeredAddressLine3;
-    const addrLine4Base = gstChanged ? '' : prev.address.registeredAddressLine4;
-    const addrCityBase = gstChanged ? '' : prev.address.registeredCity;
-    const addrStateBase = gstChanged ? '' : prev.address.registeredState;
-    const addrPinBase = gstChanged ? '' : prev.address.registeredPincode;
-    const addrDistrictBase = gstChanged ? '' : (prev.address as any).registeredDistrict;
-    const addrEmailBase = gstChanged ? '' : prev.address.registeredEmail;
-    const addrEmail2Base = gstChanged ? '' : prev.address.registeredEmail2;
-    const addrContact1Base = gstChanged ? '' : prev.address.registeredContact1;
-    const addrContact2Base = gstChanged ? '' : prev.address.registeredContact2;
-    const addrPhoneBase = gstChanged ? '' : prev.address.registeredPhone;
-
     return {
       ...prev,
       organization: {
         ...prev.organization,
-        // GST/PAN-derived — latest verified always wins; fields are read-only in the UI.
-        legalName: ocrLegalName || orgLegalBase,
-        tradeName: ocrTradeName || orgTradeBase,
-        state: stateFromDoc || orgStateBase,
-        industryType: orgIndustryBase,
-        organizationType: orgOrgTypeBase,
-        ownershipType: orgOwnershipBase,
+        // Seed blank profile fields during first registration. Replacing a KYC
+        // document never overwrites a completed Organization tab.
+        legalName: fill(prev.organization.legalName, ocrLegalName),
+        tradeName: fill(prev.organization.tradeName, ocrTradeName),
+        state: fill(prev.organization.state, stateFromDoc),
       },
 
       address: {
         ...prev.address,
-        registeredAddress: (gstYes ? addrLineFromDoc : '') || addrLineBase,
-        registeredAddressLine2: addrLine2Base,
-        registeredAddressLine3: addrLine3Base,
-        registeredAddressLine4: addrLine4Base,
-        registeredCity: (gstYes ? cityFromDoc : '') || addrCityBase,
-        registeredState: (gstYes ? stateFromDoc : '') || addrStateBase,
-        registeredPincode: (gstYes ? pinFromDoc : '') || addrPinBase,
-        registeredEmail: addrEmailBase,
-        registeredEmail2: addrEmail2Base,
-        registeredContact1: addrContact1Base,
-        registeredContact2: addrContact2Base,
-        registeredPhone: addrPhoneBase,
-        ...(gstChanged ? { registeredDistrict: addrDistrictBase || '' } : {}),
+        // Seed blanks only; preserve the completed Address tab on GST replace.
+        registeredAddress: fill(prev.address.registeredAddress, gstYes ? addrLineFromDoc : ''),
+        registeredCity: fill(prev.address.registeredCity, gstYes ? cityFromDoc : ''),
+        registeredState: fill(prev.address.registeredState, gstYes ? stateFromDoc : ''),
+        registeredPincode: fill(prev.address.registeredPincode, gstYes ? pinFromDoc : ''),
       },
 
       contact: {
