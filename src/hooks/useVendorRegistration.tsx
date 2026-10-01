@@ -246,25 +246,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           console.warn('Failed to hydrate GST validation history:', gstValError);
         }
 
-        // Restore the latest persisted KYC outcome independently for every tab.
-        // A failed replacement is authoritative on reopen even if legacy values
-        // or an older document survived a previous interrupted autosave.
-        const { data: kycHistory, error: kycHistoryError } = await supabase
-          .from('vendor_validations')
-          .select('validation_type, status, message, details, created_at')
-          .eq('vendor_id', data.id)
-          .in('validation_type', ['gst', 'pan', 'msme', 'bank'])
-          .order('created_at', { ascending: false });
-        if (!kycHistoryError) {
-          const latestByType: Record<string, any> = {};
-          for (const validation of kycHistory || []) {
-            const type = String(validation.validation_type || '');
-            if (!latestByType[type]) latestByType[type] = validation;
-          }
-          (data as any).__latest_kyc_validations = latestByType;
-        } else {
-          console.warn('Failed to hydrate latest KYC validation states:', kycHistoryError);
-        }
       }
 
       // Initialize vendorId and vendorStatus from existing vendor
@@ -394,25 +375,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     if (paths.length > 0) {
       const { error: storageError } = await supabase.storage.from('vendor-documents').remove(paths);
       if (storageError) throw storageError;
-    }
-  };
-
-  const persistFailedKycValidations = async (vendorIdForFailure: string, formData: VendorFormData) => {
-    const failures = formData.kycFailureMessages || {};
-    const cleared = new Set(formData.kycClearSections || []);
-    const sections = Object.keys(failures) as KycSection[];
-    for (const section of sections) {
-      const message = failures[section] || `${section.toUpperCase()} verification failed. Requires Review.`;
-      const { error } = await supabase.from('vendor_validations').insert({
-        vendor_id: vendorIdForFailure,
-        validation_type: section,
-        status: 'failed',
-        message,
-        details: cleared.has(section)
-          ? { requires_review: true, cleared_tab: section }
-          : { requires_review: true, preserved_existing: true, failed_replacement_tab: section },
-      });
-      if (error) throw error;
     }
   };
 
@@ -778,36 +740,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const existingFormData = useMemo<VendorFormData | null>(() => {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
-    const latestKycValidations = ((existingVendor as any).__latest_kyc_validations || {}) as Record<string, any>;
-    const hasAcceptedKycData: Record<KycSection, boolean> = {
-      gst: !!vendor.gstin,
-      pan: !!vendor.pan,
-      msme: !!vendor.msme_number,
-      bank: !!(vendor.account_number && vendor.ifsc_code),
-    };
-    const failedKycSections = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
-      const validation = latestKycValidations[section];
-      return validation?.status === 'failed' &&
-        !hasAcceptedKycData[section] &&
-        (validation?.details?.cleared_tab === section || validation?.details?.requires_review === true);
-    });
-    const failedKycSet = new Set(failedKycSections);
-    const preservedKycFailures = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
-      const validation = latestKycValidations[section];
-      return validation?.status === 'failed' && hasAcceptedKycData[section];
-    });
-    const kycFailureMessages = Object.fromEntries(
-      [...failedKycSections, ...preservedKycFailures].map((section) => [
-        section,
-        latestKycValidations[section]?.message || `${section.toUpperCase()} verification failed. Requires Review.`,
-      ]),
-    );
     const docsByType = new Map<string, any>();
     ((vendor as any).vendor_documents || []).forEach((doc: any) => docsByType.set(doc.document_type, doc));
     const persisted = (type: DocumentType) => {
-      const section = Object.entries(DOCUMENT_TYPES_BY_KYC_SECTION)
-        .find(([, types]) => types.includes(type))?.[0] as KycSection | undefined;
-      if (section && failedKycSet.has(section)) return null;
       return asPersistedFile(docsByType.get(type));
     };
 
@@ -1007,8 +942,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         selfDeclared: vendor.self_declared ?? false,
         termsAccepted: vendor.terms_accepted ?? false,
       },
-      kycClearSections: failedKycSections,
-      kycFailureMessages,
+      kycClearSections: [],
+      kycFailureMessages: {},
       international: (vendor as any).international_data ? {
         documents: { registrationCopyFile: null, swiftIbanFile: null },
         company: {
@@ -1091,17 +1026,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // Keep the accepted values, but let the latest failed attempt own the
       // displayed verification status until a later attempt passes.
       const clearedSections = new Set<KycSection>(formData.kycClearSections || []);
-      const failedSections = new Set<KycSection>(
-        Object.keys(formData.kycFailureMessages || {}) as KycSection[],
-      );
       const draftVerificationStatuses: Record<string, string> = {};
       if (formData.statutory?.gstin) draftVerificationStatuses.gst_verification_status = 'passed';
       if (formData.statutory?.pan) draftVerificationStatuses.pan_verification_status = 'passed';
       if (formData.statutory?.msmeNumber) draftVerificationStatuses.msme_verification_status = 'passed';
       if (formData.bank?.accountNumber && formData.bank?.ifscCode) draftVerificationStatuses.bank_verification_status = 'passed';
-      failedSections.forEach((section) => {
-        draftVerificationStatuses[`${section}_verification_status`] = 'failed';
-      });
 
       const vendorData: VendorRecord = {
         ...baseRecord,
@@ -1220,9 +1149,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         if (clearedSections.size > 0) {
           await clearFailedKycDocuments(resolved.id, clearedSections);
         }
-        if (Object.keys(formData.kycFailureMessages || {}).length > 0) {
-          await persistFailedKycValidations(resolved.id, formData);
-        }
         savedVendor = resolved;
       } else {
 
@@ -1263,9 +1189,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         await uploadAllDocuments(formData, data.id, clearedSections);
         if (clearedSections.size > 0) {
           await clearFailedKycDocuments(data.id, clearedSections);
-        }
-        if (Object.keys(formData.kycFailureMessages || {}).length > 0) {
-          await persistFailedKycValidations(data.id, formData);
         }
         savedVendor = data;
       }
