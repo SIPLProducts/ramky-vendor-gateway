@@ -1169,7 +1169,8 @@ export default function VendorRegistration() {
         gstin: '', gstConstitutionOfBusiness: '', gstPrincipalPlaceOfBusiness: '',
         gstAdditionalPlaces: [], gstRegistrationDate: '', gstStatus: '', gstTaxpayerType: '',
         gstBusinessNature: [], gstJurisdictionCentre: '', gstJurisdictionState: '',
-        gstFilingStatus: [], gstCertificateFile: null,
+        gstFilingStatus: [], gstDeclarationReason: '', gstCertificateFile: null,
+        gstSelfDeclarationFile: null,
       };
     }
     if (cleared.has('pan')) {
@@ -1183,7 +1184,7 @@ export default function VendorRegistration() {
       next.statutory = {
         ...next.statutory,
         msmeNumber: '', msmeCategory: '', msmeEnterpriseName: '', msmeMajorActivity: '',
-        msmeCertificateFile: null,
+        msmeDeclarationReason: '', msmeCertificateFile: null, msmeSelfDeclarationFile: null,
       };
     }
     if (cleared.has('bank')) {
@@ -1191,7 +1192,7 @@ export default function VendorRegistration() {
         ...next.bank,
         bankName: '', branchName: '', accountNumber: '', confirmAccountNumber: '',
         ifscCode: '', micrCode: '', bankAddress: '', accountHolderName: '',
-        cancelledChequeFile: null,
+        cancelledChequeFile: null, secondary: undefined,
       };
     }
     return next;

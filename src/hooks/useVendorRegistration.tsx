@@ -399,6 +399,30 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     bank: new Set(['bank_name', 'bank_branch_name', 'account_number', 'account_type', 'ifsc_code', 'micr_code', 'bank_address', 'account_holder_name', 'bank_name_2', 'branch_name_2', 'account_number_2', 'ifsc_code_2', 'account_holder_name_2', 'account_type_2', 'bank_address_2', 'micr_2', 'bank_verification_status']),
   };
 
+  const CLEARED_KYC_VALUES: Record<KycSection, VendorRecord> = {
+    gst: {
+      gstin: null, gst_declaration_reason: null, gst_constitution_of_business: null,
+      gst_principal_place_of_business: null, gst_additional_places: null,
+      gst_registration_date: null, gst_status: null, gst_taxpayer_type: null,
+      gst_business_nature: null, gst_jurisdiction_centre: null, gst_jurisdiction_state: null,
+      gst_verification_status: 'failed',
+    },
+    pan: {
+      pan: null, pan_holder_name: null, pan_status: null, pan_aadhaar_linked: null,
+      pan_comprehensive_verified_at: null, pan_verification_status: 'failed',
+    },
+    msme: {
+      msme_number: null, msme_category: null, msme_enterprise_name: null,
+      msme_major_activity: null, msme_verification_status: 'failed',
+    },
+    bank: {
+      bank_name: '', bank_branch_name: '', account_number: '', ifsc_code: '', micr_code: null,
+      bank_address: null, account_holder_name: null, bank_name_2: null, branch_name_2: null,
+      account_number_2: null, ifsc_code_2: null, account_holder_name_2: null,
+      account_type_2: null, bank_address_2: null, micr_2: null, bank_verification_status: 'failed',
+    },
+  };
+
   const isolateKycReplacementPayload = (payload: VendorRecord, sections: Set<KycSection>): VendorRecord => {
     if (sections.size === 0) return payload;
     const allowed = new Set<string>(['tenant_id', 'invitation_id', 'status']);
@@ -1038,6 +1062,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         const { user_id: _ignoreUserId, status: _ignoreStatus, ...fullUpdatePayload } = vendorData as VendorRecord & { user_id?: string; status?: string };
         const replacementSections = pendingKycSections(formData);
         const updatePayload = isolateKycReplacementPayload(fullUpdatePayload, replacementSections);
+        clearedSections.forEach((section) => Object.assign(updatePayload, CLEARED_KYC_VALUES[section]));
         // Never let an autosave revert a submitted vendor back to 'draft'.
         // Only allow status changes when the existing row is still a draft or
         // has been explicitly returned to the vendor for edits.
