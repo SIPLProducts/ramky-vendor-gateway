@@ -384,6 +384,10 @@ export interface VendorFormData {
     selfDeclared: boolean;
     termsAccepted: boolean;
   };
+  /** Internal draft marker used to clear only a failed KYC replacement tab. */
+  kycClearSections?: Array<'gst' | 'pan' | 'msme' | 'bank'>;
+  /** Exact validation failure retained for reviewer visibility. */
+  kycFailureMessages?: Partial<Record<'gst' | 'pan' | 'msme' | 'bank', string>>;
 }
 
 export interface Vendor {

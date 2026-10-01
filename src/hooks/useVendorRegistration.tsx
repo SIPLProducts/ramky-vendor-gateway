@@ -333,7 +333,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   type KycSection = 'gst' | 'pan' | 'msme' | 'bank';
   const pendingKycSections = (formData: VendorFormData): Set<KycSection> => {
-    const pending = new Set<KycSection>();
+    const pending = new Set<KycSection>(formData.kycClearSections || []);
     const inspect = (file: File | null | undefined, section: KycSection) => {
       if (!file || (file as PersistedDocumentFile).__persistedDocument) return;
       if (!uploadedFilesRef.current.has(file)) pending.add(section);
@@ -348,11 +348,79 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     return pending;
   };
 
+  const DOCUMENT_TYPES_BY_KYC_SECTION: Record<KycSection, DocumentType[]> = {
+    gst: ['gst_certificate', 'gst_self_declaration'],
+    pan: ['pan_card'],
+    msme: ['msme_certificate', 'msme_self_declaration'],
+    bank: ['cancelled_cheque', 'cancelled_cheque_2'],
+  };
+
+  const clearFailedKycDocuments = async (vendorIdForClear: string, sections: Set<KycSection>) => {
+    const documentTypes = [...sections].flatMap((section) => DOCUMENT_TYPES_BY_KYC_SECTION[section]);
+    if (documentTypes.length === 0) return;
+    const { data: rows, error: readError } = await supabase
+      .from('vendor_documents')
+      .select('file_path, document_type')
+      .eq('vendor_id', vendorIdForClear)
+      .in('document_type', documentTypes);
+    if (readError) throw readError;
+    const paths = (rows || []).map((row) => row.file_path).filter((path): path is string => !!path);
+    const { error: deleteError } = await supabase
+      .from('vendor_documents')
+      .delete()
+      .eq('vendor_id', vendorIdForClear)
+      .in('document_type', documentTypes);
+    if (deleteError) throw deleteError;
+    if (paths.length > 0) {
+      const { error: storageError } = await supabase.storage.from('vendor-documents').remove(paths);
+      if (storageError) throw storageError;
+    }
+  };
+
+  const persistFailedKycValidations = async (vendorIdForFailure: string, formData: VendorFormData) => {
+    const failures = formData.kycFailureMessages || {};
+    const sections = formData.kycClearSections || [];
+    for (const section of sections) {
+      const message = failures[section] || `${section.toUpperCase()} verification failed. Requires Review.`;
+      await supabase.from('vendor_validations').insert({
+        vendor_id: vendorIdForFailure,
+        validation_type: section,
+        status: 'failed',
+        message,
+        details: { requires_review: true, cleared_tab: section },
+      });
+    }
+  };
+
   const KYC_COLUMNS: Record<KycSection, Set<string>> = {
     gst: new Set(['is_gst_registered', 'gstin', 'gst_declaration_reason', 'gst_constitution_of_business', 'gst_principal_place_of_business', 'gst_additional_places', 'gst_registration_date', 'gst_status', 'gst_taxpayer_type', 'gst_business_nature', 'gst_jurisdiction_centre', 'gst_jurisdiction_state', 'gst_verification_status']),
     pan: new Set(['pan', 'pan_holder_name', 'pan_status', 'pan_aadhaar_linked', 'pan_comprehensive_verified_at', 'pan_verification_status']),
     msme: new Set(['is_msme_registered', 'msme_number', 'msme_category', 'msme_enterprise_name', 'msme_major_activity', 'msme_verification_status']),
     bank: new Set(['bank_name', 'bank_branch_name', 'account_number', 'account_type', 'ifsc_code', 'micr_code', 'bank_address', 'account_holder_name', 'bank_name_2', 'branch_name_2', 'account_number_2', 'ifsc_code_2', 'account_holder_name_2', 'account_type_2', 'bank_address_2', 'micr_2', 'bank_verification_status']),
+  };
+
+  const CLEARED_KYC_VALUES: Record<KycSection, VendorRecord> = {
+    gst: {
+      gstin: null, gst_declaration_reason: null, gst_constitution_of_business: null,
+      gst_principal_place_of_business: null, gst_additional_places: null,
+      gst_registration_date: null, gst_status: null, gst_taxpayer_type: null,
+      gst_business_nature: null, gst_jurisdiction_centre: null, gst_jurisdiction_state: null,
+      gst_verification_status: 'failed',
+    },
+    pan: {
+      pan: null, pan_holder_name: null, pan_status: null, pan_aadhaar_linked: null,
+      pan_comprehensive_verified_at: null, pan_verification_status: 'failed',
+    },
+    msme: {
+      msme_number: null, msme_category: null, msme_enterprise_name: null,
+      msme_major_activity: null, msme_verification_status: 'failed',
+    },
+    bank: {
+      bank_name: '', bank_branch_name: '', account_number: '', ifsc_code: '', micr_code: null,
+      bank_address: null, account_holder_name: null, bank_name_2: null, branch_name_2: null,
+      account_number_2: null, ifsc_code_2: null, account_holder_name_2: null,
+      account_type_2: null, bank_address_2: null, micr_2: null, bank_verification_status: 'failed',
+    },
   };
 
   const isolateKycReplacementPayload = (payload: VendorRecord, sections: Set<KycSection>): VendorRecord => {
@@ -957,11 +1025,15 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       // Remember which KYC sections already have verified data so reopening a
       // draft shows them as Verified instead of re-running OCR / validation.
       // Only 'passed' flags are written — never downgrade an existing status.
+      const clearedSections = new Set<KycSection>(formData.kycClearSections || []);
       const draftVerificationStatuses: Record<string, string> = {};
       if (formData.statutory?.gstin) draftVerificationStatuses.gst_verification_status = 'passed';
       if (formData.statutory?.pan) draftVerificationStatuses.pan_verification_status = 'passed';
       if (formData.statutory?.msmeNumber) draftVerificationStatuses.msme_verification_status = 'passed';
       if (formData.bank?.accountNumber && formData.bank?.ifscCode) draftVerificationStatuses.bank_verification_status = 'passed';
+      clearedSections.forEach((section) => {
+        draftVerificationStatuses[`${section}_verification_status`] = 'failed';
+      });
 
       const vendorData: VendorRecord = {
         ...baseRecord,
@@ -990,6 +1062,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         const { user_id: _ignoreUserId, status: _ignoreStatus, ...fullUpdatePayload } = vendorData as VendorRecord & { user_id?: string; status?: string };
         const replacementSections = pendingKycSections(formData);
         const updatePayload = isolateKycReplacementPayload(fullUpdatePayload, replacementSections);
+        clearedSections.forEach((section) => Object.assign(updatePayload, CLEARED_KYC_VALUES[section]));
         // Never let an autosave revert a submitted vendor back to 'draft'.
         // Only allow status changes when the existing row is still a draft or
         // has been explicitly returned to the vendor for edits.
@@ -1028,6 +1101,11 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
             'is_msme_registered',
             'updated_at',
           ]);
+          replacementSections.forEach((section) => {
+            if (clearedSections.has(section)) {
+              KYC_COLUMNS[section].forEach((column) => preserveExempt.add(column));
+            }
+          });
           for (const key of Object.keys(updatePayload)) {
             if (preserveExempt.has(key)) continue;
             const incoming = (updatePayload as Record<string, unknown>)[key];
@@ -1064,6 +1142,10 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           resolved = reread ?? { id: vendorId };
         }
 
+        if (clearedSections.size > 0) {
+          await clearFailedKycDocuments(resolved.id, clearedSections);
+          await persistFailedKycValidations(resolved.id, formData);
+        }
         // Upload documents after vendor is saved
         await uploadAllDocuments(formData, resolved.id);
         savedVendor = resolved;

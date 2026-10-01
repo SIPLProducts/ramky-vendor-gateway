@@ -120,6 +120,10 @@ function buildHolderNameSuccessMessage(labels: string[]): string {
 }
 
 export interface VerifiedDocumentData {
+  /** A failed replacement clears only these tabs in the parent draft. */
+  clearedKycSections?: Array<"gst" | "pan" | "msme" | "bank">;
+  /** Safe failure messages persisted for reviewer visibility. */
+  kycFailureMessages?: Partial<Record<"gst" | "pan" | "msme" | "bank", string>>;
   isGstRegistered?: boolean;
   gstDeclarationReason?: string;
   gst?: {
@@ -1238,7 +1242,7 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
   ) => {
     if (file.size > 5 * 1024 * 1024) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, errorMessage: "File must be under 5 MB" });
+      setDoc({ status: "failed", errorMessage: "File must be under 5 MB" });
       return;
     }
     setDoc({ status: "uploading", fileName: file.name, fileSize: file.size, file });
@@ -1253,9 +1257,6 @@ export function DocumentVerificationStep({
       const providerIssue = isProviderConfigError(ocrRes.error);
       setDoc({
         status: "failed",
-        fileName: file.name,
-        fileSize: file.size,
-        file,
         errorMessage: providerIssue
           ? `${errMsg} — the document couldn't be sent to the verification service. Please re-upload the document (or try a clear image) and retry.`
           : errMsg,
@@ -1283,7 +1284,7 @@ export function DocumentVerificationStep({
 
     const conf = ocrRes.confidence ?? 0;
     if (conf < 0.5) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, errorMessage: "Couldn't read clearly — please upload a sharper scan." });
+      setDoc({ status: "failed", errorMessage: "Couldn't read clearly — please upload a sharper scan." });
       if (kind === "cheque") {
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
@@ -1312,7 +1313,7 @@ export function DocumentVerificationStep({
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, ocrModel: ocrRes.model, errorMessage: msg });
+      setDoc({ status: "failed", errorMessage: msg });
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
@@ -1349,7 +1350,7 @@ export function DocumentVerificationStep({
     }
     const extraErr = extraValidation?.(ocrRes.extracted, v.apiData) ?? null;
     if (extraErr) {
-      setDoc({ status: "failed", fileName: file.name, fileSize: file.size, file, ocrData: ocrRes.extracted, apiData: v.apiData, ocrModel: ocrRes.model, errorMessage: extraErr });
+      setDoc({ status: "failed", errorMessage: extraErr });
       return;
     }
     // Merge normalized API fields over OCR so missing/incorrect OCR values are
@@ -1525,6 +1526,7 @@ export function DocumentVerificationStep({
   };
 
   const handlePanUpload = (file: File) => {
+    setPanCrossCheckError(null);
     return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
         // Prefer the canonical PAN returned by the GST validation API; fall
@@ -1546,6 +1548,7 @@ export function DocumentVerificationStep({
   };
 
   const handleMsmeUpload = (file: File) => {
+    setDependentCrossErrors((prev) => ({ ...prev, msme: null }));
     return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
   };
 
@@ -1652,6 +1655,7 @@ export function DocumentVerificationStep({
     // Clear any previously fetched/auto-filled bank data so a fresh upload
     // never inherits stale branch / address values from the prior cheque.
     setBankDoc(idleDoc);
+    setDependentCrossErrors((prev) => ({ ...prev, bank: null }));
     setBankBranchAutoFilled(false);
     if (!bankAddressTouchedRef.current) setBankBranchAddress("");
     return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
@@ -2169,6 +2173,28 @@ export function DocumentVerificationStep({
 
   const buildOutput = useCallback((): VerifiedDocumentData => {
     const out: VerifiedDocumentData = { isGstRegistered: isGstRegistered ?? undefined };
+    const clearedKycSections: Array<"gst" | "pan" | "msme" | "bank"> = [];
+    const kycFailureMessages: VerifiedDocumentData["kycFailureMessages"] = {};
+    if (gstDoc.status === "failed") {
+      clearedKycSections.push("gst");
+      kycFailureMessages.gst = gstDoc.errorMessage || "GST verification failed. Requires Review.";
+    }
+    if (panDoc.status === "failed" || panCrossCheckError) {
+      clearedKycSections.push("pan");
+      kycFailureMessages.pan = panCrossCheckError || panDoc.errorMessage || "PAN verification failed. Requires Review.";
+    }
+    if (msmeDoc.status === "failed" || dependentCrossErrors.msme) {
+      clearedKycSections.push("msme");
+      kycFailureMessages.msme = dependentCrossErrors.msme || msmeDoc.errorMessage || "MSME verification failed. Requires Review.";
+    }
+    if (bankDoc.status === "failed" || dependentCrossErrors.bank) {
+      clearedKycSections.push("bank");
+      kycFailureMessages.bank = dependentCrossErrors.bank || bankDoc.errorMessage || "Bank verification failed. Requires Review.";
+    }
+    if (clearedKycSections.length > 0) {
+      out.clearedKycSections = clearedKycSections;
+      out.kycFailureMessages = kycFailureMessages;
+    }
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
       out.gst = {
         gstin: gstDoc.ocrData.gstin,
@@ -2278,20 +2304,19 @@ export function DocumentVerificationStep({
       };
     }
     // Lift uploaded files so the parent can persist them in the draft.
-    // Persist as soon as a file is picked for the active section — do NOT
-    // gate on verification, otherwise unverified uploads silently vanish
-    // from Review / Approval and never reach vendor_documents storage.
+    // Only verified replacements are persisted. A failed replacement clears
+    // its own tab and never replaces the previously accepted document.
     out.gstCertificateFile =
-      isGstRegistered === true ? (gstDoc.file ?? null) : null;
-    out.panCardFile = panDoc.file ?? null;
+      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
+    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
     out.msmeCertificateFile =
-      isMsmeRegistered === true ? (msmeDoc.file ?? null) : null;
-    out.cancelledChequeFile = bankDoc.file ?? null;
-    out.cancelledChequeFile2 = bank2Enabled ? (bankDoc2.file ?? null) : null;
+      isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
+    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
+    out.cancelledChequeFile2 = bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
-  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
+  }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, panCrossCheckError, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, dependentCrossErrors, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.

@@ -1057,8 +1057,11 @@ export default function VendorRegistration() {
     // only happens after the vendor enabled it in Step 1).
     const wantsSecondary = prev.bank.secondary?.enabled === true || !!data.bank2;
 
-    return {
+    const cleared = new Set(data.clearedKycSections || []);
+    const next: VendorFormData = {
       ...prev,
+      kycClearSections: data.clearedKycSections || [],
+      kycFailureMessages: data.kycFailureMessages || {},
       organization: {
         ...prev.organization,
         // Seed blank profile fields during first registration. Replacing a KYC
@@ -1159,6 +1162,40 @@ export default function VendorRegistration() {
           : prev.bank.secondary,
       },
     };
+
+    if (cleared.has('gst')) {
+      next.statutory = {
+        ...next.statutory,
+        gstin: '', gstConstitutionOfBusiness: '', gstPrincipalPlaceOfBusiness: '',
+        gstAdditionalPlaces: [], gstRegistrationDate: '', gstStatus: '', gstTaxpayerType: '',
+        gstBusinessNature: [], gstJurisdictionCentre: '', gstJurisdictionState: '',
+        gstFilingStatus: [], gstDeclarationReason: '', gstCertificateFile: null,
+        gstSelfDeclarationFile: null,
+      };
+    }
+    if (cleared.has('pan')) {
+      next.statutory = {
+        ...next.statutory,
+        pan: '', panHolderName: null, panStatus: null, panAadhaarLinked: null,
+        panComprehensiveVerifiedAt: null, panCardFile: null,
+      };
+    }
+    if (cleared.has('msme')) {
+      next.statutory = {
+        ...next.statutory,
+        msmeNumber: '', msmeCategory: '', msmeEnterpriseName: '', msmeMajorActivity: '',
+        msmeDeclarationReason: '', msmeCertificateFile: null, msmeSelfDeclarationFile: null,
+      };
+    }
+    if (cleared.has('bank')) {
+      next.bank = {
+        ...next.bank,
+        bankName: '', branchName: '', accountNumber: '', confirmAccountNumber: '',
+        ifscCode: '', micrCode: '', bankAddress: '', accountHolderName: '',
+        cancelledChequeFile: null, secondary: undefined,
+      };
+    }
+    return next;
   };
 
 
