@@ -331,6 +331,37 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // the new file happens to share name/size with the previous one.
   const uploadedFilesRef = useRef<WeakSet<File>>(new WeakSet());
 
+  type KycSection = 'gst' | 'pan' | 'msme' | 'bank';
+  const pendingKycSections = (formData: VendorFormData): Set<KycSection> => {
+    const pending = new Set<KycSection>();
+    const inspect = (file: File | null | undefined, section: KycSection) => {
+      if (!file || (file as PersistedDocumentFile).__persistedDocument) return;
+      if (!uploadedFilesRef.current.has(file)) pending.add(section);
+    };
+    inspect(formData.statutory.gstCertificateFile, 'gst');
+    inspect(formData.statutory.gstSelfDeclarationFile, 'gst');
+    inspect(formData.statutory.panCardFile, 'pan');
+    inspect(formData.statutory.msmeCertificateFile, 'msme');
+    inspect(formData.statutory.msmeSelfDeclarationFile, 'msme');
+    inspect(formData.bank.cancelledChequeFile, 'bank');
+    inspect(formData.bank.secondary?.cancelledChequeFile, 'bank');
+    return pending;
+  };
+
+  const KYC_COLUMNS: Record<KycSection, Set<string>> = {
+    gst: new Set(['is_gst_registered', 'gstin', 'gst_declaration_reason', 'gst_constitution_of_business', 'gst_principal_place_of_business', 'gst_additional_places', 'gst_registration_date', 'gst_status', 'gst_taxpayer_type', 'gst_business_nature', 'gst_jurisdiction_centre', 'gst_jurisdiction_state', 'gst_verification_status']),
+    pan: new Set(['pan', 'pan_holder_name', 'pan_status', 'pan_aadhaar_linked', 'pan_comprehensive_verified_at', 'pan_verification_status']),
+    msme: new Set(['is_msme_registered', 'msme_number', 'msme_category', 'msme_enterprise_name', 'msme_major_activity', 'msme_verification_status']),
+    bank: new Set(['bank_name', 'bank_branch_name', 'account_number', 'account_type', 'ifsc_code', 'micr_code', 'bank_address', 'account_holder_name', 'bank_name_2', 'branch_name_2', 'account_number_2', 'ifsc_code_2', 'account_holder_name_2', 'account_type_2', 'bank_address_2', 'micr_2', 'bank_verification_status']),
+  };
+
+  const isolateKycReplacementPayload = (payload: VendorRecord, sections: Set<KycSection>): VendorRecord => {
+    if (sections.size === 0) return payload;
+    const allowed = new Set<string>(['tenant_id', 'invitation_id', 'status']);
+    sections.forEach((section) => KYC_COLUMNS[section].forEach((column) => allowed.add(column)));
+    return Object.fromEntries(Object.entries(payload).filter(([column]) => allowed.has(column)));
+  };
+
   // Upload all documents for a vendor (deduplicated by vendor_id + document_type)
   const uploadAllDocuments = async (formData: VendorFormData, vendorIdForUpload: string) => {
     if (uploadInFlight.current) {
@@ -956,7 +987,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         // `user_id = auth.uid()` to match the row's existing owner. Sending a
         // (possibly stale or null) user_id from the client races with session
         // refresh and triggers "new row violates row-level security policy".
-        const { user_id: _ignoreUserId, status: _ignoreStatus, ...updatePayload } = vendorData as VendorRecord & { user_id?: string; status?: string };
+        const { user_id: _ignoreUserId, status: _ignoreStatus, ...fullUpdatePayload } = vendorData as VendorRecord & { user_id?: string; status?: string };
+        const replacementSections = pendingKycSections(formData);
+        const updatePayload = isolateKycReplacementPayload(fullUpdatePayload, replacementSections);
         // Never let an autosave revert a submitted vendor back to 'draft'.
         // Only allow status changes when the existing row is still a draft or
         // has been explicitly returned to the vendor for edits.
@@ -1423,6 +1456,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       if (!vendorId) throw new Error('No vendor to resubmit');
       if (!canEdit) throw new Error('Vendor cannot be edited in current status');
 
+      // Save edits first. KYC replacements use the same isolated update rules
+      // as drafts, so resubmission cannot rewrite unrelated tabs.
+      const savedVendor = await saveVendorMutation.mutateAsync(formData);
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || null;
 
@@ -1437,7 +1473,6 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const nextStatus = wasReturnedToBuyer ? 'returned_to_buyer' : 'validation_pending';
 
       const vendorData = {
-        ...formDataToVendorRecord(formData, userId),
         status: nextStatus as VendorStatus,
         submitted_at: new Date().toISOString(),
         // Clear stale rejection metadata once the vendor resubmits.
@@ -1471,12 +1506,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           .select('*')
           .eq('id', vendorId)
           .maybeSingle();
-        resubmitted = reread ?? { id: vendorId };
+        resubmitted = reread ?? savedVendor ?? { id: vendorId };
       }
-
-
-      // Upload any new documents (existing ones are retained by the dedupe logic)
-      await uploadAllDocuments(formData, vendorId);
 
       await supabase.from('audit_logs').insert({
         vendor_id: vendorId,

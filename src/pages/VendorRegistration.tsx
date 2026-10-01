@@ -820,8 +820,8 @@ export default function VendorRegistration() {
                 pan: existingFormData.statutory?.pan
                   ? {
                       number: existingFormData.statutory.pan,
-                      holderName: existingFormData.organization?.legalName || '',
-                      apiName: existingFormData.organization?.legalName || '',
+                      holderName: existingFormData.statutory?.panHolderName || existingFormData.organization?.legalName || '',
+                      apiName: existingFormData.statutory?.panHolderName || existingFormData.organization?.legalName || '',
                       nameMatchScore: 100,
                     }
                   : undefined,
@@ -858,7 +858,7 @@ export default function VendorRegistration() {
                   state: existingFormData.address?.registeredState || '',
                   pincode: existingFormData.address?.registeredPincode || '',
                 } : undefined,
-                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined } : undefined,
+                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.statutory?.msmeEnterpriseName || existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined, majorActivity: existingFormData.statutory?.msmeMajorActivity || undefined } : undefined,
                 msmeCertificateFile: existingFormData.statutory?.msmeCertificateFile ?? null,
                 msmeSelfDeclarationFile: existingFormData.statutory?.msmeSelfDeclarationFile ?? null,
                 msmeDeclarationReason: existingFormData.statutory?.msmeDeclarationReason || '',
@@ -868,7 +868,7 @@ export default function VendorRegistration() {
                       ifsc: existingFormData.bank.ifscCode || '',
                       bankName: existingFormData.bank.bankName || '',
                       branchName: existingFormData.bank.branchName || '',
-                      accountHolderName: existingFormData.organization?.legalName || '',
+                      accountHolderName: existingFormData.bank.accountHolderName || '',
                       accountType: existingFormData.bank.accountType || 'current',
                       bankAddress: existingFormData.bank.bankAddress || '',
                     }

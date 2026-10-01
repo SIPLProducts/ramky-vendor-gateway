@@ -16,3 +16,4 @@
 - [x] Permanently preserve KYC provider grants, expose safe lookup failures, and add self-hosted OCR readiness checks.
 - [x] Restore GST filing history and saved self-declarations when reopening vendor registration for editing.
 - [x] Persist PAN–Aadhaar linkage as a definite boolean after every successful PAN Comprehensive response.
+- [x] Isolate GST, PAN, MSME, and Bank replacements while preserving other tabs and re-running non-destructive cross-checks.
