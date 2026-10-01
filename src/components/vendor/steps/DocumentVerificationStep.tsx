@@ -1784,6 +1784,7 @@ export function DocumentVerificationStep({
       verifiedAt: Date.now(),
       ocrModel: prev.ocrModel,
     }));
+    persistKycOutcome("gst", "passed", "GST verification completed successfully.");
     const apiAddress =
       (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
     if (apiAddress) setEditablePrincipalPlace(apiAddress);
@@ -1814,6 +1815,7 @@ export function DocumentVerificationStep({
       ocrModel: prev.ocrModel,
     }));
     setPanCrossCheckError(null);
+    persistKycOutcome("pan", "passed", "PAN verification completed successfully.");
     return { ok: true };
   };
 
