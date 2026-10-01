@@ -120,7 +120,7 @@ function buildHolderNameSuccessMessage(labels: string[]): string {
 }
 
 export interface VerifiedDocumentData {
-  /** A failed replacement clears only these tabs in the parent draft. */
+  /** Tabs with no previously accepted document after a failed first verification. */
   clearedKycSections?: Array<"gst" | "pan" | "msme" | "bank">;
   /** Safe failure messages persisted for reviewer visibility. */
   kycFailureMessages?: Partial<Record<"gst" | "pan" | "msme" | "bank", string>>;
@@ -494,6 +494,7 @@ export function DocumentVerificationStep({
         jurisdiction_state: initialData.gst.jurisdictionState,
       },
       nameMatchScore: initialData.gst.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.gst,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.gstCertificateFile),
     };
@@ -557,6 +558,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.pan,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.panCardFile),
     };
@@ -595,6 +597,7 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.msme.nameMatchScore,
+      errorMessage: initialData.kycFailureMessages?.msme,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.msmeCertificateFile),
     };
@@ -625,6 +628,7 @@ export function DocumentVerificationStep({
           account_holder_name: initialData.bank.apiName || initialData.bank.accountHolderName,
         },
       },
+      errorMessage: initialData.kycFailureMessages?.bank,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile),
     };
@@ -1246,11 +1250,18 @@ export function DocumentVerificationStep({
   const runDocFlow = async (
     kind: OcrDocumentType,
     file: File,
-    setDoc: (d: DocState) => void,
+    setDoc: React.Dispatch<React.SetStateAction<DocState>>,
     afterVerifiedOcrName: () => string | undefined,
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
+    acceptedDoc?: DocState,
   ) => {
     const failCurrentTab = (message: string) => {
+      // A rejected replacement is only an unsuccessful attempt. Keep the
+      // previously accepted document and extracted values authoritative.
+      if (acceptedDoc?.status === "verified") {
+        setDoc({ ...acceptedDoc, errorMessage: message });
+        return;
+      }
       setDoc({ status: "failed", errorMessage: message });
       publishKycFailure(kind, message);
     };
@@ -1505,14 +1516,8 @@ export function DocumentVerificationStep({
   };
 
   const handleGstUpload = (file: File) => {
-    // Reset filing-status state for the new upload
-    setGstFilingRows([]);
-    setGstFilingChecked(false);
-    setGstCompliance(null);
-    // Clear stale address up front so a previous upload's value can never
-    // bleed through if the new registry response is missing the field.
-    setEditablePrincipalPlace("");
-    return runDocFlow("gst", file, setGstDoc, () => gstDoc.ocrData?.legal_name).then(() => {
+    const acceptedDoc = gstDoc;
+    return runDocFlow("gst", file, setGstDoc, () => acceptedDoc.ocrData?.legal_name, undefined, acceptedDoc).then(() => {
       setGstDoc((prev) => {
         // Registry response is the source of truth — always overwrite the
         // editable Principal Place of Business with the API-returned address
@@ -1528,7 +1533,10 @@ export function DocumentVerificationStep({
           if (ocrAddress) setEditablePrincipalPlace(ocrAddress);
         }
         // Chain GST_FILING right after GSTIN validation succeeds.
-        if (prev.status === "verified" && prev.ocrData?.gstin) {
+        if (prev.status === "verified" && !prev.errorMessage && prev.ocrData?.gstin) {
+          setGstFilingRows([]);
+          setGstFilingChecked(false);
+          setGstCompliance(null);
           void runGstFilingStatusCheck(prev.ocrData);
         }
         return prev;
@@ -1537,6 +1545,7 @@ export function DocumentVerificationStep({
   };
 
   const handlePanUpload = (file: File) => {
+    const acceptedDoc = panDoc;
     setPanCrossCheckError(null);
     return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
@@ -1549,18 +1558,18 @@ export function DocumentVerificationStep({
         const panOcr = String(ocr.pan_number || "").toUpperCase();
         if (panFromGst.length === 10 && panOcr && panFromGst !== panOcr) {
           const src = apiPan ? "GST registry" : "GSTIN";
-          setPanCrossCheckError(`PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`);
           return `PAN on card (${panOcr}) does not match PAN from ${src} (${panFromGst}).`;
         }
       }
       setPanCrossCheckError(null);
       return null;
-    });
+    }, acceptedDoc);
   };
 
   const handleMsmeUpload = (file: File) => {
+    const acceptedDoc = msmeDoc;
     setDependentCrossErrors((prev) => ({ ...prev, msme: null }));
-    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName);
+    return runDocFlow("msme", file, setMsmeDoc, () => effectiveLegalName, undefined, acceptedDoc);
   };
 
   // ----- MSME Manual Entry (Udyam Number → MSME validation API) -----
@@ -1661,15 +1670,11 @@ export function DocumentVerificationStep({
   };
 
   const handleBankUpload = (file: File) => {
+    const acceptedDoc = bankDoc;
     chequeTargetRef.current = "primary";
     lastBankFileRef.current = file;
-    // Clear any previously fetched/auto-filled bank data so a fresh upload
-    // never inherits stale branch / address values from the prior cheque.
-    setBankDoc(idleDoc);
     setDependentCrossErrors((prev) => ({ ...prev, bank: null }));
-    setBankBranchAutoFilled(false);
-    if (!bankAddressTouchedRef.current) setBankBranchAddress("");
-    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName).then(async () => {
+    return runDocFlow("cheque", file, setBankDoc, () => effectiveLegalName, undefined, acceptedDoc).then(async () => {
       // After cheque OCR, fill Branch (and Bank Name / Address) from IFSC if missing.
       setBankDoc((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
@@ -1720,11 +1725,10 @@ export function DocumentVerificationStep({
 
   // ----- Secondary bank: same upload flow + IFSC enrichment -----
   const handleBankUpload2 = (file: File) => {
+    const acceptedDoc = bankDoc2;
     chequeTargetRef.current = "secondary";
     lastBankFile2Ref.current = file;
-    setBankDoc2(idleDoc);
-    setBankBranchAutoFilled2(false);
-    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName).then(async () => {
+    return runDocFlow("cheque", file, setBankDoc2, () => effectiveLegalName, undefined, acceptedDoc).then(async () => {
       setBankDoc2((prev) => {
         const ifsc = prev.ocrData?.ifsc_code;
         const hasBranch = !!(prev.ocrData?.branch_name && String(prev.ocrData.branch_name).trim());
@@ -2168,17 +2172,17 @@ export function DocumentVerificationStep({
     gstFilingChecked && (!gstCompliance?.declarationRequired || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
-      ? gstDoc.status === "verified" && gstFilingOk
+      ? gstDoc.status === "verified" && !gstDoc.errorMessage && gstFilingOk
       : isGstRegistered === false
         ? !!gstDeclarationFile
         : false;
-  const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
+  const stage2Done = panDoc.status === "verified" && !panDoc.errorMessage && !panCrossCheckError;
   const stage3Done = !dependentCrossErrors.msme && (
     (isMsmeRegistered === false && !!msmeDeclarationFile) ||
-    (isMsmeRegistered === true && msmeDoc.status === "verified" && !!msmeDoc.file));
+    (isMsmeRegistered === true && msmeDoc.status === "verified" && !msmeDoc.errorMessage && !!msmeDoc.file));
   const stage4Done = !dependentCrossErrors.bank && !dependentCrossErrors.bank2 &&
-    bankDoc.status === "verified" &&
-    (!bank2Enabled || bankDoc2.status === "verified");
+    bankDoc.status === "verified" && !bankDoc.errorMessage &&
+    (!bank2Enabled || (bankDoc2.status === "verified" && !bankDoc2.errorMessage));
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
@@ -2189,21 +2193,31 @@ export function DocumentVerificationStep({
     if (gstDoc.status === "failed") {
       clearedKycSections.push("gst");
       kycFailureMessages.gst = gstDoc.errorMessage || "GST verification failed. Requires Review.";
+    } else if (gstDoc.errorMessage) {
+      kycFailureMessages.gst = gstDoc.errorMessage;
     }
     if (panDoc.status === "failed" || panCrossCheckError) {
       clearedKycSections.push("pan");
       kycFailureMessages.pan = panCrossCheckError || panDoc.errorMessage || "PAN verification failed. Requires Review.";
+    } else if (panDoc.errorMessage) {
+      kycFailureMessages.pan = panDoc.errorMessage;
     }
     if (msmeDoc.status === "failed" || dependentCrossErrors.msme) {
       clearedKycSections.push("msme");
       kycFailureMessages.msme = dependentCrossErrors.msme || msmeDoc.errorMessage || "MSME verification failed. Requires Review.";
+    } else if (msmeDoc.errorMessage) {
+      kycFailureMessages.msme = msmeDoc.errorMessage;
     }
     if (bankDoc.status === "failed" || dependentCrossErrors.bank) {
       clearedKycSections.push("bank");
       kycFailureMessages.bank = dependentCrossErrors.bank || bankDoc.errorMessage || "Bank verification failed. Requires Review.";
+    } else if (bankDoc.errorMessage || bankDoc2.errorMessage) {
+      kycFailureMessages.bank = bankDoc.errorMessage || bankDoc2.errorMessage;
     }
     if (clearedKycSections.length > 0) {
       out.clearedKycSections = clearedKycSections;
+    }
+    if (Object.keys(kycFailureMessages).length > 0) {
       out.kycFailureMessages = kycFailureMessages;
     }
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
@@ -2315,8 +2329,8 @@ export function DocumentVerificationStep({
       };
     }
     // Lift uploaded files so the parent can persist them in the draft.
-    // Only verified replacements are persisted. A failed replacement clears
-    // its own tab and never replaces the previously accepted document.
+    // Only verified replacements are persisted. A failed replacement keeps
+    // the previously accepted document and values unchanged.
     out.gstCertificateFile =
       isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
     out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
@@ -3608,7 +3622,7 @@ function DocSplitRow({ uploadLabel, accept, doc, onUpload, onReset, busyLabel, v
         />
       )}
 
-      {isFailed && doc.errorMessage && (
+      {doc.errorMessage && (
         <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-md text-destructive text-sm">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>{doc.errorMessage}</span>

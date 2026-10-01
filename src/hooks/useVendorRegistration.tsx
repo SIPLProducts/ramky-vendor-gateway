@@ -399,7 +399,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   const persistFailedKycValidations = async (vendorIdForFailure: string, formData: VendorFormData) => {
     const failures = formData.kycFailureMessages || {};
-    const sections = formData.kycClearSections || [];
+    const cleared = new Set(formData.kycClearSections || []);
+    const sections = Object.keys(failures) as KycSection[];
     for (const section of sections) {
       const message = failures[section] || `${section.toUpperCase()} verification failed. Requires Review.`;
       const { error } = await supabase.from('vendor_validations').insert({
@@ -407,7 +408,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         validation_type: section,
         status: 'failed',
         message,
-        details: { requires_review: true, cleared_tab: section },
+        details: cleared.has(section)
+          ? { requires_review: true, cleared_tab: section }
+          : { requires_review: true, preserved_existing: true, failed_replacement_tab: section },
       });
       if (error) throw error;
     }
@@ -776,14 +779,25 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     if (!existingVendor) return null;
     const vendor = existingVendor as VendorRecord;
     const latestKycValidations = ((existingVendor as any).__latest_kyc_validations || {}) as Record<string, any>;
+    const hasAcceptedKycData: Record<KycSection, boolean> = {
+      gst: !!vendor.gstin,
+      pan: !!vendor.pan,
+      msme: !!vendor.msme_number,
+      bank: !!(vendor.account_number && vendor.ifsc_code),
+    };
     const failedKycSections = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
       const validation = latestKycValidations[section];
       return validation?.status === 'failed' &&
+        !hasAcceptedKycData[section] &&
         (validation?.details?.cleared_tab === section || validation?.details?.requires_review === true);
     });
     const failedKycSet = new Set(failedKycSections);
+    const preservedKycFailures = (['gst', 'pan', 'msme', 'bank'] as const).filter((section) => {
+      const validation = latestKycValidations[section];
+      return validation?.status === 'failed' && hasAcceptedKycData[section];
+    });
     const kycFailureMessages = Object.fromEntries(
-      failedKycSections.map((section) => [
+      [...failedKycSections, ...preservedKycFailures].map((section) => [
         section,
         latestKycValidations[section]?.message || `${section.toUpperCase()} verification failed. Requires Review.`,
       ]),
@@ -1203,6 +1217,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         await uploadAllDocuments(formData, resolved.id, clearedSections);
         if (clearedSections.size > 0) {
           await clearFailedKycDocuments(resolved.id, clearedSections);
+        }
+        if (Object.keys(formData.kycFailureMessages || {}).length > 0) {
           await persistFailedKycValidations(resolved.id, formData);
         }
         savedVendor = resolved;
@@ -1245,6 +1261,8 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         await uploadAllDocuments(formData, data.id, clearedSections);
         if (clearedSections.size > 0) {
           await clearFailedKycDocuments(data.id, clearedSections);
+        }
+        if (Object.keys(formData.kycFailureMessages || {}).length > 0) {
           await persistFailedKycValidations(data.id, formData);
         }
         savedVendor = data;
