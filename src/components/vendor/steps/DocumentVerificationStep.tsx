@@ -2168,17 +2168,17 @@ export function DocumentVerificationStep({
     gstFilingChecked && (!gstCompliance?.declarationRequired || !!gstDeclarationFile);
   const stage1Done =
     isGstRegistered === true
-      ? gstDoc.status === "verified" && gstFilingOk
+      ? gstDoc.status === "verified" && !gstDoc.errorMessage && gstFilingOk
       : isGstRegistered === false
         ? !!gstDeclarationFile
         : false;
-  const stage2Done = panDoc.status === "verified" && !panCrossCheckError;
+  const stage2Done = panDoc.status === "verified" && !panDoc.errorMessage && !panCrossCheckError;
   const stage3Done = !dependentCrossErrors.msme && (
     (isMsmeRegistered === false && !!msmeDeclarationFile) ||
-    (isMsmeRegistered === true && msmeDoc.status === "verified" && !!msmeDoc.file));
+    (isMsmeRegistered === true && msmeDoc.status === "verified" && !msmeDoc.errorMessage && !!msmeDoc.file));
   const stage4Done = !dependentCrossErrors.bank && !dependentCrossErrors.bank2 &&
-    bankDoc.status === "verified" &&
-    (!bank2Enabled || bankDoc2.status === "verified");
+    bankDoc.status === "verified" && !bankDoc.errorMessage &&
+    (!bank2Enabled || (bankDoc2.status === "verified" && !bankDoc2.errorMessage));
   const allDone = stage1Done && stage2Done && stage3Done && stage4Done;
   const completedCount = [stage1Done, stage2Done, stage3Done, stage4Done].filter(Boolean).length;
 
@@ -2189,21 +2189,31 @@ export function DocumentVerificationStep({
     if (gstDoc.status === "failed") {
       clearedKycSections.push("gst");
       kycFailureMessages.gst = gstDoc.errorMessage || "GST verification failed. Requires Review.";
+    } else if (gstDoc.errorMessage) {
+      kycFailureMessages.gst = gstDoc.errorMessage;
     }
     if (panDoc.status === "failed" || panCrossCheckError) {
       clearedKycSections.push("pan");
       kycFailureMessages.pan = panCrossCheckError || panDoc.errorMessage || "PAN verification failed. Requires Review.";
+    } else if (panDoc.errorMessage) {
+      kycFailureMessages.pan = panDoc.errorMessage;
     }
     if (msmeDoc.status === "failed" || dependentCrossErrors.msme) {
       clearedKycSections.push("msme");
       kycFailureMessages.msme = dependentCrossErrors.msme || msmeDoc.errorMessage || "MSME verification failed. Requires Review.";
+    } else if (msmeDoc.errorMessage) {
+      kycFailureMessages.msme = msmeDoc.errorMessage;
     }
     if (bankDoc.status === "failed" || dependentCrossErrors.bank) {
       clearedKycSections.push("bank");
       kycFailureMessages.bank = dependentCrossErrors.bank || bankDoc.errorMessage || "Bank verification failed. Requires Review.";
+    } else if (bankDoc.errorMessage || bankDoc2.errorMessage) {
+      kycFailureMessages.bank = bankDoc.errorMessage || bankDoc2.errorMessage;
     }
     if (clearedKycSections.length > 0) {
       out.clearedKycSections = clearedKycSections;
+    }
+    if (Object.keys(kycFailureMessages).length > 0) {
       out.kycFailureMessages = kycFailureMessages;
     }
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
