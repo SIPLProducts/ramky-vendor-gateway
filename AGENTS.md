@@ -6,4 +6,4 @@
 - Treat KYC provider absence separately from backend lookup failures, and verify service-role provider access during self-hosted deployment so configuration errors cannot masquerade as missing providers.
 - Hydrate GST filing status from validation history during vendor edits while preserving the newest verification details, because newer validation rows may omit filing data.
 - Normalize successful PAN Comprehensive `aadhaar_linked` results so only true stores true and false or null stores false, keeping details and reports consistent.
-- Keep KYC replacements tab-isolated; a failed replacement is the only visible status while preserving the previously accepted PDF and fields across reloads, and only a successful replacement updates that tab and reruns dependent checks.
+- Keep KYC replacements tab-isolated; a failed attempt shows only a temporary error and never changes saved fields, documents, or status, while only a successful replacement updates that tab and reruns dependent checks.

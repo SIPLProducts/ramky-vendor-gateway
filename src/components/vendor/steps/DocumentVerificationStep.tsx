@@ -449,16 +449,10 @@ export function DocumentVerificationStep({
   );
 
   // Stage 1: GST
-  const initialFailedSections = new Set(initialData?.clearedKycSections || []);
-  const failedDocState = (section: "gst" | "pan" | "msme" | "bank"): DocState => ({
-    status: "failed",
-    errorMessage: initialData?.kycFailureMessages?.[section] || `${section.toUpperCase()} verification failed. Requires Review.`,
-  });
   const [isGstRegistered, setIsGstRegistered] = useState<boolean | null>(
     initialData?.isGstRegistered ?? (initialData?.gst ? true : null),
   );
   const [gstDoc, setGstDoc] = useState<DocState>(() => {
-    if (initialFailedSections.has("gst")) return failedDocState("gst");
     if (!initialData?.gst) return idleDoc;
     const data = {
       gstin: initialData.gst.gstin,
@@ -496,7 +490,6 @@ export function DocumentVerificationStep({
         jurisdiction_state: initialData.gst.jurisdictionState,
       },
       nameMatchScore: initialData.gst.nameMatchScore,
-      errorMessage: initialData.kycFailureMessages?.gst,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.gstCertificateFile),
     };
@@ -535,7 +528,6 @@ export function DocumentVerificationStep({
 
   // Stage 2: PAN
   const [panDoc, setPanDoc] = useState<DocState>(() => {
-    if (initialFailedSections.has("pan")) return failedDocState("pan");
     if (!initialData?.pan) return idleDoc;
     const data = {
       pan_number: initialData.pan.number,
@@ -560,7 +552,6 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.pan.nameMatchScore,
-      errorMessage: initialData.kycFailureMessages?.pan,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.panCardFile),
     };
@@ -577,7 +568,6 @@ export function DocumentVerificationStep({
     initialData?.isMsmeRegistered ?? (initialData?.msme ? true : null),
   );
   const [msmeDoc, setMsmeDoc] = useState<DocState>(() => {
-    if (initialFailedSections.has("msme")) return failedDocState("msme");
     if (!initialData?.msme) return idleDoc;
     const data = {
       udyam_number: initialData.msme.udyamNumber,
@@ -599,7 +589,6 @@ export function DocumentVerificationStep({
         },
       },
       nameMatchScore: initialData.msme.nameMatchScore,
-      errorMessage: initialData.kycFailureMessages?.msme,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.msmeCertificateFile),
     };
@@ -607,7 +596,6 @@ export function DocumentVerificationStep({
 
   // Stage 4: Bank
   const [bankDoc, setBankDoc] = useState<DocState>(() => {
-    if (initialFailedSections.has("bank")) return failedDocState("bank");
     if (!initialData?.bank) return idleDoc;
     const data = {
       account_number: initialData.bank.accountNumber,
@@ -630,7 +618,6 @@ export function DocumentVerificationStep({
           account_holder_name: initialData.bank.apiName || initialData.bank.accountHolderName,
         },
       },
-      errorMessage: initialData.kycFailureMessages?.bank,
       verifiedAt: Date.now(),
       ...persistedFileMeta(initialData.cancelledChequeFile),
     };
@@ -1262,11 +1249,9 @@ export function DocumentVerificationStep({
       // previously accepted document and extracted values authoritative.
       if (acceptedDoc?.status === "verified") {
         setDoc({ ...acceptedDoc, errorMessage: message });
-        publishKycFailure(kind, message, true);
         return;
       }
       setDoc({ status: "failed", errorMessage: message });
-      publishKycFailure(kind, message, false);
     };
     if (file.size > 5 * 1024 * 1024) {
       failCurrentTab("File must be under 5 MB");
@@ -1399,7 +1384,6 @@ export function DocumentVerificationStep({
       verifiedAt: Date.now(),
       ocrModel: ocrRes.model,
     });
-    persistKycOutcome(kind, "passed", "Verification completed successfully.");
   };
 
   // Mutate a single OCR field on a verified doc — used by EditableOcrField for manual corrections.
@@ -1598,7 +1582,6 @@ export function DocumentVerificationStep({
     const acceptedDoc = msmeDoc.status === "verified" ? msmeDoc : undefined;
     const failManualMsme = (message: string) => {
       setMsmeDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
-      publishKycFailure("msme", message, !!acceptedDoc);
     };
     setMsmeManualError(null);
     setMsmeManualBusy(true);
@@ -1669,7 +1652,6 @@ export function DocumentVerificationStep({
         nameMatchScore: score,
         verifiedAt: Date.now(),
       });
-      persistKycOutcome("msme", "passed", "MSME verification completed successfully.");
     } catch (e: any) {
       const msg = e?.message || "Udyam validation failed unexpectedly.";
       setMsmeManualError(msg);
@@ -1784,7 +1766,6 @@ export function DocumentVerificationStep({
       verifiedAt: Date.now(),
       ocrModel: prev.ocrModel,
     }));
-    persistKycOutcome("gst", "passed", "GST verification completed successfully.");
     const apiAddress =
       (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
     if (apiAddress) setEditablePrincipalPlace(apiAddress);
@@ -1815,7 +1796,6 @@ export function DocumentVerificationStep({
       ocrModel: prev.ocrModel,
     }));
     setPanCrossCheckError(null);
-    persistKycOutcome("pan", "passed", "PAN verification completed successfully.");
     return { ok: true };
   };
 
@@ -1838,7 +1818,6 @@ export function DocumentVerificationStep({
     const acceptedDoc = currentDoc.status === "verified" ? currentDoc : undefined;
     const failManualBank = (message: string) => {
       setDoc(acceptedDoc ? { ...acceptedDoc, errorMessage: message } : { status: "failed", errorMessage: message });
-      publishKycFailure("cheque", message, !!acceptedDoc);
     };
     setDoc((prev) => ({
       ...prev,
@@ -1935,7 +1914,6 @@ export function DocumentVerificationStep({
         nameMatchScore: nameMatchScore(effectiveLegalName, nameAtBank),
         verifiedAt: Date.now(),
       });
-      persistKycOutcome("cheque", "passed", "Bank verification completed successfully.");
       // Push branch address into the editable Bank Address field if untouched.
       if (target === "secondary") {
         if (!bankAddressTouchedRef2.current && branchAddress) setBankBranchAddress2(branchAddress);
@@ -2207,38 +2185,6 @@ export function DocumentVerificationStep({
 
   const buildOutput = useCallback((): VerifiedDocumentData => {
     const out: VerifiedDocumentData = { isGstRegistered: isGstRegistered ?? undefined };
-    const clearedKycSections: Array<"gst" | "pan" | "msme" | "bank"> = [];
-    const kycFailureMessages: VerifiedDocumentData["kycFailureMessages"] = {};
-    if (gstDoc.status === "failed") {
-      clearedKycSections.push("gst");
-      kycFailureMessages.gst = gstDoc.errorMessage || "GST verification failed. Requires Review.";
-    } else if (gstDoc.errorMessage) {
-      kycFailureMessages.gst = gstDoc.errorMessage;
-    }
-    if (panDoc.status === "failed" || panCrossCheckError) {
-      clearedKycSections.push("pan");
-      kycFailureMessages.pan = panCrossCheckError || panDoc.errorMessage || "PAN verification failed. Requires Review.";
-    } else if (panDoc.errorMessage) {
-      kycFailureMessages.pan = panDoc.errorMessage;
-    }
-    if (msmeDoc.status === "failed" || dependentCrossErrors.msme) {
-      clearedKycSections.push("msme");
-      kycFailureMessages.msme = dependentCrossErrors.msme || msmeDoc.errorMessage || "MSME verification failed. Requires Review.";
-    } else if (msmeDoc.errorMessage) {
-      kycFailureMessages.msme = msmeDoc.errorMessage;
-    }
-    if (bankDoc.status === "failed" || dependentCrossErrors.bank) {
-      clearedKycSections.push("bank");
-      kycFailureMessages.bank = dependentCrossErrors.bank || bankDoc.errorMessage || "Bank verification failed. Requires Review.";
-    } else if (bankDoc.errorMessage || bankDoc2.errorMessage) {
-      kycFailureMessages.bank = bankDoc.errorMessage || bankDoc2.errorMessage;
-    }
-    if (clearedKycSections.length > 0) {
-      out.clearedKycSections = clearedKycSections;
-    }
-    if (Object.keys(kycFailureMessages).length > 0) {
-      out.kycFailureMessages = kycFailureMessages;
-    }
     if (isGstRegistered === true && gstDoc.status === "verified" && gstDoc.ocrData) {
       out.gst = {
         gstin: gstDoc.ocrData.gstin,
@@ -2361,61 +2307,6 @@ export function DocumentVerificationStep({
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
   }, [isGstRegistered, gstDoc, editablePrincipalPlace, gstDeclarationReason, gstDeclarationFile, manualLegalName, manualAddress, panDoc, panCrossCheckError, isMsmeRegistered, msmeDoc, msmeDeclarationReason, msmeDeclarationFile, bankDoc, bankAccountType, bankBranchAddress, bank2Enabled, bankDoc2, bankAccountType2, bankBranchAddress2, dependentCrossErrors, stage1Done, stage2Done, stage3Done, stage4Done, allDone, gstFilingRows, gstCompliance]);
-
-  function persistKycOutcome(kind: OcrDocumentType, status: "passed" | "failed", message: string) {
-    if (!vendorId) return;
-    const validationType = kind === "cheque" ? "bank" : kind;
-    if (validationType !== "gst" && validationType !== "pan" && validationType !== "msme" && validationType !== "bank") return;
-    void supabase.from("vendor_validations").insert({
-      vendor_id: vendorId,
-      validation_type: validationType,
-      status,
-      message,
-      details: status === "failed"
-        ? { requires_review: true, preserved_existing: true, failed_replacement_tab: validationType }
-        : { replacement_verified: true },
-    });
-    void supabase.from("vendors").update({ [`${validationType}_verification_status`]: status }).eq("id", vendorId);
-  }
-
-  function publishKycFailure(kind: OcrDocumentType, message: string, preserveExisting: boolean) {
-    const section = kind === "cheque" ? "bank" : kind;
-    if (section !== "gst" && section !== "pan" && section !== "msme" && section !== "bank") return;
-
-    const failed = buildOutput();
-    failed.clearedKycSections = preserveExisting
-      ? (failed.clearedKycSections || []).filter((item) => item !== section)
-      : Array.from(new Set([...(failed.clearedKycSections || []), section]));
-    failed.kycFailureMessages = { ...(failed.kycFailureMessages || {}), [section]: message };
-
-    if (!preserveExisting && section === "gst") {
-      delete failed.gst;
-      failed.gstCertificateFile = null;
-      failed.gstSelfDeclarationFile = null;
-    } else if (!preserveExisting && section === "pan") {
-      delete failed.pan;
-      failed.panCardFile = null;
-      failed.panStatus = null;
-      failed.panAadhaarLinked = null;
-      failed.panComprehensiveVerifiedAt = null;
-      failed.panHolderName = null;
-    } else if (!preserveExisting && section === "msme") {
-      delete failed.msme;
-      failed.msmeCertificateFile = null;
-      failed.msmeSelfDeclarationFile = null;
-    } else if (!preserveExisting) {
-      delete failed.bank;
-      delete failed.bank2;
-      failed.cancelledChequeFile = null;
-      failed.cancelledChequeFile2 = null;
-    }
-
-    // Publish synchronously instead of waiting for React's next state/effect
-    // cycle. Save Draft can therefore never capture the old verified details
-    // or the rejected replacement while the failure render is still pending.
-    onStageChangeRef.current?.(failed);
-    persistKycOutcome(kind, "failed", message);
-  }
 
   // Lift state to parent in real time so outer Continue + Save Draft work.
   // Use a ref for the callback so an unstable parent handler doesn't cause an infinite render loop.
