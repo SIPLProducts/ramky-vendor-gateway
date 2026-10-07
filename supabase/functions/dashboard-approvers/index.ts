@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { requireAuthenticatedUser, authErrorResponse } from '../_shared/auth.ts';
-import { assignedApprover } from './routing.ts';
+import { assignedApprover, STATUS_ROUTING } from './routing.ts';
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -27,14 +27,39 @@ Deno.serve(async (req) => {
     if (!vendors?.length) return reply({ items: [] });
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     const ids = vendors.map(v => v.id);
+    const invitationIds = vendors.map(v => v.invitation_id).filter(Boolean);
     const { data: invites, error: inviteError } = await admin.from('vendor_invitations')
-      .select('id, vendor_id, created_by, tenant_id, created_at').in('vendor_id', ids).order('created_at', { ascending: false });
+      .select('id, vendor_id, created_by, tenant_id, created_at')
+      .or(`vendor_id.in.(${ids.join(',')})${invitationIds.length ? `,id.in.(${invitationIds.join(',')})` : ''}`)
+      .order('created_at', { ascending: false });
     if (inviteError) throw inviteError;
     const buyers = [...new Set((invites ?? []).map(i => i.created_by).filter(Boolean))];
     const { data: flows, error: flowError } = buyers.length ? await admin.from('buyer_approval_flows')
       .select('*').in('buyer_user_id', buyers) : { data: [], error: null };
     if (flowError) throw flowError;
+    // SAP has a shared work queue, not a single buyer-flow assignee. Resolve
+    // eligible active team members using the same company scope as the portal.
+    const needsSapTeam = vendors.some(v => ['pending_sap_sync', 'dms_sync_pending'].includes(v.status));
+    let sapMembers: Array<{ userId: string; tenantIds: string[] }> = [];
+    if (needsSapTeam) {
+      const { data: roles, error: rolesError } = await admin.from('custom_roles').select('id, name').eq('is_active', true);
+      if (rolesError) throw rolesError;
+      const roleIds = (roles ?? []).filter(r => r.name.toLowerCase() === 'sap team').map(r => r.id);
+      if (roleIds.length) {
+        const { data: members, error: membersError } = await admin.from('user_custom_roles').select('user_id').in('custom_role_id', roleIds);
+        if (membersError) throw membersError;
+        const memberIds = [...new Set((members ?? []).map(m => m.user_id))];
+        if (memberIds.length) {
+          const { data: companies, error: companiesError } = await admin.from('user_tenants').select('user_id, tenant_id').in('user_id', memberIds);
+          if (companiesError) throw companiesError;
+          sapMembers = memberIds.map(userId => ({ userId, tenantIds: (companies ?? []).filter(c => c.user_id === userId).map(c => c.tenant_id) }));
+        }
+      }
+    }
     const assignments = vendors.map(v => {
+      if (['pending_sap_sync', 'dms_sync_pending'].includes(v.status)) {
+        return { vendorId: v.id, approverIds: sapMembers.filter(m => !m.tenantIds.length || (v.tenant_id !== null && m.tenantIds.includes(v.tenant_id))).map(m => m.userId), skipped: false };
+      }
       const invite = (invites ?? []).find(i => i.id === v.invitation_id)
         ?? (invites ?? []).find(i => i.vendor_id === v.id);
       const buyerId = invite?.created_by ?? null;
@@ -48,14 +73,16 @@ Deno.serve(async (req) => {
       const flow = candidates.length === 1 ? candidates[0]
         : exact.length === 1 ? exact[0]
         : exact.length === 0 && generic.length === 1 ? generic[0] : undefined;
-      return { vendorId: v.id, approverId: assignedApprover(v.status, buyerId, flow) };
+      const routing = STATUS_ROUTING[v.status];
+      const approverId = assignedApprover(v.status, buyerId, flow);
+      return { vendorId: v.id, approverIds: approverId ? [approverId] : [], skipped: !!(routing && flow?.[routing.skip]) };
     });
-    const userIds = [...new Set(assignments.map(a => a.approverId).filter((id): id is string => !!id))];
+    const userIds = [...new Set(assignments.flatMap(a => a.approverIds))];
     const { data: profiles, error: profileError } = userIds.length ? await admin.from('profiles')
-      .select('id, full_name').in('id', userIds) : { data: [], error: null };
+      .select('id, full_name, email, status').in('id', userIds) : { data: [], error: null };
     if (profileError) throw profileError;
-    const names = new Map((profiles ?? []).map(p => [p.id, p.full_name]));
-    return reply({ items: assignments.map(a => ({ vendorId: a.vendorId, name: a.approverId ? names.get(a.approverId) ?? null : null })) });
+    const names = new Map((profiles ?? []).filter(p => p.status === 'active').map(p => [p.id, p.full_name?.trim() || p.email]));
+    return reply({ items: assignments.map(a => ({ vendorId: a.vendorId, name: a.skipped ? 'Stage skipped' : a.approverIds.map(id => names.get(id)).filter(Boolean).sort().join(', ') || null })) });
   } catch {
     console.warn('Dashboard approver lookup failed.');
     return reply({ error: 'Could not load assigned approver names.' }, 500);
