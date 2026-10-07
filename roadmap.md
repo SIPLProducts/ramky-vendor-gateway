@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Display responsible names for all dashboard approval stages and SAP Team, with clear missing-assignment/lookup messages.
+
 - [x] Require explicit SAP DMS success confirmation; reject empty/error responses without changing documents or marking vendors synced.
 - [x] Verify DMS confirmation regressions and the uploaded response; document self-hosted rollout and deploy the function to the connected backend.
 - [ ] Verify DMS confirmation with live Quality SAP and deploy to self-hosted Quality/Production; blocked by unavailable test destination/server access.

@@ -217,6 +217,7 @@ export default function Dashboard() {
           });
           if (assignmentError || assignments?.error) {
             console.warn('Assigned approver names unavailable.');
+            batch.forEach(r => { r.current_approver = 'Names unavailable'; });
             continue;
           }
           const names = new Map<string, string | null>((assignments?.items ?? []).map((item: { vendorId: string; name: string | null }) => [item.vendorId, item.name]));
@@ -504,8 +505,8 @@ export default function Dashboard() {
                       <TableCell>
                         <div className="flex flex-col items-start gap-1.5">
                           {statusBadge(v.status)}
-                          {['buyer_review', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review'].includes(v.status) && (
-                            <span className="text-xs text-muted-foreground break-words">{v.current_approver || '—'}</span>
+                          {['submitted', 'validation_pending', 'buyer_review', 'returned_to_buyer', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review', 'pending_sap_sync', 'dms_sync_pending'].includes(v.status) && (
+                            <span className="text-xs text-muted-foreground break-words max-w-64">{v.current_approver || 'Not assigned'}</span>
                           )}
                         </div>
                       </TableCell>

@@ -1,4 +1,7 @@
 export const STATUS_ROUTING: Record<string, { column: string; skip: string } | null> = {
+  submitted: null,
+  validation_pending: null,
+  returned_to_buyer: null,
   buyer_review: null,
   scm_manager_review: { column: 'scm_manager_user_id', skip: 'skip_scm_manager' },
   scm_head_review: { column: 'scm_head_user_id', skip: 'skip_scm_head' },
