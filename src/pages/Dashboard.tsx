@@ -57,6 +57,7 @@ type VendorRow = {
   tenant_id: string | null;
   invited_by?: { name: string | null; email: string | null } | null;
   display_email?: string | null;
+  current_approver?: string | null;
 };
 
 
@@ -208,6 +209,19 @@ export default function Dashboard() {
             ? (r.registered_email || inv.email || r.primary_email || null)
             : (inv.email || r.primary_email || r.registered_email || null);
         });
+        // Batched enrichment keeps names scoped to the same visible vendor list.
+        for (let offset = 0; offset < rows.length; offset += 100) {
+          const batch = rows.slice(offset, offset + 100);
+          const { data: assignments, error: assignmentError } = await supabase.functions.invoke('dashboard-approvers', {
+            body: { vendorIds: batch.map(r => r.id) },
+          });
+          if (assignmentError || assignments?.error) {
+            console.warn('Assigned approver names unavailable.');
+            continue;
+          }
+          const names = new Map<string, string | null>((assignments?.items ?? []).map((item: { vendorId: string; name: string | null }) => [item.vendorId, item.name]));
+          batch.forEach(r => { r.current_approver = names.get(r.id) ?? null; });
+        }
       }
 
       return rows;
@@ -240,6 +254,7 @@ export default function Dashboard() {
       const hay = [
         v.reference_number ?? '',
         v.invited_by?.name ?? '',
+        v.current_approver ?? '',
         pickVendorDisplayName(v) || '',
         v.display_email ?? '',
         STATUS_LABELS[v.status]?.label ?? v.status,
@@ -258,6 +273,7 @@ export default function Dashboard() {
       'Vendor Name': pickVendorDisplayName(v) || '',
       'Vendor Email': v.display_email ?? '',
       'Status': STATUS_LABELS[v.status]?.label ?? v.status,
+      'Current Approver': v.current_approver ?? '',
       'Created Date': formatDateTime(v.created_at),
     }));
 
@@ -485,7 +501,14 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>{formatVendorName(v) || '—'}</TableCell>
                       <TableCell>{v.display_email ?? '—'}</TableCell>
-                      <TableCell>{statusBadge(v.status)}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-start gap-1.5">
+                          {statusBadge(v.status)}
+                          {['buyer_review', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review'].includes(v.status) && (
+                            <span className="text-xs text-muted-foreground break-words">{v.current_approver || '—'}</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-2">
