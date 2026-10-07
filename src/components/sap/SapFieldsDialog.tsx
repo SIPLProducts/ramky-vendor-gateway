@@ -265,7 +265,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
         </DialogHeader>
 
         <div className="flex-1 min-h-0 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 220px)' }}>
-          {f4Status.state === 'loading' ? (
+          {f4Status.state === 'loading' || addressLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <div className="text-sm font-medium">Calling SAP Fields F4 API…</div>
