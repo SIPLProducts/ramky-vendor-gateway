@@ -12,3 +12,4 @@
 - Resolve dashboard approver names in batched authenticated lookups for caller-visible vendors using the actual buyer/company routing and skip flags, never global role membership or arbitrary flow rows.
 - Use the saved application reference_number in rejection notifications and check vendor lookup errors; never substitute internal IDs or SAP codes because they identify different records.
 - Clear SAP location at client and single/bulk server payload boundaries without changing registered State, region, address lines, or location classification.
+- Mark DMS synced only after successful transport and explicit all-success SAP message rows; empty responses and missing configuration must fail closed because HTTP acceptance does not prove document creation.
