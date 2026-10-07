@@ -43,7 +43,11 @@ Deno.serve(async (req) => {
       const exact = candidates.filter(f => f.tenant_id === tenantId);
       const generic = candidates.filter(f => f.tenant_id === null);
       // Ambiguous mappings must never select an arbitrary approver.
-      const flow = exact.length === 1 ? exact[0] : exact.length === 0 && generic.length === 1 ? generic[0] : undefined;
+      // Existing approval actions are buyer-scoped. A single buyer flow remains
+      // authoritative even when its company differs from the vendor company.
+      const flow = candidates.length === 1 ? candidates[0]
+        : exact.length === 1 ? exact[0]
+        : exact.length === 0 && generic.length === 1 ? generic[0] : undefined;
       return { vendorId: v.id, approverId: assignedApprover(v.status, buyerId, flow) };
     });
     const userIds = [...new Set(assignments.map(a => a.approverId).filter((id): id is string => !!id))];
