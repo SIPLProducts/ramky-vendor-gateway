@@ -31,3 +31,5 @@ No database migration, blanket permission change, or historical data backfill is
 Saving a valid address happens before the SAP request; an upstream SAP failure does not undo the confirmed address edit. Existing accepted KYC documents are never changed by this operation.
 
 Local state/address regression checks passed. Authenticated save and SAP end-to-end verification remain unverified: the requesting account cannot access the SAP screen. No Production deployment or real SAP transaction was performed.
+
+The subsequent location/dashboard/reference corrections passed seven focused tests. The connected preview dashboard showed a real SCM CO assignment, assigned-name search returned the correct application, and the downloaded Excel contained Current Approver. The updated functions were deployed to the connected preview backend. Self-hosted Quality/Production deployment and real email/SAP destination checks remain outstanding.

@@ -1,8 +1,9 @@
 # Roadmap
 
-- [ ] Send empty SAP location in single/bulk payloads without changing State, region, or address lines.
-- [ ] Show routed approver names beneath dashboard Status, including search/export.
-- [ ] Correct rejection notification application references and validate the changes.
+- [x] Send empty SAP location in single/bulk payloads without changing State, region, or address lines.
+- [x] Show routed approver names beneath dashboard Status, including search/export; verified with an existing SCM CO application in the signed-in UI.
+- [x] Correct rejection notification application references and validate the changes with focused tests; updated functions deployed to the connected preview backend.
+- [ ] Verify real rejection-email delivery and single/bulk SAP requests in Quality; blocked by unavailable test mailbox/SAP destination, and no real rejection or SAP transaction was performed.
 
 - [x] Make password-reset email links stay on the requesting DEV, QA, or PROD portal.
 - [x] Verify recovery tokens inside the Reset Password page.
