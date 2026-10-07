@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { requireAuthenticatedUser, authErrorResponse } from '../_shared/auth.ts';
 import { invokeFunctionJson } from '../_shared/invoke-function.ts';
+import { vendorEmailIdentity } from '../_shared/vendor-email-identity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,8 +95,7 @@ Deno.serve(async (req) => {
         } else {
           buyerEmailUsed = buyerEmail;
           const vendorName = getName1(vendor);
-          const vendorRef = String(vendor.reference_number ?? '').trim() || 'Not Assigned';
-          if (vendorRef === 'Not Assigned') console.warn('SAP return notification: application reference is not assigned.');
+          const vendorRef = vendorEmailIdentity(vendor).reference;
           const rejecterName = (rejecterProfile as any)?.full_name ?? 'SAP Team';
           const rejecterEmail = (rejecterProfile as any)?.email ?? '';
           const stageLabel = 'SAP Team';
