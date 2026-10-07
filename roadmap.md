@@ -18,3 +18,5 @@
 - [x] Persist PAN–Aadhaar linkage as a definite boolean after every successful PAN Comprehensive response.
 - [x] Isolate GST, PAN, MSME, and Bank replacements while preserving other tabs and re-running non-destructive cross-checks.
 - [x] Preserve the previously accepted GST, PAN, MSME, or Bank PDF and tab fields when a replacement fails, showing the attempt error without saving the rejected file.
+- [ ] Use the latest saved Organization & Contact address in SAP confirmation, normalize only its State, and save confirmed address edits before sync.
+- [ ] Validate SAP address/state regression cases; verify authenticated save and document self-hosted deployment requirements.
