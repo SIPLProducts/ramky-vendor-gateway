@@ -37,6 +37,7 @@ import { useTenants } from '@/hooks/useTenant';
 import { useTenantContext } from '@/hooks/useTenantContext';
 import { useAuth } from '@/hooks/useAuth';
 import { safeUUID } from '@/lib/uuid';
+import { normalizeRegisteredState } from '../../supabase/functions/_shared/sap-registered-address';
 
 
 // 6-step built-in registration flow — Step 1 is the OCR + verification gate.
@@ -1046,10 +1047,10 @@ export default function VendorRegistration() {
       (gstYes ? gstAddrParts?.city : data.manualAddress?.city) ||
       msmeAddrParts?.city ||
       '';
-    const stateFromDoc =
+    const stateFromDoc = normalizeRegisteredState(
       (gstYes ? (gstAddrParts?.state || data.gst?.jurisdictionState) : data.manualAddress?.state) ||
       msmeAddrParts?.state ||
-      '';
+      '');
     const pinFromDoc =
       (gstYes ? gstAddrParts?.pincode : data.manualAddress?.pincode) ||
       msmeAddrParts?.pincode ||

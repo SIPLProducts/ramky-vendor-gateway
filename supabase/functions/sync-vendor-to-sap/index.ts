@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
 import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
+import { getRegisteredAddressPatch, applyRegisteredAddressToSap } from '../_shared/sap-registered-address.ts';
 
 const SVC = "sync-vendor-to-sap";
 const WHOLDTAX_FINAL_NORMALIZE_VERSION = "2026-07-07-wholdtax-final-boundary-v2";
@@ -361,13 +362,21 @@ serve(async (req) => {
     }));
 
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_URL") ?? '',
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? '',
     );
 
-    const { data: vendor, error: vendorError } = await supabase
+    // Read as the caller first: a privileged function must not permit editing
+    // another vendor merely because the caller knows its ID.
+    const userClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+    });
+    const { data: vendor, error: vendorError } = await userClient
       .from("vendors").select("*").eq("id", vendorId).single();
-    if (vendorError || !vendor) throw new Error(`Vendor not found: ${vendorError?.message}`);
+    if (vendorError || !vendor) return fail('Vendor not found or you do not have permission to sync this vendor.');
+
+    const addressPatch = getRegisteredAddressPatch(vendor, overrides);
+    Object.assign(vendor, addressPatch);
 
     const isIntl = String((vendor as any).vendor_type || "").toLowerCase() === "international";
     const intlCountry = String((vendor as any).branch_country || "").trim().toUpperCase();
@@ -387,6 +396,14 @@ serve(async (req) => {
       return fail(
         `Cannot sync to SAP: vendor's Registered State "${vendor.registered_state || "(empty)"}" is not mapped to an SAP region code for country IN. Please correct the vendor's Registered State and retry.`,
       );
+    }
+
+    // Persist only the confirmed address/contact fields, after state validation.
+    // Do not overwrite KYC, documents, approval status, or GST jurisdiction.
+    if (Object.keys(addressPatch).length > 0) {
+      const { data: saved, error: saveError } = await supabase.from('vendors')
+        .update(addressPatch).eq('id', vendorId).select('id').single();
+      if (saveError || !saved) return fail('Could not save the confirmed registered address. SAP sync was not started.');
     }
 
     // Resolve SAP API config (proxy/middleware)
@@ -671,6 +688,10 @@ serve(async (req) => {
 
       
     }
+
+    // Both client-payload and server-template paths use the same confirmed
+    // Organization & Contact address, including the clean state/region.
+    applyRegisteredAddressToSap(row, vendor, isIntl ? String(vendor.registered_state).trim().toUpperCase() : resolveRegion(vendor.registered_state));
 
     // Final WHOLDTAX boundary: always overwrite stale/blank WHOLDTAX rows from
     // the resolved client/template payload with the selected SAP popup rows.

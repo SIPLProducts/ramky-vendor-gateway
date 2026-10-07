@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { VendorFormData, ValidationResult, VendorStatus } from '@/types/vendor';
+import { normalizeRegisteredState } from '../../supabase/functions/_shared/sap-registered-address';
 
 /** Form data plus the admin-defined custom tab values (persisted to vendors.custom_field_values). */
 type VendorFormDataWithCustom = VendorFormData & { customFieldValues?: Record<string, Record<string, unknown>> };
@@ -562,7 +563,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       registered_address_line3: isIntl ? (intlAddrLine3 || null) : (formData.address.registeredAddressLine3 || null),
       registered_address_line4: isIntl ? (intlAddrLine4 || null) : (formData.address.registeredAddressLine4 || null),
       registered_city: isIntl ? (intlCity || '') : formData.address.registeredCity,
-      registered_state: isIntl ? (intlRegion || intlState || '') : formData.address.registeredState,
+      registered_state: isIntl ? (intlRegion || intlState || '') : normalizeRegisteredState(formData.organization.state || formData.address.registeredState),
       registered_pincode: isIntl ? (intlPin || '') : formData.address.registeredPincode,
       registered_phone: isIntl ? (intlOfficePhone || null) : (formData.address.registeredPhone || null),
       registered_fax: isIntl ? (intlFax || null) : (formData.address.registeredFax || null),
