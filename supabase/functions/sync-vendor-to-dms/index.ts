@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
 import { makeReqId, trace, traceFetch, safePreview, summarizeError } from "../_shared/trace.ts";
 
+import { assessDmsResponse } from "./response.ts";
+
 const SVC = "sync-vendor-to-dms";
 
 const corsHeaders = {
@@ -331,9 +333,8 @@ serve(async (req) => {
       attemptedCount = fileUpload.length;
 
       if (!dmsUrl) {
-        success = attemptedCount > 0;
-        uploadedCount = attemptedCount;
-        message = `Simulated DMS upload (${attemptedCount} document${attemptedCount === 1 ? '' : 's'})`;
+        success = false;
+        message = "DMS endpoint is not configured. No SAP document creation was confirmed.";
       } else if (attemptedCount === 0) {
         success = false;
         message = "No uploadable documents found for this vendor";
@@ -385,109 +386,55 @@ serve(async (req) => {
           success = false;
           message = errMsg;
         } else {
-          let inner: any = null;
-          let middlewareEnvelope: any = null;
-          try {
-            const parsed = JSON.parse(text);
-            middlewareEnvelope = parsed && typeof parsed === "object" && "sapResponse" in parsed
-              ? parsed
-              : null;
-            inner = middlewareEnvelope ? middlewareEnvelope.sapResponse : parsed;
-          } catch {
-            inner = null;
-          }
-
-          const rows: any[] = Array.isArray(inner)
-            ? inner
-            : (inner && typeof inner === "object" ? [inner] : []);
+          const confirmation = assessDmsResponse(text, res.status);
+          const rows = confirmation.rows;
           allSapRows.push(...rows);
+          sapRow = rows.find(r => r.MSGTYP !== "S") || rows[0] || null;
 
-          const upstreamOk = middlewareEnvelope ? middlewareEnvelope.ok !== false : res.ok;
-          const effectiveStatus = middlewareEnvelope?.sapStatus || res.status;
-
-          const httpFailure = !res.ok || !upstreamOk;
-          const allSuccess = rows.length > 0 && rows.every((r) => r?.MSGTYP === "S");
-          sapRow = rows.find((r) => r?.MSGTYP === "S") || rows[0] || null;
-
-          if (rows.length === 0) {
-            // No rows returned. Trust HTTP status.
-            if (!httpFailure) {
-              uploadedCount = attemptedCount;
-            } else {
-              for (const m of fileMeta) {
-                failedDocuments.push({
-                  fileName: m.fileName,
-                  filePath: m.filePath,
-                  status: effectiveStatus,
-                  url: workingDmsUrl || undefined,
-                  message: `DMS upload failed (HTTP ${effectiveStatus}): ${text.slice(0, 200)}`,
-                });
-              }
-            }
-          } else if (rows.length < fileMeta.length) {
-            // Aggregate response: one row for the whole batch.
-            if (allSuccess && !httpFailure) {
-              uploadedCount = attemptedCount;
-            } else {
-              const failRow = rows.find((r) => r?.MSGTYP !== "S") || rows[0];
-              const failMsg = failRow?.MSG || failRow?.LONG_MSG || `HTTP ${effectiveStatus}`;
-              for (const m of fileMeta) {
-                failedDocuments.push({
-                  fileName: m.fileName,
-                  filePath: m.filePath,
-                  status: effectiveStatus,
-                  url: workingDmsUrl || undefined,
-                  message: `SAP DMS error for ${m.fileName}: ${failMsg}`,
-                });
-              }
-            }
+          // A single SAP row can confirm the entire FILE_UPLOAD batch. For
+          // per-file responses, every returned row must still confirm success.
+          if (confirmation.confirmed) {
+            uploadedCount = attemptedCount;
           } else {
-            // Per-file rows (rows.length >= fileMeta.length): pair by index.
+            // Retain confirmed per-file counts only for a complete, successful
+            // transport response; never let them mark the whole vendor synced.
+            if (confirmation.transportOk && rows.length === fileMeta.length) {
+              uploadedCount = rows.filter(r => r.MSGTYP === "S").length;
+            }
             for (let idx = 0; idx < fileMeta.length; idx++) {
               const m = fileMeta[idx];
-              const row = rows[idx];
-              if (row && row.MSGTYP === "S") {
-                uploadedCount += 1;
-              } else if (row) {
-                failedDocuments.push({
-                  fileName: m.fileName,
-                  filePath: m.filePath,
-                  status: effectiveStatus,
-                  url: workingDmsUrl || undefined,
-                  message: `SAP DMS error for ${m.fileName}: ${row?.MSG || row?.LONG_MSG || "unknown error"}`,
-                });
-              } else {
-                failedDocuments.push({
-                  fileName: m.fileName,
-                  filePath: m.filePath,
-                  status: effectiveStatus,
-                  url: workingDmsUrl || undefined,
-                  message: httpFailure
-                    ? `DMS upload failed (HTTP ${effectiveStatus}) for ${m.fileName}: ${text.slice(0, 200)}`
-                    : `SAP DMS returned no row for ${m.fileName}`,
-                });
-              }
+              if (confirmation.transportOk && rows.length === fileMeta.length && rows[idx]?.MSGTYP === "S") continue;
+              failedDocuments.push({
+                fileName: m.fileName,
+                filePath: m.filePath,
+                status: confirmation.status,
+                url: workingDmsUrl || undefined,
+                message: confirmation.message,
+              });
             }
           }
-
-          if (failedDocuments.length === 0 && uploadedCount === attemptedCount) {
-            success = true;
-            message = sapRow?.MSG || `File(s) Uploaded Successfully (${uploadedCount} document${uploadedCount === 1 ? '' : 's'})`;
-          } else {
-            success = false;
-            message = `${uploadedCount}/${attemptedCount} document(s) uploaded to DMS`;
-          }
+          success = confirmation.confirmed && failedDocuments.length === 0 && skipped.length === 0;
+          message = success ? confirmation.message || "SAP confirmed document creation."
+            : confirmation.confirmed
+              ? "Some documents could not be uploaded. DMS sync remains pending."
+              : confirmation.message;
 
         }
       }
 
 
       if (success) {
-        await supabase.from("vendors").update({
+        const { data: saved, error: saveError } = await supabase.from("vendors").update({
           status: "dms_synced",
           dms_synced_at: new Date().toISOString(),
-        }).eq("id", vendor.id);
+        }).eq("id", vendor.id).select("id").maybeSingle();
+        if (saveError || !saved) {
+          success = false;
+          message = "SAP confirmed document creation, but the portal could not save the DMS status. Check SAP before retrying.";
+        }
+      }
 
+      if (success) {
         await supabase.from("audit_logs").insert({
           vendor_id: vendor.id,
           user_id: auth.userId,
