@@ -1,7 +1,8 @@
 # Roadmap
 
-- [ ] Require explicit SAP DMS success confirmation; reject empty/error responses without changing documents or marking vendors synced.
-- [ ] Verify DMS confirmation regressions and document self-hosted rollout; live Quality SAP testing requires an available test destination.
+- [x] Require explicit SAP DMS success confirmation; reject empty/error responses without changing documents or marking vendors synced.
+- [x] Verify DMS confirmation regressions and the uploaded response; document self-hosted rollout and deploy the function to the connected backend.
+- [ ] Verify DMS confirmation with live Quality SAP and deploy to self-hosted Quality/Production; blocked by unavailable test destination/server access.
 
 - [x] Send empty SAP location in single/bulk payloads without changing State, region, or address lines.
 - [x] Show routed approver names beneath dashboard Status, including search/export; verified with an existing SCM CO application in the signed-in UI.
