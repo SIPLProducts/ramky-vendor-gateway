@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_SAP_PAYLOAD_TEMPLATE } from "./sapDefaultTemplate";
 import { getRegisteredState } from '../../supabase/functions/_shared/sap-registered-address';
+import { clearSapLocation } from '../../supabase/functions/_shared/sap-location';
 
 // Indian state -> SAP T005S numeric region code for country IN.
 const stateToRegion: Record<string, string> = {
@@ -497,5 +498,6 @@ export async function buildSapPayload(
     }
   }
 
+  clearSapLocation(row);
   return { payload: [row], uploadsCount: uploads.length, skipped };
 }

@@ -94,9 +94,8 @@ Deno.serve(async (req) => {
         } else {
           buyerEmailUsed = buyerEmail;
           const vendorName = getName1(vendor);
-          const vendorRef = (vendor as any).reference_number
-            ?? (vendor as any).sap_vendor_code
-            ?? String(vendor.id).slice(0, 8);
+          const vendorRef = String(vendor.reference_number ?? '').trim() || 'Not Assigned';
+          if (vendorRef === 'Not Assigned') console.warn('SAP return notification: application reference is not assigned.');
           const rejecterName = (rejecterProfile as any)?.full_name ?? 'SAP Team';
           const rejecterEmail = (rejecterProfile as any)?.email ?? '';
           const stageLabel = 'SAP Team';

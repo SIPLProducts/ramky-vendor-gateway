@@ -31,7 +31,8 @@ describe('SAP confirmed organization address', () => {
     const row: Record<string, any> = { region: '10', vendors: [{ region: '10' }] };
     applyRegisteredAddressToSap(row, { ...vendor, registered_state: 'Telangana', registered_city: 'Hyderabad' }, '36');
     expect(row.region).toBe('36');
-    expect(row.location).toBe('Telangana');
+    expect(row.location).toBe('');
+    expect(row.vendors[0].location).toBe('');
     expect(row.vendors[0].region).toBe('36');
     expect(row.vendors[0].city).toBe('Hyderabad');
     expect(vendor.gst_jurisdiction_state).toBe('State - Karnataka, Division - Bengaluru');

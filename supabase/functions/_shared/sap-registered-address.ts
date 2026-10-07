@@ -47,7 +47,7 @@ export function applyRegisteredAddressToSap(row: Record<string, any>, vendor: Re
     str_suppl3: String(vendor.registered_address_line4 ?? '').slice(0, 40),
     city: String(vendor.registered_city ?? '').slice(0, 40),
     postl_cod1: String(vendor.registered_pincode ?? '').slice(0, 10),
-    location: String(vendor.registered_state ?? '').slice(0, 40), region,
+    location: '', region,
     mob_number: String(vendor.registered_contact_1 ?? vendor.primary_phone ?? '').slice(0, 30),
     mob_number2: String(vendor.registered_contact_2 ?? vendor.secondary_phone ?? '').slice(0, 30),
     smtp_addr: String(vendor.registered_email ?? vendor.primary_email ?? '').slice(0, 241),

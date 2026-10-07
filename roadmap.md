@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Send empty SAP location in single/bulk payloads without changing State, region, or address lines.
+- [ ] Show routed approver names beneath dashboard Status, including search/export.
+- [ ] Correct rejection notification application references and validate the changes.
+
 - [x] Make password-reset email links stay on the requesting DEV, QA, or PROD portal.
 - [x] Verify recovery tokens inside the Reset Password page.
 - [x] Validate the updated flow and document the required self-host deployment.

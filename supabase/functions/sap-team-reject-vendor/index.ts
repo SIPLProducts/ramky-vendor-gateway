@@ -108,11 +108,13 @@ serve(async (req) => {
     let buyerEmailUsed: string | null = null;
 
     try {
-      const { data: vendor } = await supabase
+      const { data: vendor, error: vendorLookupError } = await supabase
         .from("vendors")
         .select("id, legal_name, trade_name, gstin, account_holder_name, reference_number, sap_vendor_code")
         .eq("id", vendorId)
         .maybeSingle();
+
+      if (vendorLookupError || !vendor) throw new Error('Could not load vendor details for rejection notification.');
 
       const { data: invite } = await supabase
         .from("vendor_invitations")
@@ -140,9 +142,8 @@ serve(async (req) => {
         } else {
           buyerEmailUsed = buyerEmail;
           const vendorName = getName1(vendor);
-          const vendorRef = (vendor as any)?.reference_number
-            ?? (vendor as any)?.sap_vendor_code
-            ?? String(vendorId).slice(0, 8);
+          const vendorRef = String(vendor.reference_number ?? '').trim() || 'Not Assigned';
+          if (vendorRef === 'Not Assigned') console.warn('SAP closure notification: application reference is not assigned.');
           const rejecterName = (rejecterProfile as any)?.full_name ?? "SAP Team";
           const rejecterEmail = (rejecterProfile as any)?.email ?? "";
           const rejectedAtIst = new Date().toLocaleString("en-IN", {
