@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireAuthenticatedUser, authErrorResponse } from "../_shared/auth.ts";
+import { clearSapLocation } from '../_shared/sap-location.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -257,6 +258,7 @@ serve(async (req) => {
     // Final WHOLDTAX boundary: overwrite stale/blank client/template rows on
     // every outgoing row immediately before the SAP request is prepared.
     const finalWholdtaxRows = enriched.map((row: any, i: number) => {
+      clearSapLocation(row);
       const vendor = (vendors || []).find((v: any) => v.id === vendorIds[i]);
       const vendorCountry = String((vendor as any)?.country || "IN").toUpperCase();
       const lifnr = String(vendor?.sap_vendor_code || row?.LIFNR || row?.lifnr || "").trim();

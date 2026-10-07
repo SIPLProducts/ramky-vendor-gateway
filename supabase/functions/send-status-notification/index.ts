@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { invokeFunctionJson } from "../_shared/invoke-function.ts";
+import { vendorEmailIdentity } from '../_shared/vendor-email-identity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,7 +75,7 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: string): string {
+function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: string, reference?: string): string {
   const statusInfo = statusMessages[status] || {
     subject: 'Status Update',
     body: 'Your vendor registration status has been updated.',
@@ -97,6 +98,7 @@ function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: 
   
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
     <p style="font-size: 16px; margin-bottom: 10px;">Dear <strong>${vendorName}</strong>,</p>
+    ${reference ? `<p><strong>Vendor Reference Number:</strong> ${escapeHtml(reference)}</p>` : ''}
     
     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
       <h2 style="color: #667eea; margin: 0 0 10px 0; font-size: 18px;">${statusInfo.subject}</h2>
@@ -159,7 +161,18 @@ serve(async (req) => {
       body: 'Your vendor registration status has been updated.',
     };
 
-    const emailHtml = generateEmailHtml(vendorName, newStatus, comments);
+    let notificationName = vendorName;
+    let reference: string | undefined;
+    if (newStatus === 'returned_to_vendor' || newStatus.endsWith('_rejected')) {
+      const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+      const { data: vendor, error } = await client.from('vendors')
+        .select('reference_number, legal_name, trade_name, pan_holder_name, account_holder_name').eq('id', vendorId).single();
+      if (error || !vendor) throw new Error('Could not load vendor details for rejection notification.');
+      const identity = vendorEmailIdentity(vendor);
+      notificationName = identity.name;
+      reference = identity.reference;
+    }
+    const emailHtml = generateEmailHtml(notificationName, newStatus, comments, reference);
 
     // Simulation mode - log the email instead of sending
     if (simulationMode) {

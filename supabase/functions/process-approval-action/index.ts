@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { invokeFunctionJson } from '../_shared/invoke-function.ts';
+import { vendorEmailIdentity } from '../_shared/vendor-email-identity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -171,22 +172,20 @@ Deno.serve(async (req) => {
 
       if (invitingBuyerId) {
         try {
-          const [{ data: buyerProfile }, { data: rejecterProfile }, { data: vendorRow }] = await Promise.all([
+          const [{ data: buyerProfile }, { data: rejecterProfile }, { data: vendorRow, error: vendorLookupError }] = await Promise.all([
             admin.from('profiles').select('email, full_name').eq('id', invitingBuyerId).maybeSingle(),
             admin.from('profiles').select('email, full_name').eq('id', userId).maybeSingle(),
             admin.from('vendors')
-              .select('legal_name, vendor_reference_number, vendor_code, id')
+              .select('id, legal_name, trade_name, pan_holder_name, account_holder_name, reference_number')
               .eq('id', progress.vendor_id).maybeSingle(),
           ]);
+          if (vendorLookupError || !vendorRow) throw new Error('Could not load vendor details for rejection notification.');
           const buyerEmail = (buyerProfile as any)?.email;
           if (!buyerEmail) {
             emailError = 'Buyer email not found in profile.';
           } else {
             buyerEmailUsed = buyerEmail;
-            const vendorName = (vendorRow as any)?.legal_name ?? 'Vendor';
-            const vendorRef = (vendorRow as any)?.vendor_reference_number
-              ?? (vendorRow as any)?.vendor_code
-              ?? String((vendorRow as any)?.id ?? progress.vendor_id).slice(0, 8);
+            const { name: vendorName, reference: vendorRef } = vendorEmailIdentity(vendorRow);
             const rejecterName = (rejecterProfile as any)?.full_name ?? 'Approver';
             const rejecterEmail = (rejecterProfile as any)?.email ?? '';
             const stageLabel = stageLabels[curStage] ?? curStage;
