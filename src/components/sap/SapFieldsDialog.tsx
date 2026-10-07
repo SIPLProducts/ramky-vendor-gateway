@@ -19,6 +19,7 @@ import { useRefreshSapMaster, useSapMasterData } from '@/hooks/useSapMasterData'
 import { getLocationLabel } from '@/lib/stateToSapLocation';
 import { getSapName1, getSapVenClass } from '@/lib/sapPayloadBuilder';
 import { toProperCase } from '@/lib/textCase';
+import { getRegisteredState } from '../../../supabase/functions/_shared/sap-registered-address';
 
 export type WTaxRow = {
   witht: string;
@@ -73,6 +74,8 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   const [f4Status, setF4Status] = useState<{ state: 'idle' | 'loading' | 'success' | 'error'; message: string }>({ state: 'idle', message: '' });
   const [liveF4, setLiveF4] = useState<Record<string, any[]> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [wtAll, setWtAll] = useState<Array<{ LAND1: string; TAXTYPE: string; TEXT40: string }>>([]);
   const [wtLoading, setWtLoading] = useState(false);
   const [wtError, setWtError] = useState<string | null>(null);
@@ -164,7 +167,6 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    const tenantId = (vendor as any)?.tenant_id;
     const initial = buildDefaults(vendor, null);
     setForm(initial);
     const hasCfstmt = (initial.classify.CASH?.length || 0) + (initial.classify.TIER?.length || 0) > 0;
@@ -172,16 +174,25 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
     setClassifyMode(hasCfstmt && !hasDetails ? 'cfstmt' : 'details');
     setLiveF4(null);
     setMissingFields([]);
-    if (tenantId) {
-      (async () => {
-        const { data } = await supabase
-          .from('sap_default_fields' as any)
-          .select('*')
-          .eq('tenant_id', tenantId)
-          .maybeSingle();
-        if (!cancelled) setForm(buildDefaults(vendor, data));
-      })();
-    }
+    setAddressLoading(true);
+    setAddressError(null);
+    (async () => {
+      try {
+        if (!vendor?.id) throw new Error('No vendor selected.');
+        const { data: latest, error } = await supabase.from('vendors').select('*').eq('id', vendor.id).single();
+        if (error || !latest) throw new Error('Could not load the saved Organization & Contact address. Close and retry.');
+        let defaults: any = null;
+        if (latest.tenant_id) {
+          const { data } = await supabase.from('sap_default_fields').select('*').eq('tenant_id', latest.tenant_id).maybeSingle();
+          defaults = data;
+        }
+        if (!cancelled) setForm(buildDefaults(latest, defaults));
+      } catch (error) {
+        if (!cancelled) setAddressError(error instanceof Error ? error.message : 'Could not load the saved address.');
+      } finally {
+        if (!cancelled) setAddressLoading(false);
+      }
+    })();
     setF4Status({ state: 'loading', message: 'Calling SAP Fields F4 API… please wait.' });
     const slowTimer = window.setTimeout(() => {
       if (!cancelled) {
@@ -455,6 +466,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
           )}
         </div>
 
+        {addressError && <p role="alert" className="text-sm text-destructive">{addressError}</p>}
         {missingFields.length > 0 && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5" />
@@ -485,6 +497,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
                   : { ...form.classify, MGV: [], CATV: [], LOCV: [], IDS: [] };
                 onConfirm({
                   ...form,
+                  reg_state: getRegisteredState((vendor || {}) as Record<string, unknown>, form.reg_state),
                   classify: finalClassify,
                   msme: msmeCode,
                   idtype: form.reg_is_msme ? 'ZMSMEN' : '',
@@ -493,7 +506,7 @@ export function SapFieldsDialog({ open, onOpenChange, vendor, onConfirm, isSubmi
 
               }
             }}
-            disabled={isSubmitting || f4Status.state === 'loading'}
+            disabled={isSubmitting || addressLoading || !!addressError || f4Status.state === 'loading'}
             className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 shadow-lg shadow-blue-500/20"
           >
             {isSubmitting ? (
@@ -542,7 +555,7 @@ function buildDefaults(vendor: VendorRow | null, tenantDefaults: any | null): Sa
     reg_addr3: v.registered_address_line3 ?? '',
     reg_addr4: v.registered_address_line4 ?? '',
     reg_city: v.registered_city ?? '',
-    reg_state: v.registered_state ?? '',
+    reg_state: getRegisteredState(v),
     reg_pincode: v.registered_pincode ?? '',
     reg_contact1: v.registered_contact_1 ?? v.primary_phone ?? '',
     reg_contact2: v.registered_contact_2 ?? '',

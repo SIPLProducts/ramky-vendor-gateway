@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_SAP_PAYLOAD_TEMPLATE } from "./sapDefaultTemplate";
+import { getRegisteredState } from '../../supabase/functions/_shared/sap-registered-address';
 
 // Indian state -> SAP T005S numeric region code for country IN.
 const stateToRegion: Record<string, string> = {
@@ -274,7 +275,7 @@ export async function buildSapPayload(
   if (hasKey('reg_addr3'))    vendorForPayload.registered_address_line3 = ov.reg_addr3 ?? '';
   if (hasKey('reg_addr4'))    vendorForPayload.registered_address_line4 = ov.reg_addr4 ?? '';
   if (hasKey('reg_city'))     vendorForPayload.registered_city = ov.reg_city ?? '';
-  if (hasKey('reg_state'))    vendorForPayload.registered_state = ov.reg_state ?? '';
+  vendorForPayload.registered_state = getRegisteredState(vendorForPayload, hasKey('reg_state') ? ov.reg_state ?? '' : undefined);
   if (hasKey('reg_pincode'))  vendorForPayload.registered_pincode = ov.reg_pincode ?? '';
   if (hasKey('reg_contact1')) { vendorForPayload.registered_contact_1 = ov.reg_contact1 ?? ''; vendorForPayload.primary_phone = ov.reg_contact1 ?? ''; }
   if (hasKey('reg_contact2')) { vendorForPayload.registered_contact_2 = ov.reg_contact2 ?? ''; vendorForPayload.secondary_phone = ov.reg_contact2 ?? ''; }

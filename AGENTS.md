@@ -8,3 +8,4 @@
 - Normalize successful PAN Comprehensive `aadhaar_linked` results so only true stores true and false or null stores false, keeping details and reports consistent.
 - Preserve configured PAN request-template options while always overriding `id_number` from validated runtime input, so provider options pass through without permitting hardcoded identity data.
 - Keep KYC replacements tab-isolated; a failed attempt shows only a temporary error and never changes saved fields, documents, or status, while only a successful replacement updates that tab and reruns dependent checks.
+- Share SAP registered-address resolution between the popup, payload builder, and sync function; prefer the saved Organization State, never GST jurisdiction, and persist allowlisted confirmed address edits only after caller-visible vendor and state validation so SAP and saved registration stay consistent.
