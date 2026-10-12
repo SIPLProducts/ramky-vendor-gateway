@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Compact dashboard table: remove visible Vendor Email, keep names unwrapped beneath role/status, and verify tighter spacing.
+
 - [x] Display responsible names for all dashboard approval stages and eligible SAP Team members, with clear missing-assignment/lookup messages; deployed and verified signed-in lookup, SCM name, skipped-stage and missing-assignment labels.
 
 - [x] Require explicit SAP DMS success confirmation; reject empty/error responses without changing documents or marking vendors synced.
