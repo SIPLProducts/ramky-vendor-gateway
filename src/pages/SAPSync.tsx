@@ -712,8 +712,7 @@ export default function SAPSync() {
                   <p className="text-muted-foreground mt-1 text-sm">Vendors synced to SAP will appear here.</p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-[600px]">
-                  <PaginatedRecords items={filteredDms} resetKey={JSON.stringify([searchTerm, buyerCompanyFilter])}>{pageItems => (<><Table>
+                <PaginatedRecords items={filteredDms} resetKey={JSON.stringify([searchTerm, buyerCompanyFilter])}>{pageItems => (<><ScrollArea className="max-h-[600px]"><Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12"></TableHead>
@@ -777,8 +776,7 @@ export default function SAPSync() {
                         );
                       })}
                     </TableBody>
-                  </Table></>)}</PaginatedRecords>
-                </ScrollArea>
+                  </Table></ScrollArea></>)}</PaginatedRecords>
               )}
             </CardContent>
           </Card>

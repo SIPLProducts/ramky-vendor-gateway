@@ -65,8 +65,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
         </Button>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
-          <PaginatedRecords items={logs}>{pageItems => (<><Table>
+        <PaginatedRecords items={logs} resetKey={vendorId ?? ''}>{pageItems => (<><ScrollArea className="h-[400px]"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Timestamp</TableHead>
@@ -126,8 +125,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
                 </TableRow>
               )}
             </TableBody>
-          </Table></>)}</PaginatedRecords>
-        </ScrollArea>
+          </Table></ScrollArea></>)}</PaginatedRecords>
       </CardContent>
     </Card>
   );
