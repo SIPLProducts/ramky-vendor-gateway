@@ -1,5 +1,6 @@
 import { formatDateTime } from '@/lib/dateFormat';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { paginateItems } from '@/lib/pagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenantFilter } from '@/hooks/useTenantContext';
@@ -346,8 +347,10 @@ export default function GstCompliance() {
 
   // Pagination
   const totalItems = filteredVendors.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedVendors = filteredVendors.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const { totalPages, currentPage: safePage, items: paginatedVendors } = paginateItems(filteredVendors, pageSize, currentPage);
+  useEffect(() => {
+    if (safePage !== currentPage) setCurrentPage(safePage);
+  }, [safePage, currentPage]);
 
   const handleFilterChange = (value: string) => {
     setFilterStatus(value);
@@ -568,7 +571,7 @@ export default function GstCompliance() {
           
           {filteredVendors.length > 0 && (
             <DataTablePagination
-              currentPage={currentPage}
+              currentPage={safePage}
               totalPages={totalPages}
               pageSize={pageSize}
               totalItems={totalItems}

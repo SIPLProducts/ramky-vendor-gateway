@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { paginateItems } from '@/lib/pagination';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
 import { useNavigate } from 'react-router-dom';
 import { safeUUID } from '@/lib/uuid';
@@ -631,8 +632,10 @@ export default function AdminInvitations() {
 
   // Pagination
   const totalItems = filteredInvitations.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedInvitations = filteredInvitations.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const { totalPages, currentPage: safePage, items: paginatedInvitations } = paginateItems(filteredInvitations, pageSize, currentPage);
+  useEffect(() => {
+    if (safePage !== currentPage) setCurrentPage(safePage);
+  }, [safePage, currentPage]);
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -1146,7 +1149,7 @@ export default function AdminInvitations() {
               </div>
 
               <DataTablePagination
-                currentPage={currentPage}
+                currentPage={safePage}
                 totalPages={totalPages}
                 pageSize={pageSize}
                 totalItems={totalItems}

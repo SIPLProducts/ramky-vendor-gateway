@@ -1,5 +1,6 @@
 import { formatDateTime } from '@/lib/dateFormat';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { paginateItems } from '@/lib/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -39,8 +40,10 @@ export default function AuditLogs() {
 
   // Pagination
   const totalItems = filteredLogs.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const { totalPages, currentPage: safePage, items: paginatedLogs } = paginateItems(filteredLogs, pageSize, currentPage);
+  useEffect(() => {
+    if (safePage !== currentPage) setCurrentPage(safePage);
+  }, [safePage, currentPage]);
 
   // Reset to page 1 when filters change
   const handleSearchChange = (value: string) => {
@@ -194,7 +197,7 @@ export default function AuditLogs() {
               </div>
               
               <DataTablePagination
-                currentPage={currentPage}
+                currentPage={safePage}
                 totalPages={totalPages}
                 pageSize={pageSize}
                 totalItems={totalItems}
