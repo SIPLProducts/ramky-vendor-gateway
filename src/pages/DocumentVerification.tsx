@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState } from 'react';
 import { formatDate } from '@/lib/dateFormat';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -592,7 +593,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
               <p className="text-center py-8 text-muted-foreground">No submitted vendors pending verification</p>
             ) : (
               <div className="space-y-2">
-                {vendors?.map((vendor) => (
+                {<PaginatedRecords items={vendors}>{pageItems => (<>{pageItems.map((vendor) => (
                   <div
                     key={vendor.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -640,7 +641,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                       </div>
                     </div>
                   </div>
-                ))}
+                ))}</>)}</PaginatedRecords>}
               </div>
             )}
           </CardContent>

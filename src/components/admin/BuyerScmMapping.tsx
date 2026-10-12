@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDate } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -275,7 +276,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
           ) : mappings.length === 0 ? (
             <div className="text-sm text-muted-foreground">No mappings yet.</div>
           ) : (
-            <Table>
+            <PaginatedRecords items={mappings}>{pageItems => (<><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>SCM CO</TableHead>
@@ -287,7 +288,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappings.map((m) => (
+                {pageItems.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell>{label(m.scm)}</TableCell>
                     <TableCell>{label(m.buyer)}</TableCell>
@@ -313,7 +314,7 @@ export function BuyerScmMapping({ tenantId }: Props) {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
 
           )}
         </CardContent>

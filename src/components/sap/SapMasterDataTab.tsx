@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,7 +84,7 @@ export function SapMasterDataTab() {
               No values yet. Click <strong>Refresh from SAP</strong> or <strong>Add value</strong>.
             </div>
           ) : (
-            <Table>
+            <PaginatedRecords items={rows} resetKey={type}>{pageItems => (<><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
@@ -94,7 +95,7 @@ export function SapMasterDataTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {pageItems.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono">{r.code}</TableCell>
                     <TableCell>{r.description || "—"}</TableCell>
@@ -117,7 +118,7 @@ export function SapMasterDataTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
           )}
         </CardContent>
       </Card>

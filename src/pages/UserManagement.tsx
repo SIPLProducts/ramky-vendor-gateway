@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -595,7 +596,7 @@ export default function UserManagement() {
               </div>
 
               <div className="border rounded-md">
-                <Table>
+                <PaginatedRecords items={filtered}>{pageItems => (<><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -620,7 +621,7 @@ export default function UserManagement() {
                       </TableCell></TableRow>
 
                     ) : (
-                      filtered.map((u) => (
+                      pageItems.map((u) => (
                         <TableRow key={u.id}>
                           <TableCell className="font-medium">{u.full_name ?? '—'}</TableCell>
                           <TableCell>{u.email}</TableCell>
@@ -750,7 +751,7 @@ export default function UserManagement() {
                       ))
                     )}
                   </TableBody>
-                </Table>
+                </Table></>)}</PaginatedRecords>
               </div>
             </CardContent>
           </Card>
@@ -766,7 +767,7 @@ export default function UserManagement() {
             <CardContent>
               <div className="border rounded-md mt-[5px]">
 
-                <Table>
+                <PaginatedRecords items={loginAttempts}>{pageItems => (<><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>User Name</TableHead>
@@ -788,7 +789,7 @@ export default function UserManagement() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      loginAttempts.map((a) => {
+                      pageItems.map((a) => {
                         const u = users.find((x) => x.id === a.user_id || x.email.toLowerCase() === a.email.toLowerCase());
                         return (
                           <TableRow key={a.id}>
@@ -808,7 +809,7 @@ export default function UserManagement() {
                       })
                     )}
                   </TableBody>
-                </Table>
+                </Table></>)}</PaginatedRecords>
               </div>
             </CardContent>
           </Card>
@@ -833,7 +834,7 @@ export default function UserManagement() {
 
             <CardContent>
               <div className="border rounded-md">
-                <Table>
+                <PaginatedRecords items={scopedCustomRoleRows}>{pageItems => (<><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -854,7 +855,7 @@ export default function UserManagement() {
                         No custom roles yet. Click "Create Role" to add one.
                       </TableCell></TableRow>
                     ) : (
-                      scopedCustomRoleRows.map((r) => {
+                      pageItems.map((r) => {
                         const tName = r.tenant_id ? tenants.find((t) => t.id === r.tenant_id)?.name : null;
                         return (
                           <TableRow key={r.id}>
@@ -889,7 +890,7 @@ export default function UserManagement() {
                       })
                     )}
                   </TableBody>
-                </Table>
+                </Table></>)}</PaginatedRecords>
               </div>
             </CardContent>
           </Card>

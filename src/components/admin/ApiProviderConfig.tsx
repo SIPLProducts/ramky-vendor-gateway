@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -210,7 +211,7 @@ export function ApiProviderConfig({ tenantId, tenantName }: ApiProviderConfigPro
         )}
 
         {providers && providers.length > 0 ? (
-          <Table>
+          <PaginatedRecords items={providers}>{pageItems => (<><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Provider</TableHead>
@@ -222,7 +223,7 @@ export function ApiProviderConfig({ tenantId, tenantName }: ApiProviderConfigPro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {providers.map((provider) => (
+              {pageItems.map((provider) => (
                 <TableRow key={provider.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -266,7 +267,7 @@ export function ApiProviderConfig({ tenantId, tenantName }: ApiProviderConfigPro
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></>)}</PaginatedRecords>
         ) : (
           <div className="text-center py-8">
             <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />

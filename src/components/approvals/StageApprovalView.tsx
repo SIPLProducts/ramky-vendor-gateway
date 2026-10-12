@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -264,7 +265,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
 
   const renderTable = (rows: StageApprovalItem[], variant: 'pending' | 'waiting') => (
     <div className="border rounded-md">
-      <Table>
+      <PaginatedRecords items={rows}>{pageItems => (<><Table>
         <TableHeader>
           <TableRow>
             {showBuyerCompanyColumn && <TableHead>Buyer Company</TableHead>}
@@ -301,7 +302,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
                 </TableCell></TableRow>
               );
             }
-            return rows.map((it) => {
+            return pageItems.map((it) => {
               const blocked = variant === 'waiting';
               return (
                 <TableRow key={it.progressId ?? it.vendorId}>
@@ -385,14 +386,14 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             });
           })()}
         </TableBody>
-      </Table>
+      </Table></>)}</PaginatedRecords>
     </div>
   );
 
 
   const renderRejectedTable = (rows: StageApprovalItem[]) => (
     <div className="border rounded-md">
-      <Table>
+      <PaginatedRecords items={rows}>{pageItems => (<><Table>
         <TableHeader>
           <TableRow>
             <TableHead>Vendor</TableHead>
@@ -412,7 +413,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
               No rejected vendors. Items returned by a downstream approver will appear here.
             </TableCell></TableRow>
           ) : (
-            rows.map((it) => (
+            pageItems.map((it) => (
               <TableRow key={it.vendorId}>
                 <TableCell className="font-medium">
                   <div>{formatVendorName(it.vendorName)}</div>
@@ -488,7 +489,7 @@ export function StageApprovalView({ stage, title, subtitle, Icon, extraPanel }: 
             ))
           )}
         </TableBody>
-      </Table>
+      </Table></>)}</PaginatedRecords>
     </div>
   );
 

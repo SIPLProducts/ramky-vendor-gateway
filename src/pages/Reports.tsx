@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
@@ -394,7 +395,7 @@ function AllVendorsTable({ rows, onView }: { rows: VendorReportRow[]; onView: (r
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
-        <Table>
+        <PaginatedRecords items={rows}>{pageItems => (<><Table>
           <TableHeader>
             <TableRow>
               <TableHead>Reference Number</TableHead>
@@ -408,7 +409,7 @@ function AllVendorsTable({ rows, onView }: { rows: VendorReportRow[]; onView: (r
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
+            {pageItems.map((r) => (
               <TableRow key={r.vendor_id}>
                 <TableCell className="font-mono text-xs">{r.reference_number}</TableCell>
                 <TableCell className="font-medium">{r.vendor_name}</TableCell>
@@ -425,7 +426,7 @@ function AllVendorsTable({ rows, onView }: { rows: VendorReportRow[]; onView: (r
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></>)}</PaginatedRecords>
       </CardContent>
     </Card>
   );
@@ -443,7 +444,7 @@ function AllVendorsApprovalMatrix({ rows }: { rows: VendorReportRow[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0 overflow-x-auto">
-        <Table>
+        <PaginatedRecords items={rows}>{pageItems => (<><Table>
           <TableHeader>
             <TableRow>
               <TableHead className="sticky left-0 bg-background z-10">Reference Number</TableHead>
@@ -454,7 +455,7 @@ function AllVendorsApprovalMatrix({ rows }: { rows: VendorReportRow[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
+            {pageItems.map((r) => (
               <TableRow key={r.vendor_id}>
                 <TableCell className="font-mono text-xs sticky left-0 bg-background">{r.reference_number}</TableCell>
                 <TableCell className="text-xs sticky left-[100px] bg-background">{r.vendor_name}</TableCell>
@@ -476,7 +477,7 @@ function AllVendorsApprovalMatrix({ rows }: { rows: VendorReportRow[] }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></>)}</PaginatedRecords>
       </CardContent>
     </Card>
   );

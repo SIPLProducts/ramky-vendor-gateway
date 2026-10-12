@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -127,7 +128,7 @@ export default function CustomRoles() {
         <CardHeader><CardTitle className="text-base">All Custom Roles</CardTitle></CardHeader>
         <CardContent>
           <div className="border rounded-md">
-            <Table>
+            <PaginatedRecords items={roles}>{pageItems => (<><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -147,7 +148,7 @@ export default function CustomRoles() {
                     No custom roles yet. Click "Create Role" to add one.
                   </TableCell></TableRow>
                 ) : (
-                  roles.map((r) => (
+                  pageItems.map((r) => (
                     <TableRow key={r.id}>
                       <TableCell className="font-medium">{r.name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{r.description ?? '—'}</TableCell>
@@ -174,7 +175,7 @@ export default function CustomRoles() {
                   ))
                 )}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
           </div>
         </CardContent>
       </Card>
