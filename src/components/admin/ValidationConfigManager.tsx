@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState, forwardRef } from 'react';
 import { useValidationConfigs, useUpdateValidationConfig, ValidationConfig } from '@/hooks/useValidationOrchestrator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -195,7 +196,7 @@ export const ValidationConfigManager = forwardRef<HTMLDivElement, object>(
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <PaginatedRecords items={configs}>{pageItems => (<><Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">
@@ -211,7 +212,7 @@ export const ValidationConfigManager = forwardRef<HTMLDivElement, object>(
               </TableRow>
             </TableHeader>
             <TableBody>
-              {configs?.map((config) => (
+              {pageItems?.map((config) => (
                 <TableRow 
                   key={config.id}
                   className={cn(
@@ -280,7 +281,7 @@ export const ValidationConfigManager = forwardRef<HTMLDivElement, object>(
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></>)}</PaginatedRecords>
         </CardContent>
       </Card>
 

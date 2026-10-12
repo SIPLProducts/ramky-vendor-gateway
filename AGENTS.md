@@ -14,3 +14,4 @@
 - Clear SAP location at client and single/bulk server payload boundaries without changing registered State, region, address lines, or location classification.
 - Mark DMS synced only after successful transport and explicit all-success SAP message rows; empty responses and missing configuration must fail closed because HTTP acceptance does not prove document creation.
 - Make document downloads in the shared vendor review dialog opt-in per caller, so enabling a specific SAP view does not change other review screens or storage authorization.
+- Paginate record-list rendering through the shared pagination boundary, never the low-level table primitive; retain full filtered arrays for counts, exports, and bulk actions, and leave fixed detail/editing matrices unpaged.

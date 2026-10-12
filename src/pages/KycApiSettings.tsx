@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -275,7 +276,7 @@ export default function KycApiSettings() {
                     No {tab === "OCR" ? "OCR" : "validation"} APIs yet. Use a template above to add one.
                   </div>
                 ) : (
-                  <Table>
+                  <PaginatedRecords items={filtered} resetKey={tab}>{pageItems => (<><Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
@@ -288,7 +289,7 @@ export default function KycApiSettings() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filtered.map((c) => (
+                      {pageItems.map((c) => (
                         <TableRow key={c.id} className="cursor-pointer"
                           onClick={() => navigate(`/admin/kyc-api-settings/${c.id}`)}>
                           <TableCell>
@@ -322,7 +323,7 @@ export default function KycApiSettings() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                  </Table></>)}</PaginatedRecords>
                 )}
               </CardContent>
             </Card>

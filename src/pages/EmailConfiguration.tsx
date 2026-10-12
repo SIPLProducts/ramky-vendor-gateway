@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -519,7 +520,7 @@ export default function EmailConfiguration() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <PaginatedRecords items={data}>{pageItems => (<><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
@@ -538,7 +539,7 @@ export default function EmailConfiguration() {
               ) : data.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No configurations yet. Click "Add Config" to create one.</TableCell></TableRow>
               ) : (
-                data.map((c) => (
+                pageItems.map((c) => (
                   <TableRow key={c.id}>
                     <TableCell className="font-medium">{c.user_email}</TableCell>
                     <TableCell>{c.smtp_host}</TableCell>
@@ -566,7 +567,7 @@ export default function EmailConfiguration() {
                 ))
               )}
             </TableBody>
-          </Table>
+          </Table></>)}</PaginatedRecords>
         </CardContent>
       </Card>
 

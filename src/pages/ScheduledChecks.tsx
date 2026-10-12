@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -326,7 +327,7 @@ export default function ScheduledChecks() {
               </div>
             ) : (
               <div className="space-y-3">
-                {scheduledChecks.map((check) => (
+                {<PaginatedRecords items={scheduledChecks}>{pageItems => (<>{pageItems.map((check) => (
                   <div key={check.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
                       <p className="font-medium capitalize">{check.validation_type.replace(/_/g, ' ')}</p>
@@ -338,7 +339,7 @@ export default function ScheduledChecks() {
                       {check.is_active ? 'Active' : 'Paused'}
                     </Badge>
                   </div>
-                ))}
+                ))}</>)}</PaginatedRecords>}
               </div>
             )}
           </CardContent>
@@ -357,7 +358,7 @@ export default function ScheduledChecks() {
           {!auditLogs?.length ? (
             <p className="text-center py-8 text-muted-foreground">No check history available</p>
           ) : (
-            <Table>
+            <PaginatedRecords items={auditLogs}>{pageItems => (<><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Action</TableHead>
@@ -367,7 +368,7 @@ export default function ScheduledChecks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {auditLogs.map((log) => {
+                {pageItems.map((log) => {
                   const details = log.details as any;
                   return (
                     <TableRow key={log.id}>
@@ -408,7 +409,7 @@ export default function ScheduledChecks() {
                   );
                 })}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
           )}
         </CardContent>
       </Card>

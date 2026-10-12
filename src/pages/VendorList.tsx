@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { paginateItems } from '@/lib/pagination';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -222,8 +223,10 @@ export default function VendorList() {
 
   // Pagination
   const totalItems = filteredVendors.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const paginatedVendors = filteredVendors.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const { totalPages, currentPage: safePage, items: paginatedVendors } = paginateItems(filteredVendors, pageSize, currentPage);
+  useEffect(() => {
+    if (safePage !== currentPage) setCurrentPage(safePage);
+  }, [safePage, currentPage]);
 
   // Reset to page 1 when filters change
   const handleSearchChange = (value: string) => {
@@ -568,7 +571,7 @@ export default function VendorList() {
               </div>
 
               <DataTablePagination
-                currentPage={currentPage}
+                currentPage={safePage}
                 totalPages={totalPages}
                 pageSize={pageSize}
                 totalItems={totalItems}

@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDate } from '@/lib/dateFormat';
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -90,7 +91,7 @@ export function TenantManager() {
         </CardHeader>
         <CardContent>
           {tenants && tenants.length > 0 ? (
-            <Table>
+            <PaginatedRecords items={tenants}>{pageItems => (<><Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Company Name</TableHead>
@@ -101,7 +102,7 @@ export function TenantManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tenants.map((tenant) => (
+                {pageItems.map((tenant) => (
                   <TableRow key={tenant.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -142,7 +143,7 @@ export function TenantManager() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
           ) : (
             <div className="text-center py-12">
               <Building2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />

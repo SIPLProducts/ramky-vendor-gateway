@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Add shared, accessible pagination and boundary tests; five tests and 15 assertions passed.
+- [x] Apply independent pagination to growing Dashboard, users/login history/roles, reports, SAP/DMS/closed records, scheduled checks, verification vendors, stage approvals, API logs/providers, buyer mappings, tenants, SAP master/config, and email lists. Preserve full arrays for exports/selections; clamp existing Vendor List, Invitations, Audit Logs, and GST pagers. Fixed detail/editing matrices and selection popovers remain unpaged.
+- [x] Verify signed-in navigation/page sizes on populated Users, Vendor List, Audit Logs, Invitations, and GST; verify user search empty/reset flow and report/SAP/scheduled controls. Build OK. Some approval/admin lists have insufficient records or lack account access for populated navigation checks; self-hosted deployment not performed.
+
 - [x] Display Dashboard Status as Role (Person Name) and enable document downloads beside View in SAP Duplicate & Closed details only; build OK and diff check passed. Live populated-screen/download verification blocked by the requesting account being redirected to registration with Access Denied.
 
 - [x] Place dashboard responsible names above role/status badges, preserving nowrap and compact spacing; build OK. Populated UI verification blocked because the requesting account is redirected away from Dashboard.

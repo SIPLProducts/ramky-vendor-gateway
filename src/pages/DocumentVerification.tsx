@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState } from 'react';
 import { formatDate } from '@/lib/dateFormat';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -583,7 +584,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
               {vendors?.length || 0} vendors pending verification
             </CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[500px] overflow-auto">
+          <CardContent>
             {isLoadingVendors ? (
               <div className="text-center py-8">
                 <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
@@ -592,7 +593,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
               <p className="text-center py-8 text-muted-foreground">No submitted vendors pending verification</p>
             ) : (
               <div className="space-y-2">
-                {vendors?.map((vendor) => (
+                <PaginatedRecords items={vendors}>{pageItems => (<div className="max-h-[500px] overflow-auto space-y-2">{pageItems.map((vendor) => (
                   <div
                     key={vendor.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -640,7 +641,7 @@ ${additionalComments ? `Additional Comments:\n${additionalComments}` : ''}
                       </div>
                     </div>
                   </div>
-                ))}
+                ))}</div>)}</PaginatedRecords>
               </div>
             )}
           </CardContent>

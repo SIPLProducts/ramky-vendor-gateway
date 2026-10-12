@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { forwardRef } from 'react';
 import { useValidationApiLogs, ValidationApiLog } from '@/hooks/useValidationOrchestrator';
@@ -64,8 +65,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
         </Button>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
-          <Table>
+        <PaginatedRecords items={logs} resetKey={vendorId ?? ''}>{pageItems => (<><ScrollArea className="h-[400px]"><Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Timestamp</TableHead>
@@ -77,7 +77,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs?.map((log) => (
+              {pageItems?.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell className="font-mono text-xs">
                     {formatDateTime(log.created_at)}
@@ -125,8 +125,7 @@ export const ValidationApiLogs = forwardRef<HTMLDivElement, ValidationApiLogsPro
                 </TableRow>
               )}
             </TableBody>
-          </Table>
-        </ScrollArea>
+          </Table></ScrollArea></>)}</PaginatedRecords>
       </CardContent>
     </Card>
   );

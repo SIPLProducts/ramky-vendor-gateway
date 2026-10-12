@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -598,7 +599,7 @@ export default function SAPSync() {
                 <p className="text-muted-foreground mt-2">All approved vendors have been synced.</p>
               </CardContent></Card>
             ) : (
-              filteredSap.map((vendor) => (
+              <PaginatedRecords items={filteredSap} resetKey={JSON.stringify([searchTerm, buyerCompanyFilter])}>{pageItems => (<>{pageItems.map((vendor) => (
                 <Card key={vendor.id} className={`border-0 shadow-md card-interactive ${selectedSapIds.has(vendor.id) ? 'ring-2 ring-blue-500' : ''}`}>
                   <CardContent className="p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -676,7 +677,7 @@ export default function SAPSync() {
                     </div>
                   </CardContent>
                 </Card>
-              ))
+              ))}</>)}</PaginatedRecords>
             )}
           </div>
         </TabsContent>
@@ -711,8 +712,7 @@ export default function SAPSync() {
                   <p className="text-muted-foreground mt-1 text-sm">Vendors synced to SAP will appear here.</p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-[600px]">
-                  <Table>
+                <PaginatedRecords items={filteredDms} resetKey={JSON.stringify([searchTerm, buyerCompanyFilter])}>{pageItems => (<><ScrollArea className="max-h-[600px]"><Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12"></TableHead>
@@ -724,7 +724,7 @@ export default function SAPSync() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredDms.map((v) => {
+                      {pageItems.map((v) => {
                         const refNo = (v as any).sap_reference_no || v.id.slice(0, 8).toUpperCase();
                         const sapCode = (v as any).sap_vendor_code || '—';
                         const isSynced = v.status === 'dms_synced';
@@ -776,8 +776,7 @@ export default function SAPSync() {
                         );
                       })}
                     </TableBody>
-                  </Table>
-                </ScrollArea>
+                  </Table></ScrollArea></>)}</PaginatedRecords>
               )}
             </CardContent>
           </Card>
@@ -799,7 +798,7 @@ export default function SAPSync() {
                 <p className="text-muted-foreground mt-2">Vendors closed as duplicates (already in SAP) will appear here.</p>
               </CardContent></Card>
             ) : (
-              filteredRejected.map((vendor) => {
+              <PaginatedRecords items={filteredRejected} resetKey={JSON.stringify([searchTerm, buyerCompanyFilter])}>{pageItems => (<>{pageItems.map((vendor) => {
                 const remarks = (vendor as any).last_rejection_comments as string | null;
                 const rejectedAt = (vendor as any).last_rejected_at as string | null;
                 const refNo = (vendor as any).reference_number || vendor.id.slice(0, 8).toUpperCase();
@@ -894,7 +893,7 @@ export default function SAPSync() {
                     </CardContent>
                   </Card>
                 );
-              })
+              })}</>)}</PaginatedRecords>
             )}
           </div>
         </TabsContent>

@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -461,7 +462,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="px-2 pb-3 sm:px-3 sm:pb-4">
           <div className="overflow-hidden rounded-md border">
-            <Table className="[&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:text-[13px]">
+            <PaginatedRecords items={filteredVendors} resetKey={JSON.stringify([tableSearch, statusFilter, dateFrom, dateTo, tenantIds, vendorIds])}>{pageItems => (<><Table className="[&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>
@@ -491,7 +492,7 @@ export default function Dashboard() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredVendors.map((v) => (
+                  pageItems.map((v) => (
                     <TableRow key={v.id}>
                       <TableCell className="font-mono text-[13px] font-semibold text-foreground">
                         <Link to={`/vendors/${v.id}`} className="hover:text-primary transition-colors">
@@ -545,7 +546,7 @@ export default function Dashboard() {
                   ))
                 )}
               </TableBody>
-            </Table>
+            </Table></>)}</PaginatedRecords>
           </div>
         </CardContent>
       </Card>

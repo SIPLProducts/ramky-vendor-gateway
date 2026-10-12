@@ -1,3 +1,4 @@
+import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -157,7 +158,7 @@ export default function SapApiSettings() {
                   No API configurations yet. Click <strong>Add API Configuration</strong> to create one.
                 </div>
               ) : (
-                <Table>
+                <PaginatedRecords items={configs}>{pageItems => (<><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -169,7 +170,7 @@ export default function SapApiSettings() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {configs.map((c) => (
+                    {pageItems.map((c) => (
                       <TableRow key={c.id} className="cursor-pointer" onClick={() => navigate(`/sap/api-settings/${c.id}`)}>
                         <TableCell>
                           <div className="font-semibold">{c.name}</div>
@@ -203,7 +204,7 @@ export default function SapApiSettings() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></>)}</PaginatedRecords>
               )}
             </CardContent>
           </Card>
