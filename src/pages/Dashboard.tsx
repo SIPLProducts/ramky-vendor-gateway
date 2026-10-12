@@ -429,7 +429,7 @@ export default function Dashboard() {
       </section>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 p-3 sm:p-4">
           <div className="flex items-center gap-3 min-w-0">
             <CardTitle className="text-base whitespace-nowrap">Vendor Applications</CardTitle>
             {statusFilter !== 'all' && (
@@ -448,16 +448,15 @@ export default function Dashboard() {
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-2 pb-3 sm:px-3 sm:pb-4">
           <div className="overflow-hidden rounded-md border">
-            <Table>
+            <Table className="[&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>
                   <TableHead>SAP Vendor Code</TableHead>
                   <TableHead>Invited By</TableHead>
                   <TableHead>Vendor Name</TableHead>
-                  <TableHead>Vendor Email</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created Date</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
@@ -467,7 +466,7 @@ export default function Dashboard() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <TableCell key={j}>
                           <Skeleton className="h-4 w-full" />
                         </TableCell>
@@ -476,7 +475,7 @@ export default function Dashboard() {
                   ))
                 ) : filteredVendors.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       {statusFilter === 'all' ? 'No vendor applications in this date range.' : 'No vendor applications match this filter.'}
                     </TableCell>
                   </TableRow>
@@ -493,7 +492,7 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>
                         {v.invited_by ? (
-                          <div className="text-sm">
+                          <div className="text-[13px] whitespace-nowrap">
                             <div className="font-medium">{v.invited_by.name ?? '—'}</div>
                           </div>
                         ) : (
@@ -501,22 +500,22 @@ export default function Dashboard() {
                         )}
                       </TableCell>
                       <TableCell>{formatVendorName(v) || '—'}</TableCell>
-                      <TableCell>{v.display_email ?? '—'}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col items-start gap-1.5">
+                        <div className="flex flex-col items-start gap-1">
                           {statusBadge(v.status)}
                           {['submitted', 'validation_pending', 'buyer_review', 'returned_to_buyer', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review', 'pending_sap_sync', 'dms_sync_pending'].includes(v.status) && (
-                            <span className="text-xs text-muted-foreground break-words max-w-64">{v.current_approver || 'Not assigned'}</span>
+                            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{v.current_approver || 'Not assigned'}</span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
                       <TableCell>
-                        <div className="flex justify-center gap-2">
+                        <div className="flex justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             title="View"
+                             className="h-8 w-8 p-0"
                             onClick={() => setViewVendorId(v.id)}
                           >
                             <Eye className="h-4 w-4" />
@@ -525,6 +524,7 @@ export default function Dashboard() {
                             variant="ghost"
                             size="sm"
                             title="Comments"
+                             className="h-8 w-8 p-0"
                             onClick={() => setCommentsVendor({
                               id: v.id,
                               name: pickVendorDisplayName(v) || v.legal_name || '',
