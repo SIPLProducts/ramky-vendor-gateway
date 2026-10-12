@@ -927,11 +927,18 @@ export function DocumentVerificationStep({
         // cross-checking against GST Legal Name, so OCR reading errors don't
         // create false mismatches.
         const panNameForMatch = apiName || ocrName;
-        if (panNameForMatch && gstLegal && nameMatchPercentage(panNameForMatch, gstLegal) < 40) {
-          return {
-            ok: false as const,
-            message: "PAN Holder Name does not match GST Legal Name.",
-          };
+        // Tiered match: >=20% passes; 10-19% passes only when the PAN
+        // embedded in the GSTIN equals the provided PAN; otherwise invalid.
+        if (panNameForMatch && gstLegal) {
+          const nameScore = nameMatchPercentage(panNameForMatch, gstLegal);
+          const panLinkedToGst = panFromGst.length === 10 && panFromGst === ocrPan;
+          const namePasses = nameScore >= 20 || (nameScore >= 10 && panLinkedToGst);
+          if (!namePasses) {
+            return {
+              ok: false as const,
+              message: "PAN Holder Name does not match GST Legal Name.",
+            };
+          }
         }
         const holderName = panNameForMatch || gstLegal;
         const normalized: Record<string, any> = {
