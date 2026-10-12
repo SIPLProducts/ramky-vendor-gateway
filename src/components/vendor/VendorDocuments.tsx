@@ -262,6 +262,8 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                     variant="ghost"
                     size="sm"
                     onClick={() => handlePreview(doc)}
+                     aria-label={`View ${doc.file_name}`}
+                     title="View"
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -270,6 +272,8 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDownload(doc)}
+                       aria-label={`Download ${doc.file_name}`}
+                       title="Download"
                     >
                       <Download className="h-4 w-4" />
                     </Button>

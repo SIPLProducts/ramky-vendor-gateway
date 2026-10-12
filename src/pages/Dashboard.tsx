@@ -102,9 +102,20 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   sap_team_closed: { label: 'Duplicate & Closed', variant: 'destructive' },
 };
 
-function statusBadge(status: string) {
+function statusBadge(status: string, approver?: string | null) {
   const cfg = STATUS_LABELS[status] ?? { label: status, variant: 'outline' as const };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  const roles: Record<string, string> = {
+    buyer_review: 'Buyer',
+    scm_manager_review: 'SCM CO',
+    scm_head_review: 'SCM Head',
+    finance_1_review: 'Finance 1',
+    finance_2_review: 'Finance 2',
+    ceo_office_review: 'CEO Office',
+    pending_sap_sync: 'SAP Team',
+    dms_sync_pending: 'SAP Team',
+  };
+  const label = approver ? `${roles[status] ?? cfg.label} (${approver})` : cfg.label;
+  return <Badge variant={cfg.variant} className="whitespace-nowrap">{label}</Badge>;
 }
 
 const displayDate = (d: Date | null) => (d ? format(d, 'dd-MM-yyyy') : '');
@@ -501,12 +512,7 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>{formatVendorName(v) || '—'}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col items-start gap-1">
-                          {['submitted', 'validation_pending', 'buyer_review', 'returned_to_buyer', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review', 'pending_sap_sync', 'dms_sync_pending'].includes(v.status) && (
-                            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{v.current_approver || 'Not assigned'}</span>
-                          )}
-                          {statusBadge(v.status)}
-                        </div>
+                        {statusBadge(v.status, ['submitted', 'validation_pending', 'buyer_review', 'returned_to_buyer', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review', 'pending_sap_sync', 'dms_sync_pending'].includes(v.status) ? v.current_approver || 'Not assigned' : null)}
                       </TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
                       <TableCell>
