@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Add shared, accessible pagination and boundary tests.
+- [ ] Apply pagination to every growing portal record list; preserve existing pagers, exports, filters, and selections.
+- [ ] Verify coverage, populated navigation, and compile diagnostics; document inaccessible screens.
+
 - [x] Display Dashboard Status as Role (Person Name) and enable document downloads beside View in SAP Duplicate & Closed details only; build OK and diff check passed. Live populated-screen/download verification blocked by the requesting account being redirected to registration with Access Denied.
 
 - [x] Place dashboard responsible names above role/status badges, preserving nowrap and compact spacing; build OK. Populated UI verification blocked because the requesting account is redirected away from Dashboard.
