@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Display Dashboard Status as Role (Person Name) and enable document downloads beside View in SAP Duplicate & Closed details only.
+- [x] Display Dashboard Status as Role (Person Name) and enable document downloads beside View in SAP Duplicate & Closed details only; build OK and diff check passed. Live populated-screen/download verification blocked by the requesting account being redirected to registration with Access Denied.
 
 - [x] Place dashboard responsible names above role/status badges, preserving nowrap and compact spacing; build OK. Populated UI verification blocked because the requesting account is redirected away from Dashboard.
 
