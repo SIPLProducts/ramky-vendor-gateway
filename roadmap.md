@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Place dashboard responsible names above role/status badges, preserving nowrap and compact spacing; build OK. Populated UI verification blocked because the requesting account is redirected away from Dashboard.
+
 - [x] Compact dashboard table: removed visible Vendor Email, kept names unwrapped beneath role/status, and verified 22 signed-in applications at 1180px with horizontal scrolling for overflow; build OK.
 
 - [x] Display responsible names for all dashboard approval stages and eligible SAP Team members, with clear missing-assignment/lookup messages; deployed and verified signed-in lookup, SCM name, skipped-stage and missing-assignment labels.
