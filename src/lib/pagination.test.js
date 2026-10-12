@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, paginateItems, paginationWindow } from './pagination';
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, paginateItems, paginationWindow } from './pagination.ts';
 
 describe('record pagination', () => {
   test('defaults to ten records and supports the approved page sizes', () => {
