@@ -15,3 +15,4 @@
 - Mark DMS synced only after successful transport and explicit all-success SAP message rows; empty responses and missing configuration must fail closed because HTTP acceptance does not prove document creation.
 - Make document downloads in the shared vendor review dialog opt-in per caller, so enabling a specific SAP view does not change other review screens or storage authorization.
 - Paginate record-list rendering through the shared pagination boundary, never the low-level table primitive; retain full filtered arrays for counts, exports, and bulk actions, and leave fixed detail/editing matrices unpaged.
+- Keep document image orientation inside a source-keyed preview component and fit rotated natural dimensions to its viewport; this resets viewing state without rewriting stored files or changing download authorization.

@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Add 90° image preview rotation and verify orientation/reset/framing without modifying saved files.
+
 - [x] Add shared, accessible pagination and boundary tests; five tests and 15 assertions passed.
 - [x] Apply independent pagination to growing Dashboard, users/login history/roles, reports, SAP/DMS/closed records, scheduled checks, verification vendors, stage approvals, API logs/providers, buyer mappings, tenants, SAP master/config, and email lists. Preserve full arrays for exports/selections; clamp existing Vendor List, Invitations, Audit Logs, and GST pagers. Fixed detail/editing matrices and selection popovers remain unpaged.
 - [x] Verify signed-in navigation/page sizes on populated Users, Vendor List, Audit Logs, Invitations, and GST; verify user search empty/reset flow and report/SAP/scheduled controls. Build OK. Some approval/admin lists have insufficient records or lack account access for populated navigation checks; self-hosted deployment not performed.

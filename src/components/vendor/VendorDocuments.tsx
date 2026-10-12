@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { PdfPreview } from '@/components/vendor/PdfPreview';
+import { ImagePreview } from '@/components/vendor/ImagePreview';
 
 interface VendorDocument {
   id: string;
@@ -297,20 +298,16 @@ export function VendorDocuments({ vendorId, hideDownload = false }: VendorDocume
       }}>
 
         {previewDoc && previewUrl ? (
-          <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogContent className="max-w-4xl max-h-[90vh] min-w-0">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+              <DialogTitle className="flex min-w-0 items-center gap-2 pr-6">
                 {getFileIcon(previewDoc.mime_type)}
-                {previewDoc.file_name}
+                <span className="min-w-0 break-all">{previewDoc.file_name}</span>
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-hidden">
               {previewDoc.mime_type?.startsWith('image/') ? (
-                <img
-                  src={previewUrl}
-                  alt={previewDoc.file_name}
-                  className="max-w-full max-h-[70vh] mx-auto rounded-md"
-                />
+                <ImagePreview src={previewUrl} alt={previewDoc.file_name} />
               ) : previewDoc.mime_type === 'application/pdf' ? (
                 <PdfPreview blob={previewBlob} url={previewUrl} />
               ) : (
