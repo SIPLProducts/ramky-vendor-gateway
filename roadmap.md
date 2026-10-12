@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Add 90° image preview rotation and verify orientation/reset/framing without modifying saved files.
+- [x] Add 90° clockwise image preview rotation without modifying saved files; verified all four orientations, full-image framing, and close/reopen reset on an authenticated saved vendor image. Eight combined tests passed; build OK. PDFs and download permissions unchanged.
 
 - [x] Add shared, accessible pagination and boundary tests; five tests and 15 assertions passed.
 - [x] Apply independent pagination to growing Dashboard, users/login history/roles, reports, SAP/DMS/closed records, scheduled checks, verification vendors, stage approvals, API logs/providers, buyer mappings, tenants, SAP master/config, and email lists. Preserve full arrays for exports/selections; clamp existing Vendor List, Invitations, Audit Logs, and GST pagers. Fixed detail/editing matrices and selection popovers remain unpaged.
