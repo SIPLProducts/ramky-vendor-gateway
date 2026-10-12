@@ -596,7 +596,7 @@ export default function UserManagement() {
               </div>
 
               <div className="border rounded-md">
-                <PaginatedRecords items={filtered}>{pageItems => (<><Table>
+                <PaginatedRecords items={filtered} resetKey={JSON.stringify([search, roleFilter, scopeTenantId])}>{pageItems => (<><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>

@@ -462,7 +462,7 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent className="px-2 pb-3 sm:px-3 sm:pb-4">
           <div className="overflow-hidden rounded-md border">
-            <PaginatedRecords items={filteredVendors} resetKey={JSON.stringify([tableSearch, statusFilter, dateFrom, dateTo, activeTenantIds])}>{pageItems => (<><Table className="[&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:text-[13px]">
+            <PaginatedRecords items={filteredVendors} resetKey={JSON.stringify([tableSearch, statusFilter, dateFrom, dateTo, tenantIds, vendorIds])}>{pageItems => (<><Table className="[&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:whitespace-nowrap [&_td]:text-[13px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference Number</TableHead>

@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { PAGE_SIZE_OPTIONS, paginationWindow } from '@/lib/pagination';
 
 interface DataTablePaginationProps {
   currentPage: number;
@@ -25,14 +26,13 @@ export function DataTablePagination({
   totalItems,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 20, 30, 50],
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
 }: DataTablePaginationProps) {
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endItem = Math.min(currentPage * pageSize, totalItems);
+  const { startItem, endItem } = paginationWindow(totalItems, pageSize, currentPage);
 
   return (
-    <div className="flex items-center justify-between px-2 py-4">
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-4" role="navigation" aria-label="Table pagination">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>
           Showing {startItem} to {endItem} of {totalItems} results
         </span>
@@ -43,7 +43,7 @@ export function DataTablePagination({
               value={String(pageSize)}
               onValueChange={(value) => onPageSizeChange(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-8 w-[70px]" aria-label="Rows per page">
                 <SelectValue placeholder={pageSize} />
               </SelectTrigger>
               <SelectContent side="top">
@@ -63,8 +63,10 @@ export function DataTablePagination({
           variant="outline"
           size="icon"
           className="h-8 w-8"
+          aria-label="First page"
+          title="First page"
           onClick={() => onPageChange(1)}
-          disabled={currentPage === 1}
+          disabled={currentPage <= 1 || totalItems === 0}
         >
           <ChevronsLeft className="h-4 w-4" />
         </Button>
@@ -72,8 +74,10 @@ export function DataTablePagination({
           variant="outline"
           size="icon"
           className="h-8 w-8"
+          aria-label="Previous page"
+          title="Previous page"
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
+          disabled={currentPage <= 1 || totalItems === 0}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -88,6 +92,9 @@ export function DataTablePagination({
                 variant={currentPage === page ? 'default' : 'outline'}
                 size="icon"
                 className="h-8 w-8"
+                aria-label={`Page ${page}`}
+                aria-current={currentPage === page ? 'page' : undefined}
+                disabled={totalItems === 0}
                 onClick={() => onPageChange(page as number)}
               >
                 {page}
@@ -100,8 +107,10 @@ export function DataTablePagination({
           variant="outline"
           size="icon"
           className="h-8 w-8"
+          aria-label="Next page"
+          title="Next page"
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || totalPages === 0}
+          disabled={currentPage >= totalPages || totalItems === 0}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -109,8 +118,10 @@ export function DataTablePagination({
           variant="outline"
           size="icon"
           className="h-8 w-8"
+          aria-label="Last page"
+          title="Last page"
           onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages || totalPages === 0}
+          disabled={currentPage >= totalPages || totalItems === 0}
         >
           <ChevronsRight className="h-4 w-4" />
         </Button>

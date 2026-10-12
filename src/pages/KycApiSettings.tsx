@@ -276,7 +276,7 @@ export default function KycApiSettings() {
                     No {tab === "OCR" ? "OCR" : "validation"} APIs yet. Use a template above to add one.
                   </div>
                 ) : (
-                  <PaginatedRecords items={filtered}>{pageItems => (<><Table>
+                  <PaginatedRecords items={filtered} resetKey={tab}>{pageItems => (<><Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
