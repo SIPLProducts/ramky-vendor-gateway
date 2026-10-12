@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] Compact dashboard table: remove visible Vendor Email, keep names unwrapped beneath role/status, and verify tighter spacing.
+- [x] Compact dashboard table: removed visible Vendor Email, kept names unwrapped beneath role/status, and verified 22 signed-in applications at 1180px with horizontal scrolling for overflow; build OK.
 
 - [x] Display responsible names for all dashboard approval stages and eligible SAP Team members, with clear missing-assignment/lookup messages; deployed and verified signed-in lookup, SCM name, skipped-stage and missing-assignment labels.
 
