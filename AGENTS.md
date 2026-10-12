@@ -13,3 +13,4 @@
 - Use the saved application reference_number in rejection notifications and check vendor lookup errors; never substitute internal IDs or SAP codes because they identify different records.
 - Clear SAP location at client and single/bulk server payload boundaries without changing registered State, region, address lines, or location classification.
 - Mark DMS synced only after successful transport and explicit all-success SAP message rows; empty responses and missing configuration must fail closed because HTTP acceptance does not prove document creation.
+- Make document downloads in the shared vendor review dialog opt-in per caller, so enabling a specific SAP view does not change other review screens or storage authorization.

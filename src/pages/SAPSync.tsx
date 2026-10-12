@@ -1011,6 +1011,7 @@ export default function SAPSync() {
         vendorId={selectedVendor?.id ?? null}
         open={showDetails}
         onOpenChange={setShowDetails}
+        allowDocumentDownload={!!selectedVendor && ['sap_team_rejected', 'sap_team_closed'].includes(selectedVendor.status)}
       />
 
       <VendorSubmissionPreviewDialog

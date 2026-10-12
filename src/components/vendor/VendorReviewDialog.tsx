@@ -137,6 +137,8 @@ interface VendorReviewDialogProps {
   footerExtra?: ReactNode;
   /** Override the dialog subtitle. Defaults to "Review vendor details". */
   description?: string;
+  /** Opt-in document downloads; other review screens keep their existing controls. */
+  allowDocumentDownload?: boolean;
 }
 
 const getValidationsFromVendor = (v: any): ValidationResult[] => {
@@ -187,6 +189,7 @@ export function VendorReviewDialog({
   onOpenChange,
   footerExtra,
   description = 'Review vendor details',
+  allowDocumentDownload = false,
 }: VendorReviewDialogProps) {
   const [vendor, setVendor] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -723,7 +726,7 @@ export function VendorReviewDialog({
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4 flex-1 overflow-auto">
-              <VendorDocuments vendorId={vendor.id} hideDownload />
+              <VendorDocuments vendorId={vendor.id} hideDownload={!allowDocumentDownload} />
             </TabsContent>
 
 

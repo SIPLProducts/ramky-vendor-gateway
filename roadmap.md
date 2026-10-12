@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] Display Dashboard Status as Role (Person Name) and enable document downloads beside View in SAP Duplicate & Closed details only.
+
 - [x] Place dashboard responsible names above role/status badges, preserving nowrap and compact spacing; build OK. Populated UI verification blocked because the requesting account is redirected away from Dashboard.
 
 - [x] Compact dashboard table: removed visible Vendor Email, kept names unwrapped beneath role/status, and verified 22 signed-in applications at 1180px with horizontal scrolling for overflow; build OK.
