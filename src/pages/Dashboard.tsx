@@ -502,10 +502,10 @@ export default function Dashboard() {
                       <TableCell>{formatVendorName(v) || '—'}</TableCell>
                       <TableCell>
                         <div className="flex flex-col items-start gap-1">
-                          {statusBadge(v.status)}
                           {['submitted', 'validation_pending', 'buyer_review', 'returned_to_buyer', 'scm_manager_review', 'scm_head_review', 'finance_1_review', 'finance_2_review', 'ceo_office_review', 'pending_sap_sync', 'dms_sync_pending'].includes(v.status) && (
                             <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">{v.current_approver || 'Not assigned'}</span>
                           )}
+                          {statusBadge(v.status)}
                         </div>
                       </TableCell>
                       <TableCell>{formatDateTime(v.created_at)}</TableCell>
