@@ -377,12 +377,19 @@ export default function VendorRegistration() {
   useEffect(() => {
     let sawInitial = false;
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      // Skip the first INITIAL_SESSION event — it fires during hydration and
-      // can race the magic-link sign-in, causing a false "Session expired".
+      // Skip the first auth event entirely — during the invite handoff the
+      // invite page's local sign-out can deliver SIGNED_OUT before
+      // INITIAL_SESSION, which previously caused a false "Session expired"
+      // redirect loop (especially in Incognito where the sessionStorage
+      // handoff flag is not shared).
       if (!sawInitial) { sawInitial = true; return; }
       // Only react to an explicit sign-out. A TOKEN_REFRESHED with no session
       // is a transient state during hydration, not a real logout.
       if (event !== 'SIGNED_OUT') return;
+      // While the invitation token is still being validated, ignore sign-out
+      // events — validateToken() performs its own session check and redirects
+      // only if no session is actually available.
+      if (isValidatingTokenRef.current) return;
       const tokenParam = invitationToken || searchParams.get('token');
       let isFreshInviteHandoff = false;
       try {
