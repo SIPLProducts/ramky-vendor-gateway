@@ -382,7 +382,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   const KYC_COLUMNS: Record<KycSection, Set<string>> = {
     gst: new Set(['is_gst_registered', 'gstin', 'gst_declaration_reason', 'gst_constitution_of_business', 'gst_principal_place_of_business', 'gst_additional_places', 'gst_registration_date', 'gst_status', 'gst_taxpayer_type', 'gst_business_nature', 'gst_jurisdiction_centre', 'gst_jurisdiction_state', 'gst_verification_status']),
     pan: new Set(['pan', 'pan_holder_name', 'pan_status', 'pan_aadhaar_linked', 'pan_comprehensive_verified_at', 'pan_verification_status']),
-    msme: new Set(['is_msme_registered', 'msme_number', 'msme_category', 'msme_enterprise_name', 'msme_major_activity', 'msme_verification_status']),
+    msme: new Set(['is_msme_registered', 'msme_number', 'msme_category', 'msme_enterprise_name', 'msme_major_activity', 'msme_classification_year', 'msme_verification_status']),
     bank: new Set(['bank_name', 'bank_branch_name', 'account_number', 'account_type', 'ifsc_code', 'micr_code', 'bank_address', 'account_holder_name', 'bank_name_2', 'branch_name_2', 'account_number_2', 'ifsc_code_2', 'account_holder_name_2', 'account_type_2', 'bank_address_2', 'micr_2', 'bank_verification_status']),
   };
 
@@ -400,7 +400,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
     },
     msme: {
       msme_number: null, msme_category: null, msme_enterprise_name: null,
-      msme_major_activity: null, msme_verification_status: 'failed',
+      msme_major_activity: null, msme_classification_year: null, msme_verification_status: 'failed',
     },
     bank: {
       bank_name: '', bank_branch_name: '', account_number: '', ifsc_code: '', micr_code: null,
@@ -663,6 +663,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       msme_category: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeCategory || null) : null,
       msme_enterprise_name: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeEnterpriseName || null) : null,
       msme_major_activity: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeMajorActivity || null) : null,
+      msme_classification_year: formData.statutory.isMsmeRegistered ? (formData.statutory.msmeClassificationYear || null) : null,
       labour_permit_no: formData.statutory.labourPermitNo || null,
       iec_no: formData.statutory.iecNo || null,
       swift_iban_code: formData.statutory.swiftIbanCode || null,
@@ -854,6 +855,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         msmeCategory: (vendor.msme_category as 'micro' | 'small' | 'medium' | '') || '',
         msmeEnterpriseName: (vendor as VendorRecord & { msme_enterprise_name?: string }).msme_enterprise_name || '',
         msmeMajorActivity: (vendor as VendorRecord & { msme_major_activity?: string }).msme_major_activity || '',
+        msmeClassificationYear: (vendor as VendorRecord & { msme_classification_year?: string }).msme_classification_year || '',
         labourPermitNo: vendor.labour_permit_no || '',
         iecNo: vendor.iec_no || '',
         swiftIbanCode: (vendor as VendorRecord & { swift_iban_code?: string }).swift_iban_code || '',

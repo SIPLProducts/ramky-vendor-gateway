@@ -566,6 +566,7 @@ export function VendorReviewDialog({
                             <div className="space-y-1"><Label text="MSME Number" ok={msmeOk} /><p className="font-mono font-medium">{v.msme_number || '-'}</p></div>
                             <div className="space-y-1"><Label text="MSME Category" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_category || '-'}</p></div>
                             <div className="space-y-1"><Label text="MSME Major Activity" ok={msmeOk} /><p className="font-medium capitalize">{v.msme_major_activity || '-'}</p></div>
+                            <div className="space-y-1"><Label text="Classification Year" ok={msmeOk} /><p className="font-medium">{v.msme_classification_year || '-'}</p></div>
                           </div>
                         </div>
                       </SectionCard>
