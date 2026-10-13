@@ -130,7 +130,9 @@ export default function VendorInviteAccept() {
           }
 
           if (status === 'signin_ready' && d.token_hash) {
-            try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* ignore */ }
+            // No sign-out here: the session was already cleared before the claim,
+            // and a second sign-out emits a late SIGNED_OUT event that the
+            // registration page used to treat as "Session expired" (redirect loop).
             const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
               token_hash: d.token_hash,
               type: (d.otp_type || 'magiclink') as any,
