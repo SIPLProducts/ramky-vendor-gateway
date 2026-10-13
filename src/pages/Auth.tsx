@@ -90,21 +90,13 @@ export default function Auth() {
       </div>
 
       {/* Left Panel — Branding */}
-      <div className="relative hidden md:flex md:w-[58%] lg:w-[60%] flex-col justify-center gap-8 px-10 lg:px-16 py-12 bg-gradient-to-br from-muted/60 to-background overflow-hidden">
+      <div className="relative hidden md:flex md:w-[58%] lg:w-[60%] items-center justify-center bg-white overflow-hidden">
         <img
           src={ramkyGroupOverview}
           alt="Ramky Group — Towards sustainable growth"
-          className="w-full max-w-2xl mx-auto object-contain max-h-[55vh]"
+          className="absolute inset-0 h-full w-full object-contain"
         />
-
-        <div className="relative z-10 max-w-md mx-auto">
-          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-foreground mb-5">
-            Building Tomorrow's<br />Infrastructure Today
-          </h2>
-          <p className="text-base text-muted-foreground max-w-sm">
-            Join our network of trusted vendors and partners. Streamline your onboarding process with our secure, efficient portal.
-          </p>
-        </div>
+      </div>
       </div>
 
 
