@@ -394,23 +394,26 @@ export default function VendorRegistration() {
       // events — validateToken() performs its own session check and redirects
       // only if no session is actually available.
       if (isValidatingTokenRef.current) return;
+      // A SIGNED_OUT event can arrive late from the invite handoff even though
+      // a fresh valid session already exists. Confirm the session is really
+      // gone before redirecting, otherwise we bounce back to /vendor/invite
+      // and loop forever.
       const tokenParam = invitationToken || searchParams.get('token');
-      let isFreshInviteHandoff = false;
-      try {
-        isFreshInviteHandoff = !!tokenParam && window.sessionStorage.getItem('vendorInviteJustSignedIn') === tokenParam;
-      } catch { /* ignore */ }
-      if (!isFreshInviteHandoff) {
+      void (async () => {
+        await new Promise((r) => setTimeout(r, 1500));
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.access_token) return;
         toast({
           title: 'Session expired',
           description: 'Please reopen the invitation link to continue your registration.',
           variant: 'destructive',
         });
-      }
-      if (tokenParam) {
-        navigate(`/vendor/invite?token=${tokenParam}`);
-      } else {
-        navigate('/auth');
-      }
+        if (tokenParam) {
+          navigate(`/vendor/invite?token=${tokenParam}`);
+        } else {
+          navigate('/auth');
+        }
+      })();
     });
     return () => sub.subscription.unsubscribe();
   }, [invitationToken, navigate, toast, searchParams]);
