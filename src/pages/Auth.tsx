@@ -97,7 +97,6 @@ export default function Auth() {
           className="absolute inset-0 h-full w-full object-contain"
         />
       </div>
-      </div>
 
 
 
