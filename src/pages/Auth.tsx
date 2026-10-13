@@ -11,13 +11,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
 import ramkyLogo from '@/assets/ramky-logo-transparent.png';
-import loginHero from '@/assets/login-hero-construction.jpg';
+import ramkyGroupOverview from '@/assets/ramky-group-overview.jpeg';
 import { ForgotPasswordDialog } from '@/components/auth/ForgotPasswordDialog';
 
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
-
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -91,21 +90,18 @@ export default function Auth() {
       </div>
 
       {/* Left Panel — Branding */}
-      <div className="relative hidden md:flex md:w-1/2 lg:w-[55%] flex-col justify-center px-10 lg:px-20 overflow-hidden">
+      <div className="relative hidden md:flex md:w-[58%] lg:w-[60%] flex-col justify-center gap-8 px-10 lg:px-16 py-12 bg-gradient-to-br from-muted/60 to-background overflow-hidden">
         <img
-          src={loginHero}
-          alt="Construction site at sunset"
-          width={1024}
-          height={1536}
-          className="absolute inset-0 h-full w-full object-cover"
+          src={ramkyGroupOverview}
+          alt="Ramky Group — Towards sustainable growth"
+          className="w-full max-w-2xl mx-auto object-contain max-h-[55vh]"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/60 to-slate-900/70" />
 
-        <div className="relative z-10 max-w-md">
-          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-primary-foreground mb-5 drop-shadow">
+        <div className="relative z-10 max-w-md mx-auto">
+          <h2 className="text-3xl lg:text-[2.6rem] leading-tight font-bold text-foreground mb-5">
             Building Tomorrow's<br />Infrastructure Today
           </h2>
-          <p className="text-base text-primary-foreground/90 max-w-sm">
+          <p className="text-base text-muted-foreground max-w-sm">
             Join our network of trusted vendors and partners. Streamline your onboarding process with our secure, efficient portal.
           </p>
         </div>
@@ -114,7 +110,7 @@ export default function Auth() {
 
 
       {/* Right Panel — Auth Form */}
-      <div className="relative w-full md:w-1/2 lg:w-[45%] flex flex-col justify-center p-6 md:p-12">
+      <div className="relative w-full md:w-[42%] lg:w-[40%] flex flex-col justify-center p-6 md:p-12">
         <div className="w-full max-w-md mx-auto">
 
           {/* Mobile-only logo */}
@@ -156,7 +152,7 @@ export default function Auth() {
                   </AlertDescription>
                 </Alert>
               )}
-              
+
               {success && (
                 <Alert className="mb-4 bg-success/10 text-success border-success">
                   <AlertDescription>{success}</AlertDescription>
