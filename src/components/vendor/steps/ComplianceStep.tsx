@@ -558,7 +558,7 @@ export function ComplianceStep({
                 <Input id="msmeEnterpriseType" {...register('msmeEnterpriseType' as any)} placeholder="Micro / Small / Medium" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="msmeClassificationYear">Current Year</Label>
+                <Label htmlFor="msmeClassificationYear">Classification Year</Label>
                 <Input
                   id="msmeClassificationYear"
                   {...register('msmeClassificationYear' as any)}

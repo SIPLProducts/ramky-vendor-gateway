@@ -188,6 +188,8 @@ export interface StatutoryDetails {
   msmeEnterpriseName?: string;
   /** Major activity (Manufacturing / Services) from the Udyam certificate. */
   msmeMajorActivity?: string;
+  /** Classification year from the Udyam certificate. */
+  msmeClassificationYear?: string;
   msmeDeclarationReason?: string;
   msmeSelfDeclarationFile?: File | null;
   labourPermitNo: string;

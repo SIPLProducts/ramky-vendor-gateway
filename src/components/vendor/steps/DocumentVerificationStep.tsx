@@ -159,6 +159,7 @@ export interface VerifiedDocumentData {
     enterpriseName: string;
     enterpriseType?: string;
     majorActivity?: string;
+    classificationYear?: string;
     apiName?: string;
     nameMatchScore?: number;
     /** Address fields returned by the Udyam registry — used as a fallback for the Address step. */
@@ -574,6 +575,7 @@ export function DocumentVerificationStep({
       enterprise_name: initialData.msme.enterpriseName,
       enterprise_type: initialData.msme.enterpriseType,
       major_activity: initialData.msme.majorActivity,
+      classification_year: initialData.msme.classificationYear,
     };
     return {
       status: "verified",
@@ -586,6 +588,7 @@ export function DocumentVerificationStep({
           enterprise_name: initialData.msme.apiName || initialData.msme.enterpriseName,
           enterprise_type: initialData.msme.enterpriseType,
           major_activity: initialData.msme.majorActivity,
+          classification_year: initialData.msme.classificationYear,
         },
       },
       nameMatchScore: initialData.msme.nameMatchScore,
@@ -2254,6 +2257,7 @@ export function DocumentVerificationStep({
         enterpriseName: msmeDoc.ocrData.enterprise_name,
         enterpriseType: msmeDoc.ocrData.enterprise_type,
         majorActivity: msmeDoc.ocrData.major_activity,
+        classificationYear: msmeDoc.ocrData.classification_year,
         apiName: msmeDoc.apiData?.name || msmeDoc.apiData?.enterpriseName,
         nameMatchScore: msmeDoc.nameMatchScore,
         addressParts: (() => {
@@ -2880,7 +2884,7 @@ export function DocumentVerificationStep({
                                 verifiedLabel="Verified from registry"
                               />
                               <EditableOcrField
-                                label="Current Year"
+                                label="Classification Year"
                                 value={msmeDoc.ocrData?.classification_year}
                                 originalValue={msmeDoc.originalOcrData?.classification_year}
                                 onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}

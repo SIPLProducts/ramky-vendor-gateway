@@ -878,7 +878,7 @@ export default function VendorRegistration() {
                   state: existingFormData.address?.registeredState || '',
                   pincode: existingFormData.address?.registeredPincode || '',
                 } : undefined,
-                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.statutory?.msmeEnterpriseName || existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined, majorActivity: existingFormData.statutory?.msmeMajorActivity || undefined } : undefined,
+                msme: existingFormData.statutory?.msmeNumber ? { udyamNumber: existingFormData.statutory.msmeNumber, enterpriseName: existingFormData.statutory?.msmeEnterpriseName || existingFormData.organization?.legalName || '', enterpriseType: existingFormData.statutory?.msmeCategory ? (existingFormData.statutory.msmeCategory.charAt(0).toUpperCase() + existingFormData.statutory.msmeCategory.slice(1)) : undefined, majorActivity: existingFormData.statutory?.msmeMajorActivity || undefined, classificationYear: existingFormData.statutory?.msmeClassificationYear || undefined } : undefined,
                 msmeCertificateFile: existingFormData.statutory?.msmeCertificateFile ?? null,
                 msmeSelfDeclarationFile: existingFormData.statutory?.msmeSelfDeclarationFile ?? null,
                 msmeDeclarationReason: existingFormData.statutory?.msmeDeclarationReason || '',
@@ -1145,6 +1145,7 @@ export default function VendorRegistration() {
         })(),
         msmeEnterpriseName: overwrite(prev.statutory.msmeEnterpriseName, data.msme?.enterpriseName),
         msmeMajorActivity: overwrite(prev.statutory.msmeMajorActivity, data.msme?.majorActivity),
+        msmeClassificationYear: overwrite(prev.statutory.msmeClassificationYear, data.msme?.classificationYear),
         // Carry the actual uploaded files into the form so draft saves include them
         gstCertificateFile: data.gstCertificateFile ?? prev.statutory.gstCertificateFile,
         panCardFile: data.panCardFile ?? prev.statutory.panCardFile,
@@ -1206,7 +1207,7 @@ export default function VendorRegistration() {
     if (cleared.has('msme')) {
       next.statutory = {
         ...next.statutory,
-        msmeNumber: '', msmeCategory: '', msmeEnterpriseName: '', msmeMajorActivity: '',
+        msmeNumber: '', msmeCategory: '', msmeEnterpriseName: '', msmeMajorActivity: '', msmeClassificationYear: '',
         msmeDeclarationReason: '', msmeCertificateFile: null, msmeSelfDeclarationFile: null,
       };
     }
