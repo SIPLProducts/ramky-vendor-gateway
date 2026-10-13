@@ -168,6 +168,10 @@ export default function VendorRegistration() {
   const [pendingPostSubmitStatus, setPendingPostSubmitStatus] = useState<RegistrationStatus | null>(null);
   const [stepValidationState, setStepValidationState] = useState<Record<number, boolean>>({});
   const [isValidatingToken, setIsValidatingToken] = useState(true);
+  // Mirror of isValidatingToken for use inside the auth listener, which is
+  // registered once and would otherwise see a stale closure value.
+  const isValidatingTokenRef = useRef(true);
+  useEffect(() => { isValidatingTokenRef.current = isValidatingToken; }, [isValidatingToken]);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [isTokenMode, setIsTokenMode] = useState(false);
