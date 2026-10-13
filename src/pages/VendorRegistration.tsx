@@ -624,8 +624,10 @@ export default function VendorRegistration() {
 
         }
 
-        // Check if form has been submitted via invitation
-        if (invitation.used_at) {
+        // used_at is stamped as soon as the link is opened, so it does NOT mean
+        // the form was submitted. Only show the status screen when a vendor
+        // record is actually linked to this invitation (set at submission).
+        if (invitation.used_at && claimedVendorId) {
           // After submission, allow unlimited access to view progress
           console.log('[Token] Form already submitted - allowing access to view progress');
           setInvitationToken(token);
