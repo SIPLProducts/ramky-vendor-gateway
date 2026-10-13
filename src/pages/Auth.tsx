@@ -92,7 +92,7 @@ export default function Auth() {
       {/* Left Panel — Branding */}
       <div className="relative hidden md:flex md:w-[58%] lg:w-[60%] flex-col justify-center gap-8 px-10 lg:px-16 py-12 bg-gradient-to-br from-muted/60 to-background overflow-hidden">
         <img
-          src={ramkyGroupOverview.url}
+          src={ramkyGroupOverview}
           alt="Ramky Group — Towards sustainable growth"
           className="w-full max-w-2xl mx-auto object-contain max-h-[55vh]"
         />
