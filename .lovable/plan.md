@@ -1,20 +1,23 @@
-# Restore dashboard approver names on the self-hosted portal
+# Login Left Panel: Use the Ramky Group Graphic Instead of the Blue Image
 
-## Confirmed finding
-- The screenshot shows **Names unavailable** for SCM CO, Finance 2, SAP Team, and Returned to Buyer.
-- The dashboard sets this label when the `dashboard-approvers` request fails or returns an error. It does not mean those people are unassigned.
-- The exact self-hosted failure is not yet confirmed. A missing deployment, authentication failure, or server lookup error must be distinguished before changing anything.
+Replace the construction/blue hero in the login page's left branding panel with the attached Ramky Group overview graphic (logo, three business circles, Safety-First mascot, CSR wheel). The whole graphic stays visible — nothing is cropped — and the sign-in panel keeps its current width or slightly narrows so the wide graphic has room.
 
-## Plan
-1. Check the failed request's status and safe response, plus the matching self-hosted function log. Do not collect keys or Authorization headers.
-2. Apply only the correction supported by that evidence:
-   - **Missing function:** prepare targeted deployment instructions for `dashboard-approvers/index.ts`, `routing.ts`, and its shared authentication dependencies; reload the function service using the existing self-hosted procedure.
-   - **Authentication failure:** check the current signed-in request and existing self-hosted configuration without replacing production keys or weakening authentication.
-   - **Server error:** identify the failing lookup or missing schema dependency, then prepare the smallest targeted repair for approval.
-3. Verify the signed-in self-hosted dashboard displays **Role (Person Name)** for affected applications and all eligible SAP Team names. Preserve **Not assigned** and **Stage skipped** only where the actual assignments justify them.
+## What changes
 
-## Technical scope and safeguards
-- Frontend `dist` deployment alone does not deploy `dashboard-approvers`.
-- Retain caller-visible vendor checks, existing company scoping, skip flags, and active-user filtering.
-- Do not change registration saving, approval assignments, document access, or unrelated functions.
-- No production configuration, migrations, or deployment changes without explicit approval. If self-hosted access is unavailable, provide targeted instructions and leave production verification outstanding.
+1. **New asset** — the uploaded graphic becomes a CDN asset (`src/assets/ramky-group-overview.jpeg.asset.json`) and is imported in `src/pages/Auth.tsx`. The old `src/assets/login-hero-construction.jpg` is no longer referenced and is removed from the repo (recoverable from git history).
+
+2. **Left panel (`src/pages/Auth.tsx`)**:
+   - Remove the full-bleed photo, the dark blue gradient overlay, and the white/drop-shadow text.
+   - Show the graphic with `object-contain`, centered, with comfortable padding and `max-h` caps so the complete mark — logo, circles, mascot, CSR wheel — is always fully visible at any window size.
+   - Panel background becomes a soft light-blue brand surface so the graphic's white background blends in.
+   - "Building Tomorrow's Infrastructure Today" headline and the paragraph remain, in dark text below the graphic (no white text, no blue tint).
+   - Widen the left panel / narrow the sign-in side so the graphic fits: left `md:w-[58%] lg:w-[60%]`, right `md:w-[42%] lg:w-[40%]` (from the current 55/45). Because the image uses contain-fit, it never gets cut even on smaller windows.
+
+3. **Right panel** — only its width class changes; the sign-in card, mobile layout, logo, and copy are untouched.
+
+## Technical notes
+
+- Files touched: `src/pages/Auth.tsx` only, plus the new asset pointer file and deletion of the unused hero jpg.
+- Asset creation via `lovable-assets create --file /mnt/user-uploads/WhatsApp_Image_2026-10-12_at_7.03.43_PM.jpeg --filename ramky-group-overview.jpeg`; the uploaded file itself is never copied into the repo.
+- Presentation only — no logic, auth flow, or copy changes.
+- Verify by loading `/auth` at desktop width and confirming the full graphic (all three circles plus mascot/wheel) is visible and the headline reads as dark text.
