@@ -2889,6 +2889,7 @@ export function DocumentVerificationStep({
                                 originalValue={msmeDoc.originalOcrData?.classification_year}
                                 onChange={(v) => setOcrField(setMsmeDoc, "classification_year", v)}
                                 placeholder="e.g. 2026-27"
+                                readOnly={false}
                                 verifiedValue={m.classification_year}
                                 verifiedLabel="Verified from registry"
                               />

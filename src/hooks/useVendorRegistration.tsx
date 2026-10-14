@@ -247,7 +247,28 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
           console.warn('Failed to hydrate GST validation history:', gstValError);
         }
 
+        // Recover MSME Classification Year from validation history when the
+        // vendor row has no saved value (older applications).
+        if (!(data as any).msme_classification_year && (data as any).msme_number) {
+          const { data: msmeHistory } = await supabase
+            .from('vendor_validations')
+            .select('details')
+            .eq('vendor_id', data.id)
+            .eq('validation_type', 'msme')
+            .order('created_at', { ascending: false });
+          const pick = (d: any): string => {
+            if (!d || typeof d !== 'object') return '';
+            const v = d.classification_year
+              ?? d.normalized?.classification_year
+              ?? d.data?.main_details?.enterprise_type_list?.[0]?.classification_year
+              ?? d.raw?.data?.main_details?.enterprise_type_list?.[0]?.classification_year;
+            return typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
+          };
+          const year = (msmeHistory || []).map((r: any) => pick(r.details)).find(Boolean);
+          if (year) (data as any).msme_classification_year = year;
+        }
       }
+
 
       // Initialize vendorId and vendorStatus from existing vendor
       if (data) {
