@@ -11,6 +11,8 @@ interface ManualEntryFallbackDialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /** Exact message returned by the API — shown highlighted above the description. */
+  apiMessage?: string;
   label: string;
   placeholder?: string;
   maxLength?: number;
@@ -25,6 +27,7 @@ export function ManualEntryFallbackDialog({
   onOpenChange,
   title,
   description,
+  apiMessage,
   label,
   placeholder,
   maxLength,
@@ -68,7 +71,13 @@ export function ManualEntryFallbackDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
+          {apiMessage && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-semibold text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span className="break-words">{apiMessage}</span>
+            </div>
+          )}
+          {description && <DialogDescription className="text-sm text-muted-foreground">{description}</DialogDescription>}
         </DialogHeader>
 
         <div className="grid gap-2 py-2">
