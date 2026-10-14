@@ -1527,6 +1527,7 @@ export function DocumentVerificationStep({
 
   const handleGstUpload = (file: File) => {
     const acceptedDoc = gstDoc;
+    pendingGstFileRef.current = file;
     return runDocFlow("gst", file, setGstDoc, () => acceptedDoc.ocrData?.legal_name, undefined, acceptedDoc).then(() => {
       setGstDoc((prev) => {
         // Registry response is the source of truth — always overwrite the
@@ -1556,6 +1557,7 @@ export function DocumentVerificationStep({
 
   const handlePanUpload = (file: File) => {
     const acceptedDoc = panDoc;
+    pendingPanFileRef.current = file;
     setPanCrossCheckError(null);
     return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
@@ -1779,9 +1781,10 @@ export function DocumentVerificationStep({
     const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
     setGstDoc((prev) => ({
       status: "verified",
-      fileName: prev.fileName,
-      fileSize: prev.fileSize,
-      file: prev.file,
+      ...(() => {
+        const f = fileForManualSuccess(pendingGstFileRef.current, prev.ocrPassedFile, prev.file);
+        return f ? { file: f, fileName: f.name, fileSize: f.size } : { fileName: prev.fileName, fileSize: prev.fileSize };
+      })(),
       ocrData: merged,
       originalOcrData: ocr,
       apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
@@ -1808,9 +1811,10 @@ export function DocumentVerificationStep({
     const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
     setPanDoc((prev) => ({
       status: "verified",
-      fileName: prev.fileName,
-      fileSize: prev.fileSize,
-      file: prev.file,
+      ...(() => {
+        const f = fileForManualSuccess(pendingPanFileRef.current, prev.ocrPassedFile, prev.file);
+        return f ? { file: f, fileName: f.name, fileSize: f.size } : { fileName: prev.fileName, fileSize: prev.fileSize };
+      })(),
       ocrData: merged,
       originalOcrData: ocr,
       apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
@@ -2319,13 +2323,15 @@ export function DocumentVerificationStep({
     // Lift uploaded files so the parent can persist them in the draft.
     // Only verified replacements are persisted. A failed replacement keeps
     // the previously accepted document and values unchanged.
+    // First-time uploads whose OCR passed but verification failed are also
+    // saved (document only — data stays unverified).
     out.gstCertificateFile =
-      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
-    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
+      isGstRegistered === true && shouldLiftDocFile(gstDoc) ? (gstDoc.file ?? null) : null;
+    out.panCardFile = shouldLiftDocFile(panDoc) ? (panDoc.file ?? null) : null;
     out.msmeCertificateFile =
       isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
-    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
-    out.cancelledChequeFile2 = bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
+    out.cancelledChequeFile = shouldLiftDocFile(bankDoc) ? (bankDoc.file ?? null) : null;
+    out.cancelledChequeFile2 = bank2Enabled && shouldLiftDocFile(bankDoc2) ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
