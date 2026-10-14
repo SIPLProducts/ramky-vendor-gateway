@@ -375,6 +375,10 @@ function persistedFileMeta(f?: File | null): { fileName?: string; fileSize?: num
   };
 }
 
+const PAN_HINT = "Please enter your 10-character PAN and we'll verify it.";
+const GST_HINT = "Please enter your 15-character GSTIN and we'll verify it.";
+const BANK_HINT = "Please enter your bank details manually.";
+
 export function DocumentVerificationStep({
   vendorId,
   initialData,
@@ -702,6 +706,7 @@ export function DocumentVerificationStep({
     open: boolean;
     target: "primary" | "secondary";
     reason: string;
+    apiMessage?: string;
     account: string;
     ifsc: string;
     submitting: boolean;
@@ -713,11 +718,13 @@ export function DocumentVerificationStep({
     reason: string,
     prefillAccount = "",
     prefillIfsc = "",
+    apiMessage?: string,
   ) => {
     setBankPopup({
       open: true,
       target,
       reason,
+      apiMessage: apiMessage || undefined,
       account: prefillAccount,
       ifsc: prefillIfsc,
       submitting: false,
@@ -726,18 +733,19 @@ export function DocumentVerificationStep({
   };
 
   // Manual entry fallback popups for GST / PAN — opened when OCR is unreadable
-  // or the validation API rejects the extracted value. Vendor types the ID and
-  // we re-run the existing GST / PAN Comprehensive provider.
-  const [gstManualPopup, setGstManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+  // or the validation API rejects the extracted value. The exact API message
+  // is shown highlighted; our instruction is shown as small plain text.
+  type ManualPopupState = { open: boolean; reason: string; prefill: string; apiMessage?: string };
+  const [gstManualPopup, setGstManualPopup] = useState<ManualPopupState>({
     open: false, reason: "", prefill: "",
   });
-  const [panManualPopup, setPanManualPopup] = useState<{ open: boolean; reason: string; prefill: string }>({
+  const [panManualPopup, setPanManualPopup] = useState<ManualPopupState>({
     open: false, reason: "", prefill: "",
   });
-  const openGstManualPopup = (reason: string, prefill = "") =>
-    setGstManualPopup({ open: true, reason, prefill });
-  const openPanManualPopup = (reason: string, prefill = "") =>
-    setPanManualPopup({ open: true, reason, prefill });
+  const openGstManualPopup = (reason: string, prefill = "", apiMessage?: string) =>
+    setGstManualPopup({ open: true, reason, prefill, apiMessage: apiMessage || undefined });
+  const openPanManualPopup = (reason: string, prefill = "", apiMessage?: string) =>
+    setPanManualPopup({ open: true, reason, prefill, apiMessage: apiMessage || undefined });
 
 
   // ---------- Verification ----------
@@ -1298,18 +1306,11 @@ export function DocumentVerificationStep({
         return;
       }
       if (kind === "cheque") {
-        openBankManualPopup(
-          chequeTargetRef.current,
-          ocrRes.error || "We couldn't read your cheque. Please enter your bank details manually.",
-        );
+        openBankManualPopup(chequeTargetRef.current, BANK_HINT, "", "", ocrRes.error);
       } else if (kind === "gst") {
-        openGstManualPopup(
-          "We couldn't read your GST certificate. Please enter your 15-character GSTIN and we'll verify it.",
-        );
+        openGstManualPopup(GST_HINT, "", ocrRes.error);
       } else if (kind === "pan") {
-        openPanManualPopup(
-          "We couldn't read your PAN card. Please enter your 10-character PAN and we'll verify it.",
-        );
+        openPanManualPopup(PAN_HINT, "", ocrRes.error);
       }
       return;
     }
@@ -1361,11 +1362,11 @@ export function DocumentVerificationStep({
         const acc = String((ocrRes.extracted as any).account_number ?? "").replace(/\s+/g, "");
         const ifsc = String((ocrRes.extracted as any).ifsc_code ?? "").toUpperCase().trim();
         setActiveTab("bank");
-        openBankManualPopup(chequeTargetRef.current, msg, acc, ifsc);
+        openBankManualPopup(chequeTargetRef.current, BANK_HINT, acc, ifsc, msg);
 
       } else if (kind === "gst") {
         const gstin = String((ocrRes.extracted as any).gstin ?? "").toUpperCase().trim();
-        openGstManualPopup(msg, gstin);
+        openGstManualPopup(GST_HINT, gstin, msg);
       } else if (kind === "pan") {
         // Skip manual entry when the failure is a PAN-vs-GSTIN mismatch —
         // allowing manual entry would let the vendor bypass the check by
@@ -1375,7 +1376,7 @@ export function DocumentVerificationStep({
         const isPanGstMismatch = /does not match PAN derived from GSTIN/i.test(msg);
         if (!isPanGstMismatch) {
           const pan = String((ocrRes.extracted as any).pan_number ?? "").toUpperCase().trim();
-          openPanManualPopup(msg, pan);
+          openPanManualPopup(PAN_HINT, pan, msg);
         }
       }
       return;
@@ -3341,7 +3342,13 @@ export function DocumentVerificationStep({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Bank verification — enter details manually</DialogTitle>
-            <DialogDescription>
+            {bankPopup.apiMessage && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-semibold text-destructive">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="break-words">{bankPopup.apiMessage}</span>
+              </div>
+            )}
+            <DialogDescription className="text-sm text-muted-foreground">
               {bankPopup.reason || "Please enter your bank account details to verify via Penny-Drop."}
             </DialogDescription>
           </DialogHeader>
@@ -3411,6 +3418,7 @@ export function DocumentVerificationStep({
         onOpenChange={(o) => setGstManualPopup((p) => ({ ...p, open: o }))}
         title="Enter GSTIN manually"
         description={gstManualPopup.reason}
+        apiMessage={gstManualPopup.apiMessage}
         label="GSTIN *"
         placeholder="e.g. 20AAPCS1562H1ZG"
         maxLength={15}
@@ -3424,6 +3432,7 @@ export function DocumentVerificationStep({
         onOpenChange={(o) => setPanManualPopup((p) => ({ ...p, open: o }))}
         title="Enter PAN manually"
         description={panManualPopup.reason}
+        apiMessage={panManualPopup.apiMessage}
         label="PAN *"
         placeholder="AAAAA9999A"
         maxLength={10}
