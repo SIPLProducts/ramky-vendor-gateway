@@ -1426,6 +1426,7 @@ export function DocumentVerificationStep({
       // Reset GST verification state regardless of direction so previously
       // fetched fields/files cannot leak into the new selection's payload.
       setGstDoc(idleDoc);
+      pendingGstFileRef.current = null;
       setEditablePrincipalPlace("");
       // Clear self-declaration / manual fields when leaving the No path.
       if (next !== false) {
@@ -1795,6 +1796,7 @@ export function DocumentVerificationStep({
       (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
     if (apiAddress) setEditablePrincipalPlace(apiAddress);
     if (merged.gstin) void runGstFilingStatusCheck(merged);
+    pendingGstFileRef.current = null;
     return { ok: true };
   };
 
@@ -1822,6 +1824,7 @@ export function DocumentVerificationStep({
       ocrModel: prev.ocrModel,
     }));
     setPanCrossCheckError(null);
+    pendingPanFileRef.current = null;
     return { ok: true };
   };
 
