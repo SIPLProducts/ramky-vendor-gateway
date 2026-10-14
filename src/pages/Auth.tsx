@@ -84,10 +84,6 @@ export default function Auth() {
 
   return (
     <div className="login-theme relative min-h-screen flex flex-col md:flex-row overflow-hidden bg-gradient-to-br from-[hsl(210_60%_98%)] via-[hsl(205_55%_96%)] to-[hsl(210_40%_99%)]">
-      {/* Top-right logo */}
-      <div className="absolute top-5 right-8 z-10 hidden md:block">
-        <img src={ramkyLogo} alt="Ramky Group" className="h-14 w-auto object-contain" />
-      </div>
 
       {/* Left Panel — Branding */}
       <div className="relative hidden md:flex md:w-[58%] lg:w-[60%] items-center justify-center bg-white overflow-hidden">
@@ -104,14 +100,6 @@ export default function Auth() {
       <div className="relative w-full md:w-[42%] lg:w-[40%] flex flex-col justify-center p-6 md:p-12">
         <div className="w-full max-w-md mx-auto">
 
-          {/* Mobile-only logo */}
-          <div className="md:hidden flex justify-center mb-8">
-            <img
-              src={ramkyLogo}
-              alt="Ramky Group"
-              className="h-16 w-auto object-contain"
-            />
-          </div>
 
 
           <Card className="border-0 shadow-xl">
