@@ -70,18 +70,42 @@ export function useConfiguredKycApi() {
             fileMimeType = params.file.type || "application/octet-stream";
             fileName = params.file.name || undefined;
           }
+          const isPdf = !!params.file && (
+            fileMimeType?.toLowerCase() === "application/pdf" ||
+            (fileName?.toLowerCase().endsWith(".pdf") ?? false)
+          );
+          const input: Record<string, any> = { ...(params.input ?? {}) };
+          if (isPdf) input.use_pdf = true;
+          const isOcr = !!params.file;
+          if (isOcr) {
+            console.log(`[OCR Request - ${params.providerName}]`, {
+              provider: params.providerName,
+              fileName,
+              fileMimeType,
+              isPdf,
+              use_pdf: isPdf,
+            });
+          }
           const { data, error } = await supabase.functions.invoke(
             "kyc-api-execute",
             {
               body: {
                 providerName: params.providerName,
-                input: params.input ?? {},
+                input,
+                ...(isPdf ? { use_pdf: true } : {}),
                 fileBase64,
                 fileMimeType,
                 fileName,
               },
             },
           );
+          if (isOcr) {
+            console.log(`[OCR Response - ${params.providerName}]`, {
+              ok: !error && (data as any)?.ok !== false,
+              use_pdf: isPdf,
+              message: error?.message ?? (data as any)?.message,
+            });
+          }
           if (error) {
             return {
               found: false,
