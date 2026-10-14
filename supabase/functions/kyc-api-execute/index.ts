@@ -84,7 +84,7 @@ function normalizeBankPayload(filled: any, input: Record<string, any> | undefine
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const { providerName, input, fileBase64, fileMimeType, fileName, healthCheck } = await req.json();
+    const { providerName, input, fileBase64, fileMimeType, fileName, healthCheck, use_pdf: clientUsePdf } = await req.json();
     if (typeof providerName !== "string" || providerName.trim().length === 0 || providerName.length > 100) {
       return new Response(JSON.stringify({ found: false, ok: false, message: "providerName required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -236,12 +236,13 @@ serve(async (req) => {
       // requires this flag for PDF inputs). Skip if the admin's template already
       // provided it, so explicit config always wins.
       const isPdf = (fileMimeType?.toLowerCase() === "application/pdf")
-        || (uploadName?.toLowerCase().endsWith(".pdf") ?? false);
+        || (uploadName?.toLowerCase().endsWith(".pdf") ?? false)
+        || clientUsePdf === true;
       const templateHasUsePdf = !!(extraTpl && typeof extraTpl === "object" && !Array.isArray(extraTpl)
         && Object.keys(extraTpl as Record<string, any>).some((k) => k.toLowerCase() === "use_pdf"));
-      if (isPdf && !templateHasUsePdf) {
+      if (isPdf && !templateHasUsePdf && !fd.has("use_pdf")) {
         fd.append("use_pdf", "true");
-        console.log(`[kyc-api-execute] auto-injected use_pdf=true for PDF upload`);
+        console.log(`[kyc-api-execute] provider=${provider.provider_name} sent use_pdf=true for PDF upload`);
       }
       body = fd;
 
