@@ -1254,11 +1254,17 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
     acceptedDoc?: DocState,
   ) => {
-    const failCurrentTab = (message: string) => {
+    const failCurrentTab = (message: string, ocrPassed = false) => {
       // A rejected replacement is only an unsuccessful attempt. Keep the
       // previously accepted document and extracted values authoritative.
       if (acceptedDoc?.status === "verified") {
         setDoc({ ...acceptedDoc, errorMessage: message });
+        return;
+      }
+      // First upload whose OCR succeeded but verification failed: retain the
+      // document so it is saved with the draft (tab remains failed).
+      if (ocrPassed && keepFirstUploadOnVerifyFail(acceptedDoc?.status === "verified")) {
+        setDoc({ status: "failed", errorMessage: message, file, fileName: file.name, fileSize: file.size, ocrPassedFile: file });
         return;
       }
       setDoc({ status: "failed", errorMessage: message });
@@ -1333,7 +1339,7 @@ export function DocumentVerificationStep({
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      failCurrentTab(msg);
+      failCurrentTab(msg, true);
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
