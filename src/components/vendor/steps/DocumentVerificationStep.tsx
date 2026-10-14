@@ -23,6 +23,7 @@ import {
   formatCrossMatchFailure,
 } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
+import { keepFirstUploadOnVerifyFail, shouldLiftDocFile, fileForManualSuccess } from "@/lib/kycDocRetention";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -214,6 +215,8 @@ interface DocState {
   errorMessage?: string;
   verifiedAt?: number;
   ocrModel?: string;
+  /** First-time upload whose OCR passed but verification failed — saved with the draft. */
+  ocrPassedFile?: File;
 }
 
 const VerificationFailureContext = createContext(false);
@@ -692,6 +695,9 @@ export function DocumentVerificationStep({
   // and DMS keeps showing the first uploaded cheque).
   const lastBankFileRef = useRef<File | null>(null);
   const lastBankFile2Ref = useRef<File | null>(null);
+  // Latest GST / PAN upload attempt, held until manual verification succeeds.
+  const pendingGstFileRef = useRef<File | null>(null);
+  const pendingPanFileRef = useRef<File | null>(null);
   const [bankPopup, setBankPopup] = useState<{
     open: boolean;
     target: "primary" | "secondary";
@@ -1254,11 +1260,17 @@ export function DocumentVerificationStep({
     extraValidation?: (ocr: Record<string, any>, apiData: any) => string | null,
     acceptedDoc?: DocState,
   ) => {
-    const failCurrentTab = (message: string) => {
+    const failCurrentTab = (message: string, ocrPassed = false) => {
       // A rejected replacement is only an unsuccessful attempt. Keep the
       // previously accepted document and extracted values authoritative.
       if (acceptedDoc?.status === "verified") {
         setDoc({ ...acceptedDoc, errorMessage: message });
+        return;
+      }
+      // First upload whose OCR succeeded but verification failed: retain the
+      // document so it is saved with the draft (tab remains failed).
+      if (ocrPassed && keepFirstUploadOnVerifyFail(false)) {
+        setDoc({ status: "failed", errorMessage: message, file, fileName: file.name, fileSize: file.size, ocrPassedFile: file });
         return;
       }
       setDoc({ status: "failed", errorMessage: message });
@@ -1333,7 +1345,7 @@ export function DocumentVerificationStep({
     const v = await verifyApi(kind, ocrRes.extracted);
     if (!v.ok) {
       const msg = (v as any).message || "Verification failed";
-      failCurrentTab(msg);
+      failCurrentTab(msg, true);
       // Surface a hard popup for cross-tab name mismatches and force the
       // user back onto the offending tab so they cannot navigate forward.
       if (kind === "msme" && (v as any).isNameMismatch) {
@@ -1414,6 +1426,7 @@ export function DocumentVerificationStep({
       // Reset GST verification state regardless of direction so previously
       // fetched fields/files cannot leak into the new selection's payload.
       setGstDoc(idleDoc);
+      pendingGstFileRef.current = null;
       setEditablePrincipalPlace("");
       // Clear self-declaration / manual fields when leaving the No path.
       if (next !== false) {
@@ -1515,6 +1528,7 @@ export function DocumentVerificationStep({
 
   const handleGstUpload = (file: File) => {
     const acceptedDoc = gstDoc;
+    pendingGstFileRef.current = file;
     return runDocFlow("gst", file, setGstDoc, () => acceptedDoc.ocrData?.legal_name, undefined, acceptedDoc).then(() => {
       setGstDoc((prev) => {
         // Registry response is the source of truth — always overwrite the
@@ -1544,6 +1558,7 @@ export function DocumentVerificationStep({
 
   const handlePanUpload = (file: File) => {
     const acceptedDoc = panDoc;
+    pendingPanFileRef.current = file;
     setPanCrossCheckError(null);
     return runDocFlow("pan", file, setPanDoc, () => effectiveLegalName, (ocr) => {
       if (isGstRegistered === true && gstDoc.ocrData?.gstin) {
@@ -1767,9 +1782,10 @@ export function DocumentVerificationStep({
     const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
     setGstDoc((prev) => ({
       status: "verified",
-      fileName: prev.fileName,
-      fileSize: prev.fileSize,
-      file: prev.file,
+      ...(() => {
+        const f = fileForManualSuccess(pendingGstFileRef.current, prev.ocrPassedFile, prev.file);
+        return f ? { file: f, fileName: f.name, fileSize: f.size } : { fileName: prev.fileName, fileSize: prev.fileSize };
+      })(),
       ocrData: merged,
       originalOcrData: ocr,
       apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
@@ -1780,6 +1796,7 @@ export function DocumentVerificationStep({
       (v as any).normalized?.principal_place_of_business || (v as any).normalized?.address;
     if (apiAddress) setEditablePrincipalPlace(apiAddress);
     if (merged.gstin) void runGstFilingStatusCheck(merged);
+    pendingGstFileRef.current = null;
     return { ok: true };
   };
 
@@ -1796,9 +1813,10 @@ export function DocumentVerificationStep({
     const merged = (v as any).normalized ? { ...ocr, ...(v as any).normalized } : ocr;
     setPanDoc((prev) => ({
       status: "verified",
-      fileName: prev.fileName,
-      fileSize: prev.fileSize,
-      file: prev.file,
+      ...(() => {
+        const f = fileForManualSuccess(pendingPanFileRef.current, prev.ocrPassedFile, prev.file);
+        return f ? { file: f, fileName: f.name, fileSize: f.size } : { fileName: prev.fileName, fileSize: prev.fileSize };
+      })(),
       ocrData: merged,
       originalOcrData: ocr,
       apiData: { ...(v.apiData || {}), normalized: (v as any).normalized },
@@ -1806,6 +1824,7 @@ export function DocumentVerificationStep({
       ocrModel: prev.ocrModel,
     }));
     setPanCrossCheckError(null);
+    pendingPanFileRef.current = null;
     return { ok: true };
   };
 
@@ -2307,13 +2326,15 @@ export function DocumentVerificationStep({
     // Lift uploaded files so the parent can persist them in the draft.
     // Only verified replacements are persisted. A failed replacement keeps
     // the previously accepted document and values unchanged.
+    // First-time uploads whose OCR passed but verification failed are also
+    // saved (document only — data stays unverified).
     out.gstCertificateFile =
-      isGstRegistered === true && gstDoc.status === "verified" ? (gstDoc.file ?? null) : null;
-    out.panCardFile = panDoc.status === "verified" ? (panDoc.file ?? null) : null;
+      isGstRegistered === true && shouldLiftDocFile(gstDoc) ? (gstDoc.file ?? null) : null;
+    out.panCardFile = shouldLiftDocFile(panDoc) ? (panDoc.file ?? null) : null;
     out.msmeCertificateFile =
       isMsmeRegistered === true && msmeDoc.status === "verified" ? (msmeDoc.file ?? null) : null;
-    out.cancelledChequeFile = bankDoc.status === "verified" ? (bankDoc.file ?? null) : null;
-    out.cancelledChequeFile2 = bank2Enabled && bankDoc2.status === "verified" ? (bankDoc2.file ?? null) : null;
+    out.cancelledChequeFile = shouldLiftDocFile(bankDoc) ? (bankDoc.file ?? null) : null;
+    out.cancelledChequeFile2 = bank2Enabled && shouldLiftDocFile(bankDoc2) ? (bankDoc2.file ?? null) : null;
     // Authoritative completion status (mirrors what the UI shows green)
     out.step1Status = { stage1Done, stage2Done, stage3Done, stage4Done, allDone };
     return out;
