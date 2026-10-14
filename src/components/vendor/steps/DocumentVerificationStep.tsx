@@ -375,6 +375,10 @@ function persistedFileMeta(f?: File | null): { fileName?: string; fileSize?: num
   };
 }
 
+const PAN_HINT = "Please enter your 10-character PAN and we'll verify it.";
+const GST_HINT = "Please enter your 15-character GSTIN and we'll verify it.";
+const BANK_HINT = "Please enter your bank details manually.";
+
 export function DocumentVerificationStep({
   vendorId,
   initialData,
