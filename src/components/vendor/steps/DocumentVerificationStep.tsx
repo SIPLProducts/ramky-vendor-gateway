@@ -23,6 +23,7 @@ import {
   formatCrossMatchFailure,
 } from "@/lib/nameMatch";
 import { normalizeUploadToImage } from "@/lib/pdfToImage";
+import { keepFirstUploadOnVerifyFail, shouldLiftDocFile, fileForManualSuccess } from "@/lib/kycDocRetention";
 import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
@@ -214,6 +215,8 @@ interface DocState {
   errorMessage?: string;
   verifiedAt?: number;
   ocrModel?: string;
+  /** First-time upload whose OCR passed but verification failed — saved with the draft. */
+  ocrPassedFile?: File;
 }
 
 const VerificationFailureContext = createContext(false);
@@ -692,6 +695,9 @@ export function DocumentVerificationStep({
   // and DMS keeps showing the first uploaded cheque).
   const lastBankFileRef = useRef<File | null>(null);
   const lastBankFile2Ref = useRef<File | null>(null);
+  // Latest GST / PAN upload attempt, held until manual verification succeeds.
+  const pendingGstFileRef = useRef<File | null>(null);
+  const pendingPanFileRef = useRef<File | null>(null);
   const [bankPopup, setBankPopup] = useState<{
     open: boolean;
     target: "primary" | "secondary";
