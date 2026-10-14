@@ -1,19 +1,22 @@
-# Clearer Messages When a Document Cannot Be Read
+# Show the API's Message in the "Enter Manually" Popup
 
-## Recommendation
-Show a short, friendly message that tells the vendor what to do. Keep the provider's original message underneath in small text so support can still see the exact reason.
+## What is wrong now
+When a GST or PAN document can't be read, the red line on the page already shows the API's own message (for example "PAN Not Found."). The manual-entry popup does not. Its text is fixed: "We couldn't read your PAN card. Please enter your 10-character PAN and we'll verify it." The cheque popup already uses the API message.
 
-Example for PAN:
-- Main line: "We could not read the PAN from this file. Upload a clear photo of the front of the PAN card, or enter the PAN manually."
-- Small detail: "Provider: PAN Not Found."
+## Change
+For GST, PAN, and Bank, when the reading service fails, the popup starts with the API's own message, then gives the instruction. For example:
 
-## What changes
-1. When the GST, PAN, or Bank reading service says it found nothing (for example `pan_not_found` or `no_gstin_detected`, or no fields came back), show the friendly line for that document type instead of only the raw provider text.
-2. Show a friendly line for temporary provider problems too: timeouts (504, "Backend Timed Out") and server errors (5xx). Example: "The verification service is busy right now. Please try again in a minute, or enter the details manually."
-3. Any other error keeps the provider's own message, as it does today.
-4. The manual-entry popup, how documents are saved or kept, verification rules, the order of the stages, and the network payload all stay exactly as they are. Only the text the vendor sees changes.
+- PAN: "PAN Not Found. Please enter your 10-character PAN and we'll verify it."
+- GST: "<API message>. Please enter your 15-character GSTIN and we'll verify it."
+- Bank: "<API message>. Please enter your bank details manually."
+
+If the API sends no message, the current fixed text is used.
+
+The "couldn't read clearly" case (the service read the document but isn't confident) keeps its current text, because no API error comes back there.
+
+## Unchanged
+Saving and keeping documents, verification, mismatch checks, the stage order, toasts, and the request payload stay exactly as they are. Only the popup text changes.
 
 ## Technical details
-- Add a small helper in `src/lib/` that turns (`documentType`, `message_code`, `status_code`, `message`) into `{ title, detail }`, plus unit tests for `pan_not_found`, a GST "not detected" code, 504 timeout, 5xx, and an unknown code falling back to the raw message.
-- Use it only where OCR and verification errors are displayed in `DocumentVerificationStep.tsx`, and in the `toastKycResult` description.
-- Nothing changes in the backend functions. To deploy, rebuild the frontend only.
+- `DocumentVerificationStep.tsx`, in `runDocFlow` around lines 1300–1312: build the popup text from `ocrRes.error` plus the instruction for each document type, and fall back to today's text when it's empty.
+- Frontend-only change, so a frontend rebuild is enough to deploy it.
