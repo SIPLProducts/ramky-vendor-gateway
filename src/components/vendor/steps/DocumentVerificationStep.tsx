@@ -1269,7 +1269,7 @@ export function DocumentVerificationStep({
       }
       // First upload whose OCR succeeded but verification failed: retain the
       // document so it is saved with the draft (tab remains failed).
-      if (ocrPassed && keepFirstUploadOnVerifyFail(acceptedDoc?.status === "verified")) {
+      if (ocrPassed && keepFirstUploadOnVerifyFail(false)) {
         setDoc({ status: "failed", errorMessage: message, file, fileName: file.name, fileSize: file.size, ocrPassedFile: file });
         return;
       }
