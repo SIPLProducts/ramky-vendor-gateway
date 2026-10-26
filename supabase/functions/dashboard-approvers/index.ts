@@ -79,9 +79,9 @@ Deno.serve(async (req) => {
         : exact.length === 0 && generic.length === 1 ? generic[0] : undefined;
       const routing = STATUS_ROUTING[v.status];
       const approverId = assignedApprover(v.status, buyerId, flow);
-      return { vendorId: v.id, approverIds: approverId ? [approverId] : [], skipped: !!(routing && flow?.[routing.skip]) };
+      return { vendorId: v.id, approverIds: approverId ? [approverId] : [], skipped: !!(routing && flow?.[routing.skip]), inviterId: buyerId };
     });
-    const userIds = [...new Set(assignments.flatMap(a => a.approverIds))];
+    const userIds = [...new Set([...assignments.flatMap(a => a.approverIds), ...assignments.map(a => a.inviterId).filter(Boolean)])];
     const { data: profiles, error: profileError } = userIds.length ? await admin.from('profiles')
       .select('id, full_name, email, status').in('id', userIds) : { data: [], error: null };
     if (profileError) throw profileError;
