@@ -34,6 +34,7 @@ import { FileUpload } from "@/components/vendor/FileUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { formatPanStatus, formatAadhaarLinked } from "@/lib/panComprehensive";
 import { downloadTemplate } from "@/lib/downloadTemplate";
+import { BANK_ACCOUNT_ERROR, isValidBankAccount, normalizeBankAccount } from "@/lib/bankAccount";
 
 
 /**
@@ -1105,9 +1106,9 @@ export function DocumentVerificationStep({
       if (typeof v === "object" && "value" in v) return String((v as any).value ?? "");
       return "";
     };
-    const ocrAccountRaw = pickStr(ocr.account_number).replace(/\s+/g, "");
+    const ocrAccountRaw = normalizeBankAccount(pickStr(ocr.account_number));
     const ocrIfscRaw = pickStr(ocr.ifsc_code).toUpperCase().trim();
-    if (!/^\d{8,18}$/.test(ocrAccountRaw)) {
+    if (!isValidBankAccount(ocrAccountRaw)) {
       return { ok: false as const, message: "Could not read a valid account number from the cheque. Please upload a clearer scan." };
     }
     if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ocrIfscRaw)) {
@@ -1831,10 +1832,10 @@ export function DocumentVerificationStep({
 
 
   const handleBankPopupSubmit = async () => {
-    const account = bankPopup.account.replace(/\s+/g, "");
+    const account = normalizeBankAccount(bankPopup.account);
     const ifsc = bankPopup.ifsc.toUpperCase().trim();
-    if (account.length < 8 || !/^\d+$/.test(account)) {
-      setBankPopup((p) => ({ ...p, error: "Enter a valid account number (8+ digits)." }));
+    if (!isValidBankAccount(account)) {
+      setBankPopup((p) => ({ ...p, error: BANK_ACCOUNT_ERROR }));
       return;
     }
     if (!isValidIfsc(ifsc)) {

@@ -23,6 +23,7 @@ import {
 } from '@/lib/nameMatch';
 
 import { mergeOcrExtracted } from '@/lib/kycExtract';
+import { BANK_ACCOUNT_ERROR, isValidBankAccount, normalizeBankAccount } from '@/lib/bankAccount';
 
 interface BankKycTabProps {
   bankAccountNumber: string;
@@ -193,11 +194,11 @@ export function BankKycTab(props: BankKycTabProps) {
 
   // Popup submit
   const handlePopupSubmit = async () => {
-    const account = popupAccount.replace(/\s+/g, '');
+    const account = normalizeBankAccount(popupAccount);
     const ifsc = popupIfsc.toUpperCase().trim();
     setPopupError('');
-    if (account.length < 8) {
-      setPopupError('Enter a valid account number (min 8 digits).');
+    if (!isValidBankAccount(account)) {
+      setPopupError(BANK_ACCOUNT_ERROR);
       return;
     }
     if (!isValidIfsc(ifsc)) {
