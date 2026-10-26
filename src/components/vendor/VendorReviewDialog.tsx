@@ -21,7 +21,7 @@ import { VendorDocuments } from '@/components/vendor/VendorDocuments';
 import { ValidationResult } from '@/types/vendor';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { toProperCase, formatVendorName } from '@/lib/textCase';
-import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
+import { formatPanStatus, formatAadhaarLinked, formatAadhaarLinkedForPan, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
 import { formatIndianFy, getLastThreeCompletedIndianFyStartYears } from '@/lib/indianFy';
 import { useSapMasterData } from '@/hooks/useSapMasterData';
 import {
@@ -560,7 +560,7 @@ export function VendorReviewDialog({
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1"><Label text={PAN_STATUS_LABEL} ok={panOk} /><p className="font-medium">{v.pan_status ? formatPanStatus(v.pan_status) : (v.pan && panOk ? 'Valid' : '-')}</p></div>
-                            <div className="space-y-1"><Label text={AADHAAR_LINKED_LABEL} ok={panOk} /><p className="font-medium">{formatAadhaarLinked(v.pan_aadhaar_linked)}</p></div>
+                            <div className="space-y-1"><Label text={AADHAAR_LINKED_LABEL} ok={panOk} /><p className="font-medium">{formatAadhaarLinkedForPan(v.pan, v.pan_aadhaar_linked)}</p></div>
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-1"><Label text="MSME Number" ok={msmeOk} /><p className="font-mono font-medium">{v.msme_number || '-'}</p></div>

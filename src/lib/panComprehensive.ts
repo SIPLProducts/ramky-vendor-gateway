@@ -12,6 +12,16 @@ export function formatAadhaarLinked(linked: boolean | null | undefined): string 
   return 'Aadhaar Not Linked with PAN';
 }
 
+/** Display-only: Aadhaar linkage applies to individual PANs (4th char 'P'); others show N/A. */
+export function formatAadhaarLinkedForPan(
+  pan: string | null | undefined,
+  linked: boolean | null | undefined,
+): string {
+  const p = String(pan ?? '').trim().toUpperCase();
+  if (p.length >= 4 && p.charAt(3) !== 'P') return 'N/A';
+  return formatAadhaarLinked(linked);
+}
+
 /** Human label used across the app. */
 export const PAN_STATUS_LABEL = 'PAN Status';
 export const AADHAAR_LINKED_LABEL = 'Is Aadhaar Linked';
