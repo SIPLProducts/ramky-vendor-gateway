@@ -232,8 +232,16 @@ export default function Dashboard() {
             batch.forEach(r => { r.current_approver = 'Names unavailable'; });
             continue;
           }
-          const names = new Map<string, string | null>((assignments?.items ?? []).map((item: { vendorId: string; name: string | null }) => [item.vendorId, item.name]));
-          batch.forEach(r => { r.current_approver = names.get(r.id) ?? null; });
+          const items = new Map<string, { name: string | null; invitedBy: { name: string | null; email: string | null } | null }>(
+            (assignments?.items ?? []).map((item: { vendorId: string; name: string | null; invitedBy?: { name: string | null; email: string | null } | null }) => [item.vendorId, { name: item.name, invitedBy: item.invitedBy ?? null }]),
+          );
+          batch.forEach(r => {
+            const item = items.get(r.id);
+            r.current_approver = item?.name ?? null;
+            // On-behalf records without a linked invitation: the backend resolves
+            // the inviter from the vendor creator, so fill Invited By from it.
+            if (!r.invited_by && item?.invitedBy) r.invited_by = item.invitedBy;
+          });
         }
       }
 
