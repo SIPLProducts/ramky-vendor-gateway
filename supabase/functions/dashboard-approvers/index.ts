@@ -62,7 +62,9 @@ Deno.serve(async (req) => {
     }
     const assignments = vendors.map(v => {
       if (['pending_sap_sync', 'dms_sync_pending'].includes(v.status)) {
-        return { vendorId: v.id, approverIds: sapMembers.filter(m => !m.tenantIds.length || (v.tenant_id !== null && m.tenantIds.includes(v.tenant_id))).map(m => m.userId), skipped: false };
+        const sapInvite = (invites ?? []).find(i => i.id === v.invitation_id)
+          ?? (invites ?? []).find(i => i.vendor_id === v.id);
+        return { vendorId: v.id, approverIds: sapMembers.filter(m => !m.tenantIds.length || (v.tenant_id !== null && m.tenantIds.includes(v.tenant_id))).map(m => m.userId), skipped: false, inviterId: sapInvite?.created_by ?? v.user_id ?? null };
       }
       const invite = (invites ?? []).find(i => i.id === v.invitation_id)
         ?? (invites ?? []).find(i => i.vendor_id === v.id);
@@ -85,8 +87,14 @@ Deno.serve(async (req) => {
     const { data: profiles, error: profileError } = userIds.length ? await admin.from('profiles')
       .select('id, full_name, email, status').in('id', userIds) : { data: [], error: null };
     if (profileError) throw profileError;
-    const names = new Map((profiles ?? []).filter(p => p.status === 'active').map(p => [p.id, p.full_name?.trim() || p.email]));
-    return reply({ items: assignments.map(a => ({ vendorId: a.vendorId, name: a.skipped ? 'Stage skipped' : a.approverIds.map(id => names.get(id)).filter(Boolean).sort().join(', ') || null })) });
+    const activeProfiles = (profiles ?? []).filter(p => p.status === 'active');
+    const names = new Map(activeProfiles.map(p => [p.id, p.full_name?.trim() || p.email]));
+    const inviters = new Map(activeProfiles.map(p => [p.id, { name: p.full_name?.trim() || null, email: p.email ?? null }]));
+    return reply({ items: assignments.map(a => ({
+      vendorId: a.vendorId,
+      name: a.skipped ? 'Stage skipped' : a.approverIds.map(id => names.get(id)).filter(Boolean).sort().join(', ') || null,
+      invitedBy: a.inviterId ? inviters.get(a.inviterId) ?? null : null,
+    })) });
   } catch {
     console.warn('Dashboard approver lookup failed.');
     return reply({ error: 'Could not load assigned approver names.' }, 500);
