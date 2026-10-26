@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     });
     // Resolve visibility before privileged routing/profile lookups. Never trust
     // client-supplied status, tenant, buyer, or approver IDs.
-    const { data: vendors, error } = await caller.from('vendors').select('id, status, tenant_id, invitation_id').in('id', parsed.data.vendorIds);
+    const { data: vendors, error } = await caller.from('vendors').select('id, status, tenant_id, invitation_id, user_id').in('id', parsed.data.vendorIds);
     if (error) throw error;
     if (!vendors?.length) return reply({ items: [] });
     const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
@@ -33,7 +33,11 @@ Deno.serve(async (req) => {
       .or(`vendor_id.in.(${ids.join(',')})${invitationIds.length ? `,id.in.(${invitationIds.join(',')})` : ''}`)
       .order('created_at', { ascending: false });
     if (inviteError) throw inviteError;
-    const buyers = [...new Set((invites ?? []).map(i => i.created_by).filter(Boolean))];
+    const buyers = [...new Set([
+      ...(invites ?? []).map(i => i.created_by).filter(Boolean),
+      // On-behalf records may have no invitation row; the vendor creator is the buyer.
+      ...vendors.map(v => v.user_id).filter(Boolean),
+    ])];
     const { data: flows, error: flowError } = buyers.length ? await admin.from('buyer_approval_flows')
       .select('*').in('buyer_user_id', buyers) : { data: [], error: null };
     if (flowError) throw flowError;
@@ -62,7 +66,7 @@ Deno.serve(async (req) => {
       }
       const invite = (invites ?? []).find(i => i.id === v.invitation_id)
         ?? (invites ?? []).find(i => i.vendor_id === v.id);
-      const buyerId = invite?.created_by ?? null;
+      const buyerId = invite?.created_by ?? v.user_id ?? null;
       const candidates = (flows ?? []).filter(f => f.buyer_user_id === buyerId);
       const tenantId = v.tenant_id ?? invite?.tenant_id;
       const exact = candidates.filter(f => f.tenant_id === tenantId);
