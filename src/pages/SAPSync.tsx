@@ -153,6 +153,9 @@ export default function SAPSync() {
       (vendor.legal_name || '').toLowerCase().includes(q) ||
       ((vendor as any).account_holder_name || '').toLowerCase().includes(q) ||
       (vendor.gstin || '').toLowerCase().includes(q) ||
+      ((vendor as any).reference_number || '').toLowerCase().includes(q) ||
+      ((vendor as any).sap_reference_no || '').toLowerCase().includes(q) ||
+      ((vendor as any).sap_vendor_code || '').toLowerCase().includes(q) ||
       vendor.id.toLowerCase().includes(q);
     const inScope =
       scopedTenantIds.size === 0 || !vendor.tenant_id || scopedTenantIds.has(vendor.tenant_id);
@@ -725,7 +728,7 @@ export default function SAPSync() {
                     </TableHeader>
                     <TableBody>
                       {pageItems.map((v) => {
-                        const refNo = (v as any).sap_reference_no || v.id.slice(0, 8).toUpperCase();
+                        const refNo = (v as any).reference_number || (v as any).sap_reference_no || v.id.slice(0, 8).toUpperCase();
                         const sapCode = (v as any).sap_vendor_code || '—';
                         const isSynced = v.status === 'dms_synced';
                         return (

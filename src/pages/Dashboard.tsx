@@ -95,6 +95,7 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   finance_2_review: { label: 'Finance 2 Review', variant: 'secondary' },
   ceo_office_review: { label: 'CEO Office Review', variant: 'secondary' },
   pending_sap_sync: { label: 'Pending SAP Sync', variant: 'secondary' },
+  dms_sync_pending: { label: 'Pending DMS Sync', variant: 'secondary' },
   returned_to_vendor: { label: 'Returned to Vendor', variant: 'outline' },
   returned_to_buyer: { label: 'Returned to Buyer', variant: 'outline' },
   sap_synced: { label: 'Approved (SAP Synced)', variant: 'default' },
@@ -113,7 +114,7 @@ function statusBadge(status: string, approver?: string | null) {
     finance_2_review: 'Finance 2',
     ceo_office_review: 'CEO Office',
     pending_sap_sync: 'SAP Team',
-    dms_sync_pending: 'SAP Team',
+    dms_sync_pending: 'Pending DMS Sync',
   };
   const label = approver ? `${roles[status] ?? cfg.label} (${approver})` : cfg.label;
   return <Badge variant={cfg.variant} className="whitespace-nowrap">{label}</Badge>;
