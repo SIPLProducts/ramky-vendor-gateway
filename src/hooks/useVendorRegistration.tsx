@@ -433,8 +433,18 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
 
   const isolateKycReplacementPayload = (payload: VendorRecord, sections: Set<KycSection>): VendorRecord => {
     if (sections.size === 0) return payload;
-    const allowed = new Set<string>(['tenant_id', 'invitation_id', 'status']);
-    sections.forEach((section) => KYC_COLUMNS[section].forEach((column) => allowed.add(column)));
+    // Only a true replacement (section already has accepted saved data) is
+    // isolated. First-time verification saves the full payload so identity,
+    // organization and contact fields seeded from the document are persisted.
+    const existingRow = (existingVendor as Record<string, unknown> | null) || {};
+    const hasSaved = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== '';
+    const SECTION_KEY: Record<KycSection, string> = { gst: 'gstin', pan: 'pan', msme: 'msme_number', bank: 'account_number' };
+    const replacing = [...sections].filter((section) => hasSaved(existingRow[SECTION_KEY[section]]));
+    if (replacing.length === 0) return payload;
+    const allowed = new Set<string>(['tenant_id', 'invitation_id', 'status', 'legal_name', 'trade_name']);
+    replacing.forEach((section) => KYC_COLUMNS[section].forEach((column) => allowed.add(column)));
+    // Non-replacing pending sections (first upload) keep their columns too.
+    [...sections].filter((s) => !replacing.includes(s)).forEach((section) => KYC_COLUMNS[section].forEach((column) => allowed.add(column)));
     return Object.fromEntries(Object.entries(payload).filter(([column]) => allowed.has(column)));
   };
 
