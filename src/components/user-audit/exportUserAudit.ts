@@ -34,9 +34,11 @@ export function exportUserAudit(opts: {
   actions: Record<string, any>[];
   pending: Record<string, any>[];
   activity: Record<string, any>[];
+  all?: Record<string, any>[];
 }) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet(Object.entries(opts.summary).map(([Metric, Value]) => ({ Metric, Value }))), 'Summary');
+  if (opts.all) XLSX.utils.book_append_sheet(wb, sheet(opts.all), 'All Records');
   XLSX.utils.book_append_sheet(wb, sheet(opts.vendors.map(({ vendor, relation }) => ({ 'User Relation': relation, ...flatVendor(vendor) }))), 'Vendors');
   XLSX.utils.book_append_sheet(wb, sheet(opts.actions), 'Approval Actions');
   XLSX.utils.book_append_sheet(wb, sheet(opts.pending), 'Pending Queue');

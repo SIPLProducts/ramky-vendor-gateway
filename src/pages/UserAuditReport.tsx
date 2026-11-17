@@ -68,8 +68,19 @@ const STATUS_ROW = (st?: string, pending?: boolean) => pending ? 'bg-warning/10 
 const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive/10 text-destructive border-destructive/30'
   : /approved|synced|active|completed/i.test(st ?? '') ? 'bg-success/10 text-success border-success/30'
   : /pending|review|submitted/i.test(st ?? '') ? 'bg-warning/10 text-warning border-warning/30' : 'bg-primary/10 text-primary border-primary/30';
-const TH = 'h-8 px-2 text-[11px] font-semibold uppercase tracking-wide text-primary';
-const TD = 'px-2 py-1.5 text-xs';
+const TH = '!h-auto !py-1.5 !px-1.5 !text-[10px] leading-tight whitespace-normal font-semibold uppercase tracking-wide text-primary';
+const TD = '!px-1.5 !py-1 !text-[11px] leading-tight';
+const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
+type RowType = typeof TYPE_ORDER[number];
+const TYPE_STYLE: Record<RowType, { pill: string; row: string; chip: string; chipOn: string }> = {
+  Pending: { pill: 'bg-gradient-to-r from-warning to-warning/70 text-warning-foreground', row: 'border-l-warning bg-warning/10 font-medium', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
+  Approved: { pill: 'bg-success/15 text-success', row: 'border-l-success bg-success/5', chip: 'border-success/40 text-success bg-success/5', chipOn: 'bg-success text-success-foreground border-success' },
+  Rejected: { pill: 'bg-destructive/15 text-destructive', row: 'border-l-destructive bg-destructive/5', chip: 'border-destructive/40 text-destructive bg-destructive/5', chipOn: 'bg-destructive text-destructive-foreground border-destructive' },
+  Returned: { pill: 'bg-warning/15 text-warning', row: 'border-l-warning/60 bg-warning/5', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
+  Invited: { pill: 'bg-primary/15 text-primary', row: 'border-l-primary bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
+  'On Behalf': { pill: 'bg-gradient-to-r from-primary/25 to-success/20 text-primary', row: 'border-l-primary/60 bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
+  Activity: { pill: 'bg-muted text-muted-foreground', row: 'border-l-muted-foreground/30', chip: 'border-border text-muted-foreground', chipOn: 'bg-muted-foreground text-background border-muted-foreground' },
+};
 
 function Kpi({ icon: Icon, label, value, tone = 'primary' }: { icon: any; label: string; value: string | number; tone?: string }) {
   return (
@@ -254,9 +265,30 @@ export default function UserAuditReport() {
     return { stage: STAGE_LABEL[s], Approved: c.Approved, Rejected: c.Rejected, Returned: c.Returned };
   }).filter((x) => x.Approved + x.Rejected + x.Returned > 0);
 
-  const vPage = usePaged(vendorRows), aPage = usePaged(actionRows), pPage = usePaged(pendingRows), lPage = usePaged(activityRows);
-  useEffect(() => { vPage.reset(); aPage.reset(); pPage.reset(); lPage.reset(); // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, from, to, company, status, q]);
+  const hrs2 = (a?: string, b?: string) => (a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 36e5)) : null);
+  const combined = useMemo(() => {
+    const out: { key: string; at: string; type: RowType; ref: string; vendor: string; vendorId?: string; invitedBy: string; stage: string; status: string; rawStatus: string; details: string; duration: string }[] = [];
+    const vf = (id?: string) => { const v = vendorsMap[id ?? '']; return { ref: v?.reference_number ?? '', vendor: v ? vName(v) : '', status: v ? titleCase(v.status) : '', rawStatus: v?.status ?? '' }; };
+    pendingRows.forEach((p) => out.push({ key: `p${p.vendor_id}${p.stage}`, at: p.started_at ?? p.created_at, type: 'Pending', vendorId: p.vendor_id, ...vf(p.vendor_id),
+      invitedBy: invitedByText(p.vendor_id), stage: stageLabel(p.stage), details: 'Waiting For This User', duration: fmtWait(hoursSince(p.started_at ?? p.created_at)) }));
+    actionRows.forEach((h) => { const t = classifyAction(h.action); out.push({ key: `a${h.id}`, at: h.acted_at, type: (t === 'Other' ? 'Activity' : t) as RowType, vendorId: h.vendor_id, ...vf(h.vendor_id),
+      invitedBy: invitedByText(h.vendor_id), stage: stageLabel(h.stage), details: h.comments || (t === 'Other' ? titleCase(h.action) : ''), duration: fmtWait(hrs2(h.started_at, h.acted_at)) }); });
+    invites.filter((i) => i.created_by === userId && inRange(i.created_at) && (!i.vendor_id || vendorOk(vendorsMap[i.vendor_id]) || (company === 'all' && status === 'all'))).forEach((i) => {
+      const v = vf(i.vendor_id); if (!matchQ(v.vendor, i.vendor_name, i.email, v.ref)) return;
+      out.push({ key: `i${i.id}`, at: i.created_at, type: i.created_on_behalf ? 'On Behalf' : 'Invited', vendorId: i.vendor_id ?? undefined, ...v, vendor: v.vendor || i.vendor_name || i.email,
+        invitedBy: i.created_on_behalf ? 'Self (On Behalf)' : 'Self', stage: '', details: i.used_at ? `Link Opened ${formatDate(i.used_at)}` : i.email, duration: '' }); });
+    activityRows.forEach((a) => out.push({ key: `l${a.id}`, at: a.created_at, type: 'Activity', vendorId: a.vendor_id ?? undefined, ...vf(a.vendor_id),
+      invitedBy: a.vendor_id ? invitedByText(a.vendor_id) : '', stage: '', details: `${titleCase(a.action)}${a.details && Object.keys(a.details).length ? ' · ' + JSON.stringify(a.details) : ''}`, duration: '' }));
+    return out.sort((x, y) => (x.type === 'Pending' ? 0 : 1) - (y.type === 'Pending' ? 0 : 1) || (y.at ?? '').localeCompare(x.at ?? ''));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRows, actionRows, activityRows, invites, vendorsMap, vInvites, userId, from, to, company, status, q]);
+  const [typeFilter, setTypeFilter] = useState<'All' | RowType>('All');
+  const shown = typeFilter === 'All' ? combined : combined.filter((r) => r.type === typeFilter);
+  const cPage = usePaged(shown);
+  useEffect(() => { cPage.reset(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, from, to, company, status, q, typeFilter]);
+  const combinedExport = () => combined.map((r) => ({ 'Date / Time': formatDateTime(r.at, ''), Type: r.type, 'Reference No': r.ref, Vendor: r.vendor,
+    'Invited By': r.invitedBy, Stage: r.stage, 'Vendor Status': r.status, 'Comments / Details': r.details, 'Time Taken / Waiting': r.duration }));
 
   const hoursSince = (d?: string) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 36e5)) : null);
   const fmtWait = (h: number | null) => (h == null ? '—' : h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`);
@@ -269,7 +301,7 @@ export default function UserAuditReport() {
     return {
       userName: user.full_name || user.email,
       summary: {
-        'User Name': user.full_name ?? '', Email: user.email, Roles: roles, Companies: companies, Status: titleCase(user.status),
+        'User Name': user.full_name ?? '', Email: user.email, Roles: roles, Status: titleCase(user.status),
         'Date Range': from || to ? `${from ? formatDate(from) : 'Start'} to ${to ? formatDate(to) : 'Today'}` : 'All Time',
         'Vendors Linked': vendorRows.length, 'Vendors Invited': invitedCount, 'Created On Behalf': behalfCount,
         Approvals: types.Approved, Rejections: types.Rejected, 'Returns / Clarifications': types.Returned,
@@ -292,13 +324,10 @@ export default function UserAuditReport() {
       })),
     };
   };
-  const doExport = () => { const d = buildExport(); if (d) exportUserAudit(d); };
+  const doExport = () => { const d = buildExport(); if (d) exportUserAudit({ ...d, all: combinedExport() }); };
   const doPdf = () => {
     const d = buildExport(); if (!d) return;
-    exportUserAuditPdf({ userName: d.userName, summary: d.summary, actions: d.actions, pending: d.pending, activity: d.activity,
-      vendors: vendorRows.map((r) => ({ 'Reference No': r.vendor.reference_number ?? '', Vendor: vName(r.vendor), GSTIN: r.vendor.gstin ?? '',
-        Company: tenantNames[r.vendor.tenant_id] ?? '', Status: titleCase(r.vendor.status), 'Invited By': invitedByText(r.vendor.id),
-        'SAP Code': r.vendor.sap_vendor_code ?? '', 'Pending With User': pendingIds.has(r.vendor.id) ? 'Pending' : '', Relation: r.relation })) });
+    exportUserAuditPdf({ userName: d.userName, summary: d.summary, all: combinedExport() });
   };
 
   return (
@@ -394,7 +423,6 @@ export default function UserAuditReport() {
               </div>
               <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Mail className="h-3 w-3" />Email</p>{user?.email}</div>
               <div className="text-xs"><p className="text-muted-foreground text-[11px]">Roles</p>{roles}</div>
-              <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Building2 className="h-3 w-3" />Companies</p>{companies}</div>
               <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Clock className="h-3 w-3" />Last Login</p>{formatDateTime(user?.last_login_attempt_at, '—')}</div>
               <div className="text-xs"><p className="text-muted-foreground text-[11px]">User Since</p>{formatDate(user?.created_at, '—')}</div>
             </CardContent>
@@ -447,95 +475,36 @@ export default function UserAuditReport() {
 
           <Card className="rounded-[10px] shadow-sm">
             <CardContent className="p-3">
-              <Tabs defaultValue="vendors">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <TabsList className="h-8 bg-gradient-to-r from-primary/10 to-muted [&>button]:text-xs [&>button]:py-1">
-                    <TabsTrigger value="vendors">Vendors ({vendorRows.length})</TabsTrigger>
-                    <TabsTrigger value="actions">Approval Actions ({actionRows.length})</TabsTrigger>
-                    <TabsTrigger value="pending">Pending Queue ({pendingRows.length})</TabsTrigger>
-                    <TabsTrigger value="activity">Activity Log ({activityRows.length})</TabsTrigger>
-                  </TabsList>
-                  <div className="relative w-full sm:w-64"><Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
-                    <Input className="pl-8 h-8 text-xs" placeholder="Search Vendor, Reference, GSTIN..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {(['All', ...TYPE_ORDER] as const).map((t) => { const n = t === 'All' ? combined.length : combined.filter((r) => r.type === t).length;
+                    if (t !== 'All' && !n) return null; const on = typeFilter === t;
+                    return <button key={t} type="button" onClick={() => setTypeFilter(t)}
+                      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${on ? (t === 'All' ? 'bg-primary text-primary-foreground border-primary' : TYPE_STYLE[t].chipOn) : (t === 'All' ? 'bg-card text-foreground' : TYPE_STYLE[t].chip)}`}>{t} ({n})</button>; })}
                 </div>
-
-                <TabsContent value="vendors">
-                  <div className="flex flex-wrap gap-3 mb-2 text-[11px] text-muted-foreground">
-                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-warning/30 border-l-4 border-l-warning" />Pending With User</span>
-                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-success/20 border-l-4 border-l-success/60" />Approved / Synced</span>
-                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-destructive/15 border-l-4 border-l-destructive/60" />Rejected</span>
-                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border" />Other</span>
-                  </div>
-                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
-                    <TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor Name</TableHead><TableHead className={TH}>GSTIN</TableHead><TableHead className={TH}>PAN</TableHead>
-                    <TableHead className={TH}>Company</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Current Status</TableHead><TableHead className={TH}>SAP Code</TableHead><TableHead className={TH}>Invited On</TableHead>
-                    <TableHead className={TH}>Submitted On</TableHead><TableHead className={TH}>User Relation</TableHead><TableHead className={TH} /></TableRow></TableHeader>
-                    <TableBody>{vPage.rows.length ? vPage.rows.map(({ vendor: v, relation, invite }) => (
-                      <TableRow key={v.id} className={STATUS_ROW(v.status, pendingIds.has(v.id))}>
-                        <TableCell className={`${TD} font-mono text-xs`}>{v.reference_number ?? '—'}</TableCell>
-                        <TableCell className={`${TD} font-medium`}>{vName(v)}</TableCell>
-                        <TableCell className={`${TD} font-mono text-xs`}>{v.gstin ?? '—'}</TableCell>
-                        <TableCell className={`${TD} font-mono text-xs`}>{v.pan ?? '—'}</TableCell>
-                        <TableCell className={`${TD} `}>{tenantNames[v.tenant_id] ?? '—'}</TableCell>
-                        <TableCell className={`${TD} `}><InvBy b={invitedBy(v.id)} /></TableCell>
-                        <TableCell className={`${TD} `}><div className="flex flex-col gap-0.5 items-start"><Badge variant="outline" className={`text-[10px] ${STATUS_BADGE(v.status)}`}>{titleCase(v.status)}</Badge>
-                          {pendingIds.has(v.id) && <Badge className="text-[10px] bg-gradient-to-r from-warning to-warning/70 text-warning-foreground border-0">Pending With User</Badge>}</div></TableCell>
-                        <TableCell className={`${TD} `}>{v.sap_vendor_code ?? '—'}</TableCell>
-                        <TableCell className={`${TD} `}>{formatDate(invite?.created_at, '—')}</TableCell>
-                        <TableCell className={`${TD} `}>{formatDate(v.submitted_at, '—')}</TableCell>
-                        <TableCell className={`${TD} text-xs`}>{relation}</TableCell>
-                        <TableCell className={`${TD} `}><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setReviewId(v.id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
-                      </TableRow>)) : <EmptyRow cols={12} />}</TableBody></Table></div>{vPage.pager}
-                </TabsContent>
-
-                <TabsContent value="actions">
-                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
-                    <TableHead className={TH}>Date / Time</TableHead><TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Stage</TableHead>
-                    <TableHead className={TH}>Action</TableHead><TableHead className={TH}>Comments</TableHead><TableHead className={TH}>Time Taken</TableHead></TableRow></TableHeader>
-                    <TableBody>{aPage.rows.length ? aPage.rows.map((h) => {
-                      const t = classifyAction(h.action);
-                      const hrs = h.started_at ? Math.max(0, Math.round((new Date(h.acted_at).getTime() - new Date(h.started_at).getTime()) / 36e5)) : null;
-                      return (<TableRow key={h.id}>
-                        <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(h.acted_at)}</TableCell>
-                        <TableCell className={`${TD} font-mono text-xs`}>{h.vendor?.reference_number ?? '—'}</TableCell>
-                        <TableCell className={`${TD} font-medium`}>{vName(h.vendor)}</TableCell>
-                        <TableCell className={`${TD} `}><InvBy b={invitedBy(h.vendor_id)} /></TableCell>
-                        <TableCell className={`${TD} `}>{stageLabel(h.stage)}</TableCell>
-                        <TableCell className={`${TD} `}><Badge variant={t === 'Rejected' ? 'destructive' : 'outline'} className={t === 'Approved' ? 'bg-success/10 text-success' : t === 'Returned' ? 'bg-warning/10 text-warning' : ''}>{t === 'Other' ? titleCase(h.action) : t}</Badge></TableCell>
-                        <TableCell className={`${TD} max-w-xs text-sm`}>{h.comments || '—'}</TableCell>
-                        <TableCell className={`${TD} `}>{fmtWait(hrs)}</TableCell>
-                      </TableRow>);
-                    }) : <EmptyRow cols={8} />}</TableBody></Table></div>{aPage.pager}
-                </TabsContent>
-
-                <TabsContent value="pending">
-                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
-                    <TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Stage</TableHead><TableHead className={TH}>Waiting Since</TableHead><TableHead className={TH}>Waiting For</TableHead><TableHead className={TH} /></TableRow></TableHeader>
-                    <TableBody>{pPage.rows.length ? pPage.rows.map((p) => (
-                      <TableRow key={`${p.vendor_id}-${p.stage}`} className={STATUS_ROW('', true)}>
-                        <TableCell className={`${TD} font-mono text-xs`}>{p.vendor?.reference_number ?? '—'}</TableCell>
-                        <TableCell className={`${TD} font-medium`}>{vName(p.vendor)}</TableCell>
-                        <TableCell className={`${TD} `}><InvBy b={invitedBy(p.vendor_id)} /></TableCell>
-                        <TableCell className={`${TD} `}>{stageLabel(p.stage)}</TableCell>
-                        <TableCell className={`${TD} `}>{formatDateTime(p.started_at ?? p.created_at, '—')}</TableCell>
-                        <TableCell className={`${TD} `}><Badge variant="outline" className="bg-warning/10 text-warning">{fmtWait(hoursSince(p.started_at ?? p.created_at))}</Badge></TableCell>
-                        <TableCell className={`${TD} `}><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setReviewId(p.vendor_id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
-                      </TableRow>)) : <EmptyRow cols={7} />}</TableBody></Table></div>{pPage.pager}
-                </TabsContent>
-
-                <TabsContent value="activity">
-                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
-                    <TableHead className={TH}>Date / Time</TableHead><TableHead className={TH}>Action</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Details</TableHead><TableHead className={TH}>IP Address</TableHead></TableRow></TableHeader>
-                    <TableBody>{lPage.rows.length ? lPage.rows.map((a) => (
-                      <TableRow key={a.id}>
-                        <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(a.created_at)}</TableCell>
-                        <TableCell className={`${TD} `}><Badge variant="outline">{titleCase(a.action)}</Badge></TableCell>
-                        <TableCell className={`${TD} `}>{a.vendor_id && vendorsMap[a.vendor_id] ? vName(vendorsMap[a.vendor_id]) : '—'}</TableCell>
-                        <TableCell className="max-w-md text-xs text-muted-foreground truncate" title={JSON.stringify(a.details ?? {})}>{JSON.stringify(a.details ?? {})}</TableCell>
-                        <TableCell className={`${TD} text-xs`}>{a.ip_address ?? '—'}</TableCell>
-                      </TableRow>)) : <EmptyRow cols={5} />}</TableBody></Table></div>{lPage.pager}
-                </TabsContent>
-              </Tabs>
+                <div className="relative w-full sm:w-60"><Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+                  <Input className="pl-8 h-8 text-xs" placeholder="Search Any Column..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+              </div>
+              <div className="rounded-md border"><Table className="table-fixed w-full">
+                <TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10 sticky top-0"><TableRow className="hover:bg-transparent">
+                  <TableHead className={`${TH} w-[12%]`}>Date / Time</TableHead><TableHead className={`${TH} w-[10%]`}>Type</TableHead>
+                  <TableHead className={`${TH} w-[9%]`}>Ref No</TableHead><TableHead className={`${TH} w-[12%]`}>Vendor</TableHead>
+                  <TableHead className={`${TH} w-[10%]`}>Invited By</TableHead><TableHead className={`${TH} w-[7%]`}>Stage</TableHead>
+                  <TableHead className={`${TH} w-[10%]`}>Status</TableHead><TableHead className={`${TH} w-[16%]`}>Comments / Details</TableHead>
+                  <TableHead className={`${TH} w-[7%]`}>Time</TableHead><TableHead className={`${TH} w-[6%]`} /></TableRow></TableHeader>
+                <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
+                  <TableRow key={r.key} className={`border-l-4 ${TYPE_STYLE[r.type].row}`}>
+                    <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(r.at, '—')}</TableCell>
+                    <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{r.type}</span></TableCell>
+                    <TableCell className={`${TD} font-mono text-[11px] truncate`} title={r.ref}>{r.ref || '—'}</TableCell>
+                    <TableCell className={`${TD} font-medium truncate`} title={r.vendor}>{r.vendor || '—'}</TableCell>
+                    <TableCell className={`${TD} truncate`} title={r.invitedBy}>{r.invitedBy || '—'}</TableCell>
+                    <TableCell className={`${TD} truncate`}>{r.stage || '—'}</TableCell>
+                    <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] truncate max-w-full ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
+                    <TableCell className={`${TD} truncate text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-nowrap ${r.type === 'Pending' ? 'font-semibold text-warning' : ''}`}>{r.duration || '—'}</TableCell>
+                    <TableCell className={TD}>{r.vendorId && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5 mr-1" />View</Button>}</TableCell>
+                  </TableRow>)) : <EmptyRow cols={10} />}</TableBody></Table></div>{cPage.pager}
             </CardContent>
           </Card>
         </>
