@@ -66,6 +66,7 @@ const drawerNavItems = [
   { label: 'GST Compliance', href: '/compliance/gst', icon: CheckCircle, screenKey: 'gst_compliance' },
   { label: 'Scheduled Checks', href: '/compliance/scheduled', icon: ClipboardCheck, screenKey: 'scheduled_checks' },
   { label: 'Audit Logs', href: '/audit-logs', icon: History, screenKey: 'audit_logs' },
+  { label: 'User Audit Report', href: '/user-audit-report', icon: FileSpreadsheet, screenKey: 'user_audit_report' },
   { label: 'Reports', href: '/reports', icon: BarChart3, screenKey: 'reports' },
   { label: 'Admin Configuration', href: '/settings', icon: Settings, screenKey: 'admin_configuration' },
   { label: 'Email Configuration', href: '/admin/email-config', icon: Mail, screenKey: 'email_configuration' },

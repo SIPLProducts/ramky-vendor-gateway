@@ -30,6 +30,7 @@ import VendorList from "./pages/VendorList";
 import VendorStatus from "./pages/VendorStatus";
 
 import AuditLogs from "./pages/AuditLogs";
+import UserAuditReport from "./pages/UserAuditReport";
 import AdminConfiguration from "./pages/AdminConfiguration";
 import AdminInvitations from "./pages/AdminInvitations";
 import UserManagement from "./pages/UserManagement";
@@ -91,6 +92,7 @@ const App = () => (
                 <Route path="/vendor-status/:id" element={<VendorStatus />} />
 
                 <Route path="/audit-logs" element={<AuditLogs />} />
+                <Route path="/user-audit-report" element={<UserAuditReport />} />
                 <Route path="/settings" element={<AdminConfiguration />} />
                 <Route path="/admin/invitations" element={<AdminInvitations />} />
                 <Route path="/admin/users" element={<UserManagement />} />
