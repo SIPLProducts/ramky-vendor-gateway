@@ -68,8 +68,8 @@ const STATUS_ROW = (st?: string, pending?: boolean) => pending ? 'bg-warning/10 
 const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive/10 text-destructive border-destructive/30'
   : /approved|synced|active|completed/i.test(st ?? '') ? 'bg-success/10 text-success border-success/30'
   : /pending|review|submitted/i.test(st ?? '') ? 'bg-warning/10 text-warning border-warning/30' : 'bg-primary/10 text-primary border-primary/30';
-const TH = '!h-auto !py-1.5 !px-1.5 !text-[10px] leading-tight whitespace-normal font-semibold uppercase tracking-wide text-primary';
-const TD = '!px-1.5 !py-1 !text-[11px] leading-tight';
+const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide text-primary';
+const TD = '!px-2 !py-1 !text-[11px] leading-tight whitespace-nowrap';
 const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
 const TYPE_LABEL: Record<string, string> = { Pending: 'Pending With User', Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
 type RowType = typeof TYPE_ORDER[number];
@@ -457,28 +457,28 @@ export default function UserAuditReport() {
                 <div className="relative w-full sm:w-60"><Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
                   <Input className="pl-8 h-8 text-xs" placeholder="Search Any Column..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               </div>
-              <div className="rounded-md border"><Table className="table-fixed w-full">
+              <div className="rounded-md border overflow-x-auto"><Table className="w-max min-w-full">
                 <TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10 sticky top-0"><TableRow className="hover:bg-transparent">
-                  <TableHead className={`${TH} w-[8%]`}>Action Date</TableHead><TableHead className={`${TH} w-[10%]`}>Action</TableHead>
-                  <TableHead className={`${TH} w-[8%]`}>Ref No</TableHead><TableHead className={`${TH} w-[11%]`}>Vendor Name</TableHead>
-                  <TableHead className={`${TH} w-[9%]`}>GSTIN</TableHead><TableHead className={`${TH} w-[9%]`}>Company</TableHead>
-                  <TableHead className={`${TH} w-[8%]`}>Invited By</TableHead><TableHead className={`${TH} w-[6%]`}>Approval Stage</TableHead>
-                  <TableHead className={`${TH} w-[12%]`}>Comments</TableHead><TableHead className={`${TH} w-[9%]`}>Current Vendor Status</TableHead>
-                  <TableHead className={`${TH} w-[7%]`}>SAP Code</TableHead><TableHead className={`${TH} w-[3%]`} /></TableRow></TableHeader>
+                  <TableHead className={`${TH}`}>Action Date</TableHead><TableHead className={`${TH}`}>Action</TableHead>
+                  <TableHead className={`${TH}`}>Ref No</TableHead><TableHead className={`${TH}`}>Vendor Name</TableHead>
+                  <TableHead className={`${TH}`}>GSTIN</TableHead><TableHead className={`${TH}`}>Company</TableHead>
+                  <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Approval Stage</TableHead>
+                  <TableHead className={`${TH}`}>Comments</TableHead><TableHead className={`${TH}`}>Current Vendor Status</TableHead>
+                  <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 bg-card`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 ${TYPE_STYLE[r.type].row}`}>
-                    <TableCell className={TD}>{formatDate(r.at, '—')}<div className="text-[10px] text-muted-foreground">{r.at ? formatDateTime(r.at).slice(11) : ''}</div></TableCell>
-                    <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-normal text-center leading-tight ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
-                    <TableCell className={`${TD} font-mono text-[11px] whitespace-normal break-words`} title={r.ref}>{r.ref || '—'}</TableCell>
-                    <TableCell className={`${TD} font-medium whitespace-normal break-words`} title={r.vendor}>{r.vendor || '—'}</TableCell>
-                    <TableCell className={`${TD} font-mono text-[10px] whitespace-normal break-words`} title={r.gstin}>{r.gstin || '—'}</TableCell>
-                    <TableCell className={`${TD} whitespace-normal break-words`} title={r.company}>{r.company || '—'}</TableCell>
-                    <TableCell className={`${TD} whitespace-normal break-words`} title={r.invitedBy}>{r.invitedBy || '—'}</TableCell>
-                    <TableCell className={`${TD} whitespace-normal break-words`}>{r.stage || '—'}</TableCell>
-                    <TableCell className={`${TD} whitespace-normal break-words text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
-                    <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] whitespace-normal break-words max-w-full whitespace-normal text-center leading-tight ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
-                    <TableCell className={`${TD} font-mono whitespace-normal break-words`}>{r.sap || '—'}</TableCell>
-                    <TableCell className={TD}>{r.vendorId && <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5" /></Button>}</TableCell>
+                    <TableCell className={TD}>{formatDateTime(r.at, '—')}</TableCell>
+                    <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
+                    <TableCell className={`${TD} font-mono text-[11px] whitespace-nowrap`} title={r.ref}>{r.ref || '—'}</TableCell>
+                    <TableCell className={`${TD} font-medium whitespace-nowrap`} title={r.vendor}>{r.vendor || '—'}</TableCell>
+                    <TableCell className={`${TD} font-mono text-[10px] whitespace-nowrap`} title={r.gstin}>{r.gstin || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-nowrap`} title={r.company}>{r.company || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-nowrap`} title={r.invitedBy}>{r.invitedBy || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-nowrap`}>{r.stage || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-nowrap text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
+                    <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] whitespace-nowrap max-w-full whitespace-nowrap ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
+                    <TableCell className={`${TD} font-mono whitespace-nowrap`}>{r.sap || '—'}</TableCell>
+                    <TableCell className={`${TD} sticky right-0 bg-card`}>{r.vendorId && <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5" /></Button>}</TableCell>
                   </TableRow>)) : <EmptyRow cols={12} />}</TableBody></Table></div>{cPage.pager}
             </CardContent>
           </Card>
