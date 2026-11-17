@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { ChangePasswordDialog } from '@/components/account/ChangePasswordDialog';
 import { KeyRound } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 import {
   LayoutDashboard,
   FileText,
