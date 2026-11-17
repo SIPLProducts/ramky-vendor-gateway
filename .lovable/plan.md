@@ -19,7 +19,10 @@
 - Charts: gradient fills for bars, pie slices and line area.
 - Table headers: light gradient background; status badges coloured by status.
 
-## 5. Highlight pending vendors in the Vendors table
+## 5. Polished, modern look
+- Gradient icon badges, soft shadows, hover lift on tiles, gradient header strip on the user card, coloured tab bar, rounded bordered tables.
+
+## 6. Highlight pending vendors in the Vendors table
 - Rows where the vendor is currently pending with this user get an amber tinted background and a left amber border, plus a "Pending With User" badge.
 - Small legend above the table: Pending With User / Approved / Rejected / Other. Rejected rows tinted red, approved/SAP-synced rows tinted green.
 
