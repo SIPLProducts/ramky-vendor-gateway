@@ -23,3 +23,8 @@ Show only the tiles that make sense for that user:
 - Derive the tile list from `rolesBy[userId]` (buyer, scm_manager, scm_head, finance_1, finance_2, ceo_office, sap_team) and filter it. Use `grid-cols-[repeat(auto-fit,minmax(150px,1fr))]`.
 - Charts: `md:grid-cols-2`, `h-60`, recharts `LabelList` on bars, and gradient stops with opacity 1 to 0.7.
 - Verify in the browser by selecting Grandhi Srinivas (approver) and a buyer.
+
+## 4. Smaller fonts to fit on one screen
+- Shrink text across the whole report: title 15px, labels 10–11px, tile numbers 16px, table 11px, filters and buttons 11px with 28px height.
+- Tighter tiles, card padding and gaps, so the user card, tiles, charts and the top of the table fit in one screen on a laptop.
+- The page's global font rules currently override these sizes, so the report uses forced sizes.
