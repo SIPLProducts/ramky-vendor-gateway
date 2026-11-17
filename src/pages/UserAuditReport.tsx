@@ -18,7 +18,7 @@ import { exportUserAudit } from '@/components/user-audit/exportUserAudit';
 import { exportUserAuditPdf } from '@/components/user-audit/exportUserAuditPdf';
 import { useToast } from '@/hooks/use-toast';
 import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend,
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend, LabelList,
 } from 'recharts';
 import {
   ChevronsUpDown, Check, Download, Eye, UserRound, Mail, Building2, Clock, Send, CheckCircle2, XCircle,
@@ -85,11 +85,11 @@ const TYPE_STYLE: Record<RowType, { pill: string; row: string; chip: string; chi
 function Kpi({ icon: Icon, label, value, tone = 'primary' }: { icon: any; label: string; value: string | number; tone?: string }) {
   return (
     <Card className={`rounded-[10px] bg-gradient-to-br shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${(TONES[tone] ?? TONES.primary).card}`}>
-      <CardContent className="p-2.5 flex items-center gap-2.5">
+      <CardContent className="!p-2 flex items-center gap-2">
         <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-primary-foreground shadow-sm ${(TONES[tone] ?? TONES.primary).icon}`}><Icon className="h-4 w-4" /></div>
         <div className="min-w-0">
-          <p className="text-[11px] leading-tight text-muted-foreground line-clamp-2">{label}</p>
-          <p className={`text-lg leading-tight font-bold ${(TONES[tone] ?? TONES.primary).text}`}>{value}</p>
+          <p className="!text-[10px] leading-tight text-muted-foreground line-clamp-2">{label}</p>
+          <p className={`!text-base leading-tight font-bold ${(TONES[tone] ?? TONES.primary).text}`}>{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -265,6 +265,8 @@ export default function UserAuditReport() {
     return { stage: STAGE_LABEL[s], Approved: c.Approved, Rejected: c.Rejected, Returned: c.Returned };
   }).filter((x) => x.Approved + x.Rejected + x.Returned > 0);
 
+  const hoursSince = (d?: string) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 36e5)) : null);
+  const fmtWait = (h: number | null) => (h == null ? '—' : h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`);
   const hrs2 = (a?: string, b?: string) => (a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 36e5)) : null);
   const combined = useMemo(() => {
     const out: { key: string; at: string; type: RowType; ref: string; vendor: string; vendorId?: string; invitedBy: string; stage: string; status: string; rawStatus: string; details: string; duration: string }[] = [];
@@ -290,8 +292,6 @@ export default function UserAuditReport() {
   const combinedExport = () => combined.map((r) => ({ 'Date / Time': formatDateTime(r.at, ''), Type: r.type, 'Reference No': r.ref, Vendor: r.vendor,
     'Invited By': r.invitedBy, Stage: r.stage, 'Vendor Status': r.status, 'Comments / Details': r.details, 'Time Taken / Waiting': r.duration }));
 
-  const hoursSince = (d?: string) => (d ? Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 36e5)) : null);
-  const fmtWait = (h: number | null) => (h == null ? '—' : h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`);
   const roles = (rolesBy[userId] ?? []).map(titleCase).join(', ') || '—';
   const companies = (tenantsBy[userId] ?? []).map((t) => tenantNames[t]).filter(Boolean).join(', ') || 'All Companies';
   const statuses = [...new Set(Object.values(vendorsMap).map((v: any) => v.status))].sort();
@@ -324,6 +324,23 @@ export default function UserAuditReport() {
       })),
     };
   };
+  const roleSet = new Set(rolesBy[userId] ?? []);
+  const isBuyer = roleSet.has('buyer');
+  const isApprover = ['approver', 'scm_manager', 'scm_head', 'finance_1', 'finance_2', 'ceo_office'].some((x) => roleSet.has(x as any));
+  const isSap = roleSet.has('sap_team');
+  const ALL_TILES = [
+    { k: 'inv', icon: Send, label: 'Vendors Invited', value: invitedCount, tone: 'primary', show: isBuyer },
+    { k: 'beh', icon: Users, label: 'Created On Behalf', value: behalfCount, tone: 'accent', show: isBuyer },
+    { k: 'app', icon: CheckCircle2, label: 'Approvals', value: types.Approved, tone: 'success', show: isApprover || isSap },
+    { k: 'rej', icon: XCircle, label: 'Rejections', value: types.Rejected, tone: 'destructive', show: isApprover },
+    { k: 'ret', icon: RotateCcw, label: 'Returns / Clarifications', value: types.Returned, tone: 'warning', show: isApprover },
+    { k: 'pen', icon: Hourglass, label: 'Pending In Queue', value: pendingRows.length, tone: 'warning', show: isBuyer || isApprover || isSap },
+    { k: 'avg', icon: Timer, label: 'Avg Approval Time', value: avg == null ? '—' : `${avg} h`, tone: 'accent', show: isApprover || isSap },
+    { k: 'sap', icon: RefreshCw, label: 'SAP Synced Vendors', value: sapSynced, tone: 'success', show: isBuyer || isSap },
+    { k: 'ven', icon: Building2, label: 'Vendors Linked', value: vendorRows.length, tone: 'primary', show: !isBuyer && !isApprover && !isSap },
+    { k: 'act', icon: Clock, label: 'Activity Records', value: activityRows.length, tone: 'accent', show: !isBuyer && !isApprover && !isSap },
+  ];
+  const tiles = ALL_TILES.filter((t) => t.show || (typeof t.value === 'number' && t.value > 0));
   const doExport = () => { const d = buildExport(); if (d) exportUserAudit({ ...d, all: combinedExport() }); };
   const doPdf = () => {
     const d = buildExport(); if (!d) return;
@@ -331,21 +348,21 @@ export default function UserAuditReport() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 text-[11px]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-foreground flex items-center gap-2"><span className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center shadow-sm"><FileSpreadsheet className="h-4 w-4" /></span>User Audit Report</h1>
+          <h1 className="!text-[15px] font-bold text-foreground flex items-center gap-2"><span className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center shadow-sm"><FileSpreadsheet className="h-4 w-4" /></span>User Audit Report</h1>
           <p className="text-xs text-muted-foreground">Select A User To See Every Vendor, Approval And Action Linked To Them.</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!userId || loading} onClick={() => load(userId)}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
-          <Button size="sm" variant="outline" disabled={!user || loading} onClick={doPdf} className="border-destructive/30 text-destructive hover:bg-destructive/10"><FileText className="h-4 w-4 mr-1" />Download PDF</Button>
-          <Button size="sm" disabled={!user || loading} onClick={doExport} className="bg-gradient-to-r from-primary to-primary/80"><Download className="h-4 w-4 mr-1" />Export To Excel</Button>
+          <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="outline" disabled={!userId || loading} onClick={() => load(userId)}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
+          <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="outline" disabled={!user || loading} onClick={doPdf} className="border-destructive/30 text-destructive hover:bg-destructive/10"><FileText className="h-4 w-4 mr-1" />Download PDF</Button>
+          <Button size="sm" style={{ height: 28, fontSize: 11 }} disabled={!user || loading} onClick={doExport} className="bg-gradient-to-r from-primary to-primary/80"><Download className="h-4 w-4 mr-1" />Export To Excel</Button>
         </div>
       </div>
 
       <Card className="rounded-[10px]">
-        <CardContent className="p-3 grid gap-2 md:grid-cols-2 lg:grid-cols-6 [&_input]:h-8 [&_input]:text-xs [&_button]:h-8 [&_button]:text-xs">
+        <CardContent className="p-3 grid gap-2 md:grid-cols-2 lg:grid-cols-6 !p-2 [&_input]:!h-7 [&_input]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_p]:!text-[10px]">
           <div className="lg:col-span-2">
             <p className="text-xs font-medium text-muted-foreground mb-1">User</p>
             <div className="relative" ref={pickerRef}>
@@ -428,49 +445,43 @@ export default function UserAuditReport() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-2">
-            <Kpi icon={Send} label="Vendors Invited" value={invitedCount} />
-            <Kpi icon={Users} label="Created On Behalf" value={behalfCount} tone="accent" />
-            <Kpi icon={CheckCircle2} label="Approvals" value={types.Approved} tone="success" />
-            <Kpi icon={XCircle} label="Rejections" value={types.Rejected} tone="destructive" />
-            <Kpi icon={RotateCcw} label="Returns / Clarifications" value={types.Returned} tone="warning" />
-            <Kpi icon={Hourglass} label="Pending In Queue" value={pendingRows.length} tone="warning" />
-            <Kpi icon={Timer} label="Avg Approval Time" value={avg == null ? '—' : `${avg} h`} tone="accent" />
-            <Kpi icon={RefreshCw} label="SAP Synced Vendors" value={sapSynced} tone="success" />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2">
+            {tiles.map((t) => <Kpi key={t.k} icon={t.icon} label={t.label} value={t.value} tone={t.tone} />)}
           </div>
 
           <svg width="0" height="0" className="absolute"><defs>
             {[['gP','--primary'],['gS','--success'],['gD','--destructive'],['gW','--warning'],['gM','--muted-foreground']].map(([id, v]) => (
-              <linearGradient key={id} id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={`hsl(var(${v}))`} stopOpacity={1} /><stop offset="100%" stopColor={`hsl(var(${v}))`} stopOpacity={0.45} /></linearGradient>))}
+              <linearGradient key={id} id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={`hsl(var(${v}))`} stopOpacity={1} /><stop offset="100%" stopColor={`hsl(var(${v}))`} stopOpacity={0.7} /></linearGradient>))}
             <linearGradient id="gPv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient>
             <linearGradient id="gSv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} /></linearGradient>
           </defs></svg>
+          {!(timeline.length || typeData.length || statusData.length || stageData.length) && <p className="text-[11px] text-muted-foreground text-center py-2">No Chart Data For This User In The Selected Period.</p>}
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-2">
-            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Activity Over Time</p></CardHeader>
-              <CardContent className="h-48 p-1.5">{timeline.length ? (
+            {timeline.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Activity Over Time</p></CardHeader>
+              <CardContent className="h-52 p-1.5">{(
                 <ResponsiveContainer><AreaChart data={timeline}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" fontSize={10} /><YAxis allowDecimals={false} fontSize={10} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} />
+                  <XAxis dataKey="month" fontSize={11} /><YAxis allowDecimals={false} fontSize={11} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
                   <Area type="monotone" dataKey="Actions" stroke="hsl(var(--primary))" fill="url(#gPv)" strokeWidth={2} />
                   <Area type="monotone" dataKey="Invitations" stroke="hsl(var(--success))" fill="url(#gSv)" strokeWidth={2} /></AreaChart></ResponsiveContainer>
-              ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Actions By Type</p></CardHeader>
-              <CardContent className="h-48 p-1.5">{typeData.length ? (
-                <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={3} label={{ fontSize: 10 }}>
-                  {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} /></PieChart></ResponsiveContainer>
-              ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Vendors By Current Status</p></CardHeader>
-              <CardContent className="h-48 p-1.5">{statusData.length ? (
+              )}</CardContent></Card>}
+            {typeData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Actions By Type</p></CardHeader>
+              <CardContent className="h-52 p-1.5">{(
+                <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={3} label={({ value, percent }: any) => `${value} (${Math.round(percent * 100)}%)`} labelLine={false} fontSize={11}>
+                  {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer>
+              )}</CardContent></Card>}
+            {statusData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Vendors By Current Status</p></CardHeader>
+              <CardContent className="h-52 p-1.5">{(
                 <ResponsiveContainer><BarChart data={statusData} layout="vertical" margin={{ left: 0 }}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" allowDecimals={false} fontSize={10} /><YAxis type="category" dataKey="name" width={100} fontSize={9} /><Tooltip />
-                  <Bar dataKey="count" name="Vendors" fill="url(#gP)" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer>
-              ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Actions By Approval Stage</p></CardHeader>
-              <CardContent className="h-48 p-1.5">{stageData.length ? (
+                  <XAxis type="number" allowDecimals={false} fontSize={11} /><YAxis type="category" dataKey="name" width={100} fontSize={10} /><Tooltip />
+                  <Bar dataKey="count" name="Vendors" fill="url(#gP)" radius={[0, 6, 6, 0]}><LabelList dataKey="count" position="right" fontSize={11} /></Bar></BarChart></ResponsiveContainer>
+              )}</CardContent></Card>}
+            {stageData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Actions By Approval Stage</p></CardHeader>
+              <CardContent className="h-52 p-1.5">{(
                 <ResponsiveContainer><BarChart data={stageData}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="stage" fontSize={9} /><YAxis allowDecimals={false} fontSize={10} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} />
+                  <XAxis dataKey="stage" fontSize={10} interval={0} /><YAxis allowDecimals={false} fontSize={11} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="Approved" stackId="a" fill="url(#gS)" /><Bar dataKey="Rejected" stackId="a" fill="url(#gD)" />
-                  <Bar dataKey="Returned" stackId="a" fill="url(#gW)" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
-              ) : <Empty />}</CardContent></Card>
+                  <Bar dataKey="Returned" stackId="a" fill="url(#gW)" radius={[4, 4, 0, 0]}><LabelList position="top" fontSize={10} valueAccessor={(e: any) => (e.Approved + e.Rejected + e.Returned) || ''} /></Bar></BarChart></ResponsiveContainer>
+              )}</CardContent></Card>}
           </div>
 
           <Card className="rounded-[10px] shadow-sm">
@@ -490,8 +501,8 @@ export default function UserAuditReport() {
                   <TableHead className={`${TH} w-[12%]`}>Date / Time</TableHead><TableHead className={`${TH} w-[10%]`}>Type</TableHead>
                   <TableHead className={`${TH} w-[9%]`}>Ref No</TableHead><TableHead className={`${TH} w-[12%]`}>Vendor</TableHead>
                   <TableHead className={`${TH} w-[10%]`}>Invited By</TableHead><TableHead className={`${TH} w-[7%]`}>Stage</TableHead>
-                  <TableHead className={`${TH} w-[10%]`}>Status</TableHead><TableHead className={`${TH} w-[16%]`}>Comments / Details</TableHead>
-                  <TableHead className={`${TH} w-[7%]`}>Time</TableHead><TableHead className={`${TH} w-[6%]`} /></TableRow></TableHeader>
+                  <TableHead className={`${TH} w-[10%]`}>Status</TableHead><TableHead className={`${TH} w-[18%]`}>Comments / Details</TableHead>
+                  <TableHead className={`${TH} w-[7%]`}>Time</TableHead><TableHead className={`${TH} w-[4%]`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 ${TYPE_STYLE[r.type].row}`}>
                     <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(r.at, '—')}</TableCell>
@@ -503,7 +514,7 @@ export default function UserAuditReport() {
                     <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] truncate max-w-full ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
                     <TableCell className={`${TD} truncate text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
                     <TableCell className={`${TD} whitespace-nowrap ${r.type === 'Pending' ? 'font-semibold text-warning' : ''}`}>{r.duration || '—'}</TableCell>
-                    <TableCell className={TD}>{r.vendorId && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5 mr-1" />View</Button>}</TableCell>
+                    <TableCell className={TD}>{r.vendorId && <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5" /></Button>}</TableCell>
                   </TableRow>)) : <EmptyRow cols={10} />}</TableBody></Table></div>{cPage.pager}
             </CardContent>
           </Card>
