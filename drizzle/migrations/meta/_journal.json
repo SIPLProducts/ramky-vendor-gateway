@@ -29,6 +29,13 @@
       "when": 1791903959861,
       "tag": "0003_add_msme_classification_year",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794910533138,
+      "tag": "0004_user_audit_report_permission",
+      "breakpoints": true
     }
   ]
 }
