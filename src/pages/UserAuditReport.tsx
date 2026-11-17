@@ -71,6 +71,7 @@ const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive
 const TH = '!h-auto !py-1.5 !px-1.5 !text-[10px] leading-tight whitespace-normal font-semibold uppercase tracking-wide text-primary';
 const TD = '!px-1.5 !py-1 !text-[11px] leading-tight';
 const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
+const TYPE_LABEL: Record<string, string> = { Pending: 'Pending With User', Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
 type RowType = typeof TYPE_ORDER[number];
 const TYPE_STYLE: Record<RowType, { pill: string; row: string; chip: string; chipOn: string }> = {
   Pending: { pill: 'bg-gradient-to-r from-warning to-warning/70 text-warning-foreground', row: 'border-l-warning bg-warning/10 font-medium', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
@@ -269,18 +270,16 @@ export default function UserAuditReport() {
   const fmtWait = (h: number | null) => (h == null ? '—' : h >= 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`);
   const hrs2 = (a?: string, b?: string) => (a && b ? Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 36e5)) : null);
   const combined = useMemo(() => {
-    const out: { key: string; at: string; type: RowType; ref: string; vendor: string; vendorId?: string; invitedBy: string; stage: string; status: string; rawStatus: string; details: string; duration: string }[] = [];
-    const vf = (id?: string) => { const v = vendorsMap[id ?? '']; return { ref: v?.reference_number ?? '', vendor: v ? vName(v) : '', status: v ? titleCase(v.status) : '', rawStatus: v?.status ?? '' }; };
+    const out: { key: string; at: string; type: RowType; ref: string; vendor: string; vendorId?: string; invitedBy: string; stage: string; status: string; rawStatus: string; details: string; duration: string; gstin: string; company: string; sap: string }[] = [];
+    const vf = (id?: string) => { const v = vendorsMap[id ?? '']; return { ref: v?.reference_number ?? '', vendor: v ? vName(v) : '', status: v ? titleCase(v.status) : '', rawStatus: v?.status ?? '', gstin: v?.gstin ?? '', company: tenantNames[v?.tenant_id] ?? '', sap: v?.sap_vendor_code ?? '' }; };
     pendingRows.forEach((p) => out.push({ key: `p${p.vendor_id}${p.stage}`, at: p.started_at ?? p.created_at, type: 'Pending', vendorId: p.vendor_id, ...vf(p.vendor_id),
       invitedBy: invitedByText(p.vendor_id), stage: stageLabel(p.stage), details: 'Waiting For This User', duration: fmtWait(hoursSince(p.started_at ?? p.created_at)) }));
-    actionRows.forEach((h) => { const t = classifyAction(h.action); out.push({ key: `a${h.id}`, at: h.acted_at, type: (t === 'Other' ? 'Activity' : t) as RowType, vendorId: h.vendor_id, ...vf(h.vendor_id),
-      invitedBy: invitedByText(h.vendor_id), stage: stageLabel(h.stage), details: h.comments || (t === 'Other' ? titleCase(h.action) : ''), duration: fmtWait(hrs2(h.started_at, h.acted_at)) }); });
+    actionRows.forEach((h) => { const t = classifyAction(h.action); if (t === 'Other') return; out.push({ key: `a${h.id}`, at: h.acted_at, type: t as RowType, vendorId: h.vendor_id, ...vf(h.vendor_id),
+      invitedBy: invitedByText(h.vendor_id), stage: stageLabel(h.stage), details: h.comments || '', duration: fmtWait(hrs2(h.started_at, h.acted_at)) }); });
     invites.filter((i) => i.created_by === userId && inRange(i.created_at) && (!i.vendor_id || vendorOk(vendorsMap[i.vendor_id]) || (company === 'all' && status === 'all'))).forEach((i) => {
       const v = vf(i.vendor_id); if (!matchQ(v.vendor, i.vendor_name, i.email, v.ref)) return;
       out.push({ key: `i${i.id}`, at: i.created_at, type: i.created_on_behalf ? 'On Behalf' : 'Invited', vendorId: i.vendor_id ?? undefined, ...v, vendor: v.vendor || i.vendor_name || i.email,
         invitedBy: i.created_on_behalf ? 'Self (On Behalf)' : 'Self', stage: '', details: i.used_at ? `Link Opened ${formatDate(i.used_at)}` : i.email, duration: '' }); });
-    activityRows.forEach((a) => out.push({ key: `l${a.id}`, at: a.created_at, type: 'Activity', vendorId: a.vendor_id ?? undefined, ...vf(a.vendor_id),
-      invitedBy: a.vendor_id ? invitedByText(a.vendor_id) : '', stage: '', details: `${titleCase(a.action)}${a.details && Object.keys(a.details).length ? ' · ' + JSON.stringify(a.details) : ''}`, duration: '' }));
     return out.sort((x, y) => (x.type === 'Pending' ? 0 : 1) - (y.type === 'Pending' ? 0 : 1) || (y.at ?? '').localeCompare(x.at ?? ''));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingRows, actionRows, activityRows, invites, vendorsMap, vInvites, userId, from, to, company, status, q]);
@@ -289,8 +288,8 @@ export default function UserAuditReport() {
   const cPage = usePaged(shown);
   useEffect(() => { cPage.reset(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, from, to, company, status, q, typeFilter]);
-  const combinedExport = () => combined.map((r) => ({ 'Date / Time': formatDateTime(r.at, ''), Type: r.type, 'Reference No': r.ref, Vendor: r.vendor,
-    'Invited By': r.invitedBy, Stage: r.stage, 'Vendor Status': r.status, 'Comments / Details': r.details, 'Time Taken / Waiting': r.duration }));
+  const combinedExport = () => combined.map((r) => ({ 'Action Date': formatDateTime(r.at, ''), Action: r.type, 'Ref No': r.ref, 'Vendor Name': r.vendor,
+    GSTIN: r.gstin, Company: r.company, 'Invited By': r.invitedBy, 'Approval Stage': r.stage, Comments: r.details, 'Current Vendor Status': r.status, 'SAP Code': r.sap }));
 
   const roles = (rolesBy[userId] ?? []).map(titleCase).join(', ') || '—';
   const companies = (tenantsBy[userId] ?? []).map((t) => tenantNames[t]).filter(Boolean).join(', ') || 'All Companies';
@@ -445,44 +444,6 @@ export default function UserAuditReport() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2">
-            {tiles.map((t) => <Kpi key={t.k} icon={t.icon} label={t.label} value={t.value} tone={t.tone} />)}
-          </div>
-
-          <svg width="0" height="0" className="absolute"><defs>
-            {[['gP','--primary'],['gS','--success'],['gD','--destructive'],['gW','--warning'],['gM','--muted-foreground']].map(([id, v]) => (
-              <linearGradient key={id} id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={`hsl(var(${v}))`} stopOpacity={1} /><stop offset="100%" stopColor={`hsl(var(${v}))`} stopOpacity={0.7} /></linearGradient>))}
-            <linearGradient id="gPv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient>
-            <linearGradient id="gSv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} /></linearGradient>
-          </defs></svg>
-          {!(timeline.length || typeData.length || statusData.length || stageData.length) && <p className="text-[11px] text-muted-foreground text-center py-2">No Chart Data For This User In The Selected Period.</p>}
-          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-2">
-            {timeline.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Activity Over Time</p></CardHeader>
-              <CardContent className="h-52 p-1.5">{(
-                <ResponsiveContainer><AreaChart data={timeline}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" fontSize={11} /><YAxis allowDecimals={false} fontSize={11} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Area type="monotone" dataKey="Actions" stroke="hsl(var(--primary))" fill="url(#gPv)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="Invitations" stroke="hsl(var(--success))" fill="url(#gSv)" strokeWidth={2} /></AreaChart></ResponsiveContainer>
-              )}</CardContent></Card>}
-            {typeData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Actions By Type</p></CardHeader>
-              <CardContent className="h-52 p-1.5">{(
-                <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={3} label={({ value, percent }: any) => `${value} (${Math.round(percent * 100)}%)`} labelLine={false} fontSize={11}>
-                  {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer>
-              )}</CardContent></Card>}
-            {statusData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Vendors By Current Status</p></CardHeader>
-              <CardContent className="h-52 p-1.5">{(
-                <ResponsiveContainer><BarChart data={statusData} layout="vertical" margin={{ left: 0 }}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" allowDecimals={false} fontSize={11} /><YAxis type="category" dataKey="name" width={100} fontSize={10} /><Tooltip />
-                  <Bar dataKey="count" name="Vendors" fill="url(#gP)" radius={[0, 6, 6, 0]}><LabelList dataKey="count" position="right" fontSize={11} /></Bar></BarChart></ResponsiveContainer>
-              )}</CardContent></Card>}
-            {stageData.length > 0 && <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="!text-[11px] font-semibold text-foreground">Actions By Approval Stage</p></CardHeader>
-              <CardContent className="h-52 p-1.5">{(
-                <ResponsiveContainer><BarChart data={stageData}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="stage" fontSize={10} interval={0} /><YAxis allowDecimals={false} fontSize={11} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="Approved" stackId="a" fill="url(#gS)" /><Bar dataKey="Rejected" stackId="a" fill="url(#gD)" />
-                  <Bar dataKey="Returned" stackId="a" fill="url(#gW)" radius={[4, 4, 0, 0]}><LabelList position="top" fontSize={10} valueAccessor={(e: any) => (e.Approved + e.Rejected + e.Returned) || ''} /></Bar></BarChart></ResponsiveContainer>
-              )}</CardContent></Card>}
-          </div>
 
           <Card className="rounded-[10px] shadow-sm">
             <CardContent className="p-3">
@@ -498,24 +459,27 @@ export default function UserAuditReport() {
               </div>
               <div className="rounded-md border"><Table className="table-fixed w-full">
                 <TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10 sticky top-0"><TableRow className="hover:bg-transparent">
-                  <TableHead className={`${TH} w-[12%]`}>Date / Time</TableHead><TableHead className={`${TH} w-[10%]`}>Type</TableHead>
-                  <TableHead className={`${TH} w-[9%]`}>Ref No</TableHead><TableHead className={`${TH} w-[12%]`}>Vendor</TableHead>
-                  <TableHead className={`${TH} w-[10%]`}>Invited By</TableHead><TableHead className={`${TH} w-[7%]`}>Stage</TableHead>
-                  <TableHead className={`${TH} w-[10%]`}>Status</TableHead><TableHead className={`${TH} w-[18%]`}>Comments / Details</TableHead>
-                  <TableHead className={`${TH} w-[7%]`}>Time</TableHead><TableHead className={`${TH} w-[4%]`} /></TableRow></TableHeader>
+                  <TableHead className={`${TH} w-[8%]`}>Action Date</TableHead><TableHead className={`${TH} w-[10%]`}>Action</TableHead>
+                  <TableHead className={`${TH} w-[8%]`}>Ref No</TableHead><TableHead className={`${TH} w-[11%]`}>Vendor Name</TableHead>
+                  <TableHead className={`${TH} w-[9%]`}>GSTIN</TableHead><TableHead className={`${TH} w-[9%]`}>Company</TableHead>
+                  <TableHead className={`${TH} w-[8%]`}>Invited By</TableHead><TableHead className={`${TH} w-[6%]`}>Approval Stage</TableHead>
+                  <TableHead className={`${TH} w-[12%]`}>Comments</TableHead><TableHead className={`${TH} w-[9%]`}>Current Vendor Status</TableHead>
+                  <TableHead className={`${TH} w-[7%]`}>SAP Code</TableHead><TableHead className={`${TH} w-[3%]`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 ${TYPE_STYLE[r.type].row}`}>
-                    <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(r.at, '—')}</TableCell>
-                    <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{r.type}</span></TableCell>
-                    <TableCell className={`${TD} font-mono text-[11px] truncate`} title={r.ref}>{r.ref || '—'}</TableCell>
-                    <TableCell className={`${TD} font-medium truncate`} title={r.vendor}>{r.vendor || '—'}</TableCell>
-                    <TableCell className={`${TD} truncate`} title={r.invitedBy}>{r.invitedBy || '—'}</TableCell>
-                    <TableCell className={`${TD} truncate`}>{r.stage || '—'}</TableCell>
-                    <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] truncate max-w-full ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
-                    <TableCell className={`${TD} truncate text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
-                    <TableCell className={`${TD} whitespace-nowrap ${r.type === 'Pending' ? 'font-semibold text-warning' : ''}`}>{r.duration || '—'}</TableCell>
+                    <TableCell className={TD}>{formatDate(r.at, '—')}<div className="text-[10px] text-muted-foreground">{r.at ? formatDateTime(r.at).slice(11) : ''}</div></TableCell>
+                    <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-normal text-center leading-tight ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
+                    <TableCell className={`${TD} font-mono text-[11px] whitespace-normal break-words`} title={r.ref}>{r.ref || '—'}</TableCell>
+                    <TableCell className={`${TD} font-medium whitespace-normal break-words`} title={r.vendor}>{r.vendor || '—'}</TableCell>
+                    <TableCell className={`${TD} font-mono text-[10px] whitespace-normal break-words`} title={r.gstin}>{r.gstin || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-normal break-words`} title={r.company}>{r.company || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-normal break-words`} title={r.invitedBy}>{r.invitedBy || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-normal break-words`}>{r.stage || '—'}</TableCell>
+                    <TableCell className={`${TD} whitespace-normal break-words text-muted-foreground`} title={r.details}>{r.details || '—'}</TableCell>
+                    <TableCell className={TD}>{r.status ? <Badge variant="outline" className={`text-[10px] whitespace-normal break-words max-w-full whitespace-normal text-center leading-tight ${STATUS_BADGE(r.rawStatus)}`}>{r.status}</Badge> : '—'}</TableCell>
+                    <TableCell className={`${TD} font-mono whitespace-normal break-words`}>{r.sap || '—'}</TableCell>
                     <TableCell className={TD}>{r.vendorId && <Button size="sm" style={{ height: 28, fontSize: 11 }} variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setReviewId(r.vendorId!)}><Eye className="h-3.5 w-3.5" /></Button>}</TableCell>
-                  </TableRow>)) : <EmptyRow cols={10} />}</TableBody></Table></div>{cPage.pager}
+                  </TableRow>)) : <EmptyRow cols={12} />}</TableBody></Table></div>{cPage.pager}
             </CardContent>
           </Card>
         </>
