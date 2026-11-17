@@ -340,11 +340,13 @@ export default function UserAuditReport() {
     { k: 'act', icon: Clock, label: 'Activity Records', value: activityRows.length, tone: 'accent', show: !isBuyer && !isApprover && !isSap },
   ];
   const tiles = ALL_TILES.filter((t) => t.show || (typeof t.value === 'number' && t.value > 0));
-  const doExport = () => { const d = buildExport(); if (d) exportUserAudit({ ...d, all: combinedExport() }); };
-  const doPdf = () => {
-    const d = buildExport(); if (!d) return;
-    void exportUserAuditPdf({ userName: d.userName, summary: d.summary, all: combinedExport() });
-  };
+  const userCard = () => user ? {
+    Name: user.full_name || user.email, Status: titleCase(user.status), Email: user.email, Role: roles,
+    'Last Login': user.last_login_attempt_at ? formatDateTime(user.last_login_attempt_at) : '—', Created: formatDate(user.created_at),
+    'Date Range': from || to ? `${from ? formatDate(from) : 'Start'} to ${to ? formatDate(to) : 'Today'}` : 'All Time',
+  } : null;
+  const doExport = () => { const u = userCard(); if (u) exportUserAudit({ userName: u.Name, user: u, all: combinedExport() }); };
+  const doPdf = () => { const u = userCard(); if (u) void exportUserAuditPdf({ userName: u.Name, user: u, all: combinedExport() }); };
 
   return (
     <div className="space-y-2 text-[11px]">

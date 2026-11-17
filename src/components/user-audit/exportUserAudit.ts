@@ -48,22 +48,33 @@ function sheet(rows: Record<string, any>[], title = '', tintKey?: string) {
   return ws;
 }
 
-export function exportUserAudit(opts: {
-  userName: string;
-  summary: Record<string, any>;
-  vendors: { vendor: Record<string, any>; relation: string }[];
-  actions: Record<string, any>[];
-  pending: Record<string, any>[];
-  activity: Record<string, any>[];
-  all?: Record<string, any>[];
-}) {
+export function exportUserAudit(opts: { userName: string; user: Record<string, string>; all: Record<string, any>[] }) {
+  const cols = Object.keys(opts.all[0] || { 'Action Date': '', Action: '', 'Ref No': '', 'Vendor Name': '' });
+  const n = cols.length;
+  const uf = Object.entries(opts.user);
+  const aoa: any[][] = [[`Ramky Group – User Audit Report`], [`Generated ${formatDateTime(new Date())}`], []];
+  for (let i = 0; i < uf.length; i += 3) aoa.push([0, 1, 2].flatMap((k) => (uf[i + k] ? [uf[i + k][0], uf[i + k][1]] : ['', ''])));
+  aoa.push([]);
+  const hr = aoa.length;
+  aoa.push(cols);
+  opts.all.forEach((r) => aoa.push(cols.map((c) => r[c] ?? '')));
+  if (!opts.all.length) aoa.push(['No Records Found']);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const last = Math.max(n - 1, 5);
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: last } }, { s: { r: 1, c: 0 }, e: { r: 1, c: last } }];
+  const set = (r: number, c: number, st: any) => { const a = XLSX.utils.encode_cell({ r, c }); if (!ws[a]) ws[a] = { t: 's', v: '' }; ws[a].s = st; };
+  for (let c = 0; c <= last; c++) { set(0, c, { font: { bold: true, sz: 15, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: BLUE } } }); set(1, c, { font: { sz: 9, italic: true, color: { rgb: BLUE } }, fill: { fgColor: { rgb: 'FFF1E3' } } }); }
+  for (let r = 3; r < hr - 1; r++) for (let c = 0; c < 6; c++)
+    set(r, c, { border, fill: { fgColor: { rgb: c % 2 ? 'F3FAF5' : 'E8F2FB' } }, font: { sz: 10, bold: c % 2 === 0, color: { rgb: c % 2 ? '1F2937' : BLUE } } });
+  for (let c = 0; c < n; c++) {
+    set(hr, c, { font: { bold: true, color: { rgb: BLUE } }, fill: { fgColor: { rgb: 'E8F2FB' } }, alignment: { vertical: 'center' }, border: { ...border, bottom: { style: 'medium', color: { rgb: BLUE } } } });
+    opts.all.forEach((row, i) => { const tint = TINT[String(row.Action)];
+      set(hr + 1 + i, c, { border, fill: { fgColor: { rgb: tint ?? (i % 2 ? 'FFFFFF' : 'F5F9FD') } }, font: { sz: 10, bold: c === 1, color: { rgb: '1F2937' } } }); });
+  }
+  ws['!cols'] = cols.map((k, i) => ({ wch: Math.min(45, Math.max(14, k.length + 2, String(aoa[3 + Math.floor(i / 2)]?.[i] ?? '').length, ...opts.all.slice(0, 50).map((r) => String(r[k] ?? '').length))) }));
+  ws['!views'] = [{ state: 'frozen', ySplit: hr + 1 }];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheet(Object.entries(opts.summary).map(([Metric, Value]) => ({ Metric, Value })), `Ramky Group – User Audit Report – ${opts.userName}`), 'Summary');
-  if (opts.all) XLSX.utils.book_append_sheet(wb, sheet(opts.all, `Audit Records – ${opts.userName}`, 'Action'), 'All Records');
-  XLSX.utils.book_append_sheet(wb, sheet(opts.vendors.map(({ vendor, relation }) => ({ 'User Relation': relation, ...flatVendor(vendor) })), 'Vendors'), 'Vendors');
-  XLSX.utils.book_append_sheet(wb, sheet(opts.actions, 'Approval Actions'), 'Approval Actions');
-  XLSX.utils.book_append_sheet(wb, sheet(opts.pending, 'Pending Queue'), 'Pending Queue');
-  XLSX.utils.book_append_sheet(wb, sheet(opts.activity, 'Activity Log'), 'Activity Log');
+  XLSX.utils.book_append_sheet(wb, ws, 'User Audit');
   const safe = opts.userName.replace(/[^\w]+/g, '_').replace(/^_|_$/g, '') || 'User';
   XLSX.writeFile(wb, `User_Audit_${safe}_${formatDate(new Date())}.xlsx`);
 }

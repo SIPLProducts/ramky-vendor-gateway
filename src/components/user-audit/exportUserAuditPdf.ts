@@ -19,28 +19,42 @@ async function loadLogo(): Promise<{ data: string; w: number; h: number } | null
   } catch { return null; }
 }
 
-export async function exportUserAuditPdf(opts: { userName: string; summary: Record<string, any>; all: Rows }) {
+export async function exportUserAuditPdf(opts: { userName: string; user: Record<string, string>; all: Rows }) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
   const logo = await loadLogo();
   if (logo) { const h = 54, w = (logo.w / logo.h) * h; doc.addImage(logo.data, 'PNG', 28, 14, w, h); }
   doc.setTextColor(...BLUE); doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text('User Audit Report', W / 2, 38, { align: 'center' });
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(90);
-  doc.text(opts.userName, W - 28, 32, { align: 'right' });
   doc.text(`Generated ${formatDateTime(new Date())}`, W - 28, 46, { align: 'right' });
   const sw = W / 3;
   doc.setFillColor(...BLUE); doc.rect(0, 76, sw, 4, 'F');
   doc.setFillColor(...ORANGE); doc.rect(sw, 76, sw, 4, 'F');
   doc.setFillColor(...GREEN); doc.rect(sw * 2, 76, sw, 4, 'F');
 
-  const e = Object.entries(opts.summary); const body: string[][] = [];
-  for (let i = 0; i < e.length; i += 3) body.push([0, 1, 2].flatMap((k) => (e[i + k] ? [e[i + k][0], String(e[i + k][1] ?? '')] : ['', ''])));
-  autoTable(doc, {
-    startY: 92, theme: 'grid', body, styles: { fontSize: 8, cellPadding: 4, lineColor: [210, 225, 240] },
-    columnStyles: { 0: { fillColor: [232, 242, 251], textColor: BLUE, fontStyle: 'bold' }, 2: { fillColor: [232, 242, 251], textColor: BLUE, fontStyle: 'bold' }, 4: { fillColor: [232, 242, 251], textColor: BLUE, fontStyle: 'bold' } },
+  // User card (matches screen)
+  const u = opts.user, cx = 28, cy = 92, cw = W - 56, ch = 54;
+  const steps = 40;
+  for (let i = 0; i < steps; i++) { const t = i / steps; doc.setFillColor(232 + (230 - 232) * t, 242 + (246 - 242) * t, 251 + (236 - 251) * t); doc.rect(cx + (cw * i) / steps, cy, cw / steps + 1, ch, 'F'); }
+  doc.setFillColor(...BLUE); doc.rect(cx, cy, 4, ch, 'F');
+  doc.setDrawColor(210, 225, 240); doc.roundedRect(cx, cy, cw, ch, 4, 4, 'S');
+  doc.setFillColor(...BLUE); doc.circle(cx + 26, cy + ch / 2, 13, 'F');
+  doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  doc.text((u.Name || '?').trim().charAt(0).toUpperCase(), cx + 26, cy + ch / 2 + 4, { align: 'center' });
+  doc.setTextColor(...BLUE); doc.setFontSize(12); doc.text(u.Name, cx + 48, cy + 22);
+  const nw = doc.getTextWidth(u.Name);
+  const active = /active/i.test(u.Status) && !/inactive/i.test(u.Status);
+  doc.setFillColor(...(active ? GREEN : ORANGE)); doc.roundedRect(cx + 54 + nw, cy + 12, doc.getTextWidth(u.Status) * 0.75 + 12, 13, 6, 6, 'F');
+  doc.setTextColor(255); doc.setFontSize(7.5); doc.text(u.Status, cx + 60 + nw, cy + 21);
+  const fields = ['Email', 'Role', 'Last Login', 'Created', 'Date Range'];
+  const fx = cx + 48, fw = (cw - 60) / fields.length;
+  fields.forEach((f, i) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(110); doc.text(f.toUpperCase(), fx + fw * i, cy + 36);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(31, 41, 55);
+    const v = String(u[f] ?? '—'); doc.text(doc.splitTextToSize(v, fw - 8)[0], fx + fw * i, cy + 47);
   });
 
-  let y = (doc as any).lastAutoTable.finalY + 22;
+  let y = cy + ch + 20;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE); doc.text(`Audit Records (${opts.all.length})`, 28, y);
   doc.setFillColor(...ORANGE); doc.rect(28, y + 4, 60, 2, 'F');
   if (!opts.all.length) { autoTable(doc, { startY: y + 12, body: [['No Records Found']], styles: { fontSize: 8 } }); }
@@ -48,7 +62,7 @@ export async function exportUserAuditPdf(opts: { userName: string; summary: Reco
     const cols = Object.keys(opts.all[0]);
     autoTable(doc, {
       startY: y + 12, theme: 'grid', head: [cols], body: opts.all.map((r) => cols.map((c) => String(r[c] ?? ''))),
-      styles: { fontSize: 7, cellPadding: 3, lineColor: [220, 228, 238], overflow: 'linebreak' },
+      styles: { fontSize: 7, cellPadding: 3, lineColor: [220, 228, 238], overflow: 'linebreak', textColor: [31, 41, 55] },
       headStyles: { fillColor: [232, 242, 251], textColor: BLUE, fontStyle: 'bold', lineColor: BLUE },
       margin: { bottom: 40 },
       didParseCell: (d) => {
