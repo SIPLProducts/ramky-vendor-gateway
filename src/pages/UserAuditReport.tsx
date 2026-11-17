@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -79,6 +78,14 @@ export default function UserAuditReport() {
   const [tenantNames, setTenantNames] = useState<Record<string, string>>({});
   const [userId, setUserId] = useState<string>('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDown = (e: MouseEvent) => { if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
+    document.addEventListener('mousedown', onDown); document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [pickerOpen]);
   const [loading, setLoading] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -278,21 +285,28 @@ export default function UserAuditReport() {
         <CardContent className="p-4 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <p className="text-xs font-medium text-muted-foreground mb-1">User</p>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+            <div className="relative" ref={pickerRef}>
+                <Button type="button" onClick={() => setPickerOpen((o) => !o)} variant="outline" role="combobox" className="w-full justify-between font-normal">
                   <span className="truncate">{user ? `${user.full_name || user.email}` : 'Select A User'}</span>
                   <ChevronsUpDown className="h-4 w-4 opacity-50" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[360px] p-0" align="start">
+              {pickerOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-[360px] max-w-[90vw] rounded-md border bg-popover text-popover-foreground shadow-md">
                 <Command>
-                  <CommandInput placeholder="Search Name Or Email..." />
+                  <CommandInput autoFocus placeholder="Search Name Or Email..." />
                   <CommandList>
                     <CommandEmpty>No Users Found.</CommandEmpty>
                     <CommandGroup>
                       {profiles.map((p) => (
-                        <CommandItem key={p.id} value={`${p.full_name ?? ''} ${p.email}`} onSelect={() => { setUserId(p.id); setPickerOpen(false); }}>
+                        <CommandItem
+                          key={p.id}
+                          value={p.id}
+                          keywords={[p.full_name ?? '', p.email ?? '']}
+                          onSelect={() => { setUserId(p.id); setPickerOpen(false); }}
+                          onPointerDown={(e) => e.preventDefault()}
+                          onClick={() => { setUserId(p.id); setPickerOpen(false); }}
+                          className="cursor-pointer"
+                        >
                           <Check className={`h-4 w-4 mr-2 ${p.id === userId ? 'opacity-100' : 'opacity-0'}`} />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm truncate">{p.full_name || p.email}</p>
@@ -304,8 +318,9 @@ export default function UserAuditReport() {
                     </CommandGroup>
                   </CommandList>
                 </Command>
-              </PopoverContent>
-            </Popover>
+              </div>
+              )}
+            </div>
           </div>
           <div><p className="text-xs font-medium text-muted-foreground mb-1">From</p><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
           <div><p className="text-xs font-medium text-muted-foreground mb-1">To</p><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
