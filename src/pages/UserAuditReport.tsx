@@ -55,11 +55,13 @@ function usePaged<T>(items: T[]) {
   return { rows: p.items, pager, reset: () => setPage(1) };
 }
 
+const TONES: Record<string, string> = { primary: 'bg-primary/10 text-primary', success: 'bg-success/10 text-success', destructive: 'bg-destructive/10 text-destructive', warning: 'bg-warning/10 text-warning' };
+
 function Kpi({ icon: Icon, label, value, tone = 'primary' }: { icon: any; label: string; value: string | number; tone?: string }) {
   return (
     <Card className="rounded-[10px]">
       <CardContent className="p-4 flex items-center gap-3">
-        <div className={`h-10 w-10 rounded-lg flex items-center justify-center bg-${tone}/10 text-${tone}`}><Icon className="h-5 w-5" /></div>
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${TONES[tone] ?? TONES.primary}`}><Icon className="h-5 w-5" /></div>
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground truncate">{label}</p>
           <p className="text-xl font-semibold text-foreground">{value}</p>
