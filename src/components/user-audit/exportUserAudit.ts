@@ -31,7 +31,7 @@ function styleSheet(ws: any, rows: Record<string, any>[], title: string, tintKey
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: Math.max(keys.length - 1, 1) } }];
   ws.A1.s = { font: { bold: true, sz: 14, color: { rgb: BLUE } }, fill: { fgColor: { rgb: 'EAF3FB' } } };
   for (let c = 0; c < keys.length; c++) {
-    const h = ws[XLSX.utils.encode_cell({ r: 2, c })]; if (h) h.s = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: BLUE } }, alignment: { vertical: 'center' }, border };
+    const h = ws[XLSX.utils.encode_cell({ r: 2, c })]; if (h) h.s = { font: { bold: true, color: { rgb: BLUE } }, fill: { fgColor: { rgb: 'E8F2FB' } }, alignment: { vertical: 'center' }, border: { ...border, bottom: { style: 'medium', color: { rgb: BLUE } } } };
     for (let r = 3; r <= range.e.r; r++) {
       const cell = ws[XLSX.utils.encode_cell({ r, c })]; if (!cell) continue;
       const row = rows[r - 3]; const tint = tintKey && row ? TINT[String(row[tintKey])] : undefined;

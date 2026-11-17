@@ -49,7 +49,7 @@ export async function exportUserAuditPdf(opts: { userName: string; summary: Reco
     autoTable(doc, {
       startY: y + 12, theme: 'grid', head: [cols], body: opts.all.map((r) => cols.map((c) => String(r[c] ?? ''))),
       styles: { fontSize: 7, cellPadding: 3, lineColor: [220, 228, 238], overflow: 'linebreak' },
-      headStyles: { fillColor: BLUE, textColor: 255, fontStyle: 'bold' },
+      headStyles: { fillColor: [232, 242, 251], textColor: BLUE, fontStyle: 'bold', lineColor: BLUE },
       margin: { bottom: 40 },
       didParseCell: (d) => {
         if (d.section !== 'body') return;

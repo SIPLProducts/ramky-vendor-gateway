@@ -68,7 +68,7 @@ const STATUS_ROW = (st?: string, pending?: boolean) => pending ? 'bg-warning/10 
 const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive/10 text-destructive border-destructive/30'
   : /approved|synced|active|completed/i.test(st ?? '') ? 'bg-success/10 text-success border-success/30'
   : /pending|review|submitted/i.test(st ?? '') ? 'bg-warning/10 text-warning border-warning/30' : 'bg-primary/10 text-primary border-primary/30';
-const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide !text-primary-foreground !bg-primary';
+const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide !text-[hsl(207,100%,28%)] !bg-transparent !rounded-none border-b-2 border-[hsl(207,100%,32%)]';
 const TD = '!px-2 !py-1 !text-[11px] leading-tight whitespace-nowrap';
 const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
 const TYPE_LABEL: Record<string, string> = { Pending: 'Pending With User', Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
@@ -458,13 +458,13 @@ export default function UserAuditReport() {
                   <Input className="pl-8 h-8 text-xs" placeholder="Search Any Column..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               </div>
               <div className="rounded-md border overflow-x-auto"><Table className="w-max min-w-full">
-                <TableHeader className="bg-gradient-to-r from-primary via-primary/90 to-success/80 sticky top-0"><TableRow className="hover:bg-transparent border-0" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.85) 60%, hsl(var(--success) / 0.85))' }}>
+                <TableHeader className="sticky top-0"><TableRow className="hover:bg-transparent border-0" style={{ background: 'linear-gradient(90deg, hsl(207 80% 93%), hsl(30 90% 94%) 55%, hsl(140 50% 92%))' }}>
                   <TableHead className={`${TH}`}>Action Date</TableHead><TableHead className={`${TH}`}>Action</TableHead>
                   <TableHead className={`${TH}`}>Ref No</TableHead><TableHead className={`${TH}`}>Vendor Name</TableHead>
                   <TableHead className={`${TH}`}>GSTIN</TableHead><TableHead className={`${TH}`}>Company</TableHead>
                   <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Approval Stage</TableHead>
                   <TableHead className={`${TH}`}>Comments</TableHead><TableHead className={`${TH}`}>Current Vendor Status</TableHead>
-                  <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0`} /></TableRow></TableHeader>
+                  <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 !bg-[hsl(140,50%,92%)]`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 even:bg-primary/[0.03] hover:bg-primary/5 ${TYPE_STYLE[r.type].row}`}>
                     <TableCell className={TD}>{formatDateTime(r.at, '—')}</TableCell>
