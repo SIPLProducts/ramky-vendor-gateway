@@ -68,17 +68,17 @@ const STATUS_ROW = (st?: string, pending?: boolean) => pending ? 'bg-warning/10 
 const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive/10 text-destructive border-destructive/30'
   : /approved|synced|active|completed/i.test(st ?? '') ? 'bg-success/10 text-success border-success/30'
   : /pending|review|submitted/i.test(st ?? '') ? 'bg-warning/10 text-warning border-warning/30' : 'bg-primary/10 text-primary border-primary/30';
-const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide text-primary';
+const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide !text-primary-foreground';
 const TD = '!px-2 !py-1 !text-[11px] leading-tight whitespace-nowrap';
 const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
 const TYPE_LABEL: Record<string, string> = { Pending: 'Pending With User', Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
 type RowType = typeof TYPE_ORDER[number];
 const TYPE_STYLE: Record<RowType, { pill: string; row: string; chip: string; chipOn: string }> = {
   Pending: { pill: 'bg-gradient-to-r from-warning to-warning/70 text-warning-foreground', row: 'border-l-warning bg-warning/10 font-medium', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
-  Approved: { pill: 'bg-success/15 text-success', row: 'border-l-success bg-success/5', chip: 'border-success/40 text-success bg-success/5', chipOn: 'bg-success text-success-foreground border-success' },
-  Rejected: { pill: 'bg-destructive/15 text-destructive', row: 'border-l-destructive bg-destructive/5', chip: 'border-destructive/40 text-destructive bg-destructive/5', chipOn: 'bg-destructive text-destructive-foreground border-destructive' },
-  Returned: { pill: 'bg-warning/15 text-warning', row: 'border-l-warning/60 bg-warning/5', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
-  Invited: { pill: 'bg-primary/15 text-primary', row: 'border-l-primary bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
+  Approved: { pill: 'bg-success text-success-foreground', row: 'border-l-success bg-success/5', chip: 'border-success/40 text-success bg-success/5', chipOn: 'bg-success text-success-foreground border-success' },
+  Rejected: { pill: 'bg-destructive text-destructive-foreground', row: 'border-l-destructive bg-destructive/5', chip: 'border-destructive/40 text-destructive bg-destructive/5', chipOn: 'bg-destructive text-destructive-foreground border-destructive' },
+  Returned: { pill: 'bg-warning/80 text-warning-foreground', row: 'border-l-warning/60 bg-warning/5', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
+  Invited: { pill: 'bg-primary text-primary-foreground', row: 'border-l-primary bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
   'On Behalf': { pill: 'bg-gradient-to-r from-primary/25 to-success/20 text-primary', row: 'border-l-primary/60 bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
   Activity: { pill: 'bg-muted text-muted-foreground', row: 'border-l-muted-foreground/30', chip: 'border-border text-muted-foreground', chipOn: 'bg-muted-foreground text-background border-muted-foreground' },
 };
@@ -343,7 +343,7 @@ export default function UserAuditReport() {
   const doExport = () => { const d = buildExport(); if (d) exportUserAudit({ ...d, all: combinedExport() }); };
   const doPdf = () => {
     const d = buildExport(); if (!d) return;
-    exportUserAuditPdf({ userName: d.userName, summary: d.summary, all: combinedExport() });
+    void exportUserAuditPdf({ userName: d.userName, summary: d.summary, all: combinedExport() });
   };
 
   return (
@@ -430,7 +430,7 @@ export default function UserAuditReport() {
         <div className="space-y-4"><Skeleton className="h-24 w-full" /><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div><Skeleton className="h-72 w-full" /></div>
       ) : (
         <>
-          <Card className="rounded-[10px] border-l-4 border-l-primary bg-gradient-to-r from-primary/10 via-card to-card shadow-sm">
+          <Card className="rounded-[10px] border-l-4 border-l-primary bg-gradient-to-r from-primary/10 via-success/5 to-card shadow-sm">
             <CardContent className="p-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center shadow"><UserRound className="h-4 w-4" /></div>
@@ -458,15 +458,15 @@ export default function UserAuditReport() {
                   <Input className="pl-8 h-8 text-xs" placeholder="Search Any Column..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               </div>
               <div className="rounded-md border overflow-x-auto"><Table className="w-max min-w-full">
-                <TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10 sticky top-0"><TableRow className="hover:bg-transparent">
+                <TableHeader className="bg-gradient-to-r from-primary via-primary/90 to-success/80 sticky top-0"><TableRow className="hover:bg-transparent">
                   <TableHead className={`${TH}`}>Action Date</TableHead><TableHead className={`${TH}`}>Action</TableHead>
                   <TableHead className={`${TH}`}>Ref No</TableHead><TableHead className={`${TH}`}>Vendor Name</TableHead>
                   <TableHead className={`${TH}`}>GSTIN</TableHead><TableHead className={`${TH}`}>Company</TableHead>
                   <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Approval Stage</TableHead>
                   <TableHead className={`${TH}`}>Comments</TableHead><TableHead className={`${TH}`}>Current Vendor Status</TableHead>
-                  <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 bg-card`} /></TableRow></TableHeader>
+                  <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 bg-success/80`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
-                  <TableRow key={r.key} className={`border-l-4 ${TYPE_STYLE[r.type].row}`}>
+                  <TableRow key={r.key} className={`border-l-4 even:bg-primary/[0.03] hover:bg-primary/5 ${TYPE_STYLE[r.type].row}`}>
                     <TableCell className={TD}>{formatDateTime(r.at, '—')}</TableCell>
                     <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
                     <TableCell className={`${TD} font-mono text-[11px] whitespace-nowrap`} title={r.ref}>{r.ref || '—'}</TableCell>
