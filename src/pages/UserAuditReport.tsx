@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -363,25 +363,25 @@ export default function UserAuditReport() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><CardTitle className="text-base">Activity Over Time</CardTitle></CardHeader>
+            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Activity Over Time</h3></CardHeader>
               <CardContent className="h-64">{timeline.length ? (
                 <ResponsiveContainer><LineChart data={timeline}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="month" fontSize={12} /><YAxis allowDecimals={false} fontSize={12} /><Tooltip /><Legend />
                   <Line type="monotone" dataKey="Actions" stroke="hsl(var(--primary))" strokeWidth={2} />
                   <Line type="monotone" dataKey="Invitations" stroke="hsl(var(--success))" strokeWidth={2} /></LineChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><CardTitle className="text-base">Actions By Type</CardTitle></CardHeader>
+            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Actions By Type</h3></CardHeader>
               <CardContent className="h-64">{typeData.length ? (
                 <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} label>
                   {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><CardTitle className="text-base">Vendors By Current Status</CardTitle></CardHeader>
+            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Vendors By Current Status</h3></CardHeader>
               <CardContent className="h-64">{statusData.length ? (
                 <ResponsiveContainer><BarChart data={statusData} layout="vertical" margin={{ left: 40 }}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis type="number" allowDecimals={false} fontSize={12} /><YAxis type="category" dataKey="name" width={130} fontSize={11} /><Tooltip />
                   <Bar dataKey="count" name="Vendors" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><CardTitle className="text-base">Actions By Approval Stage</CardTitle></CardHeader>
+            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Actions By Approval Stage</h3></CardHeader>
               <CardContent className="h-64">{stageData.length ? (
                 <ResponsiveContainer><BarChart data={stageData}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="stage" fontSize={12} /><YAxis allowDecimals={false} fontSize={12} /><Tooltip /><Legend />
