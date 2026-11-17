@@ -15,13 +15,14 @@ import { paginateItems } from '@/lib/pagination';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { avgHours, byMonth, classifyAction, countByType, titleCase } from '@/lib/userAudit';
 import { exportUserAudit } from '@/components/user-audit/exportUserAudit';
+import { exportUserAuditPdf } from '@/components/user-audit/exportUserAuditPdf';
 import { useToast } from '@/hooks/use-toast';
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend,
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend,
 } from 'recharts';
 import {
   ChevronsUpDown, Check, Download, Eye, UserRound, Mail, Building2, Clock, Send, CheckCircle2, XCircle,
-  RotateCcw, Hourglass, Timer, RefreshCw, Users, Search, FileSpreadsheet,
+  RotateCcw, Hourglass, Timer, RefreshCw, Users, Search, FileSpreadsheet, FileText,
 } from 'lucide-react';
 
 type Profile = { id: string; email: string; full_name: string | null; status: string; created_at: string; last_login_attempt_at: string | null };
@@ -34,7 +35,7 @@ const STAGE_LABEL: Record<string, string> = {
 };
 const stageLabel = (s?: string | null) => (s ? STAGE_LABEL[s] ?? titleCase(s) : '—');
 const vName = (v: any) => v?.trade_name || v?.legal_name || v?.pan_holder_name || 'Unnamed Vendor';
-const COLORS = ['hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--warning))', 'hsl(var(--primary))', 'hsl(var(--muted-foreground))'];
+const COLORS = ['url(#gS)', 'url(#gD)', 'url(#gW)', 'url(#gP)', 'url(#gM)'];
 
 async function chunked<T>(ids: string[], fn: (part: string[]) => Promise<T[]>) {
   const out: T[] = [];
@@ -54,16 +55,30 @@ function usePaged<T>(items: T[]) {
   return { rows: p.items, pager, reset: () => setPage(1) };
 }
 
-const TONES: Record<string, string> = { primary: 'bg-primary/10 text-primary', success: 'bg-success/10 text-success', destructive: 'bg-destructive/10 text-destructive', warning: 'bg-warning/10 text-warning' };
+const TONES: Record<string, { card: string; icon: string; text: string }> = {
+  primary: { card: 'from-primary/15 via-primary/5 to-card border-primary/20', icon: 'bg-gradient-to-br from-primary to-primary/70', text: 'text-primary' },
+  success: { card: 'from-success/15 via-success/5 to-card border-success/20', icon: 'bg-gradient-to-br from-success to-success/70', text: 'text-success' },
+  destructive: { card: 'from-destructive/15 via-destructive/5 to-card border-destructive/20', icon: 'bg-gradient-to-br from-destructive to-destructive/70', text: 'text-destructive' },
+  warning: { card: 'from-warning/20 via-warning/5 to-card border-warning/25', icon: 'bg-gradient-to-br from-warning to-warning/70', text: 'text-warning' },
+  accent: { card: 'from-success/10 via-primary/5 to-card border-primary/20', icon: 'bg-gradient-to-br from-primary/80 to-success/80', text: 'text-primary' },
+};
+const STATUS_ROW = (st?: string, pending?: boolean) => pending ? 'bg-warning/10 border-l-4 border-l-warning hover:bg-warning/15'
+  : /reject/i.test(st ?? '') ? 'bg-destructive/5 border-l-4 border-l-destructive/60'
+  : /approved|sap_synced|dms_synced|active|completed/i.test(st ?? '') ? 'bg-success/5 border-l-4 border-l-success/60' : 'border-l-4 border-l-transparent';
+const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive/10 text-destructive border-destructive/30'
+  : /approved|synced|active|completed/i.test(st ?? '') ? 'bg-success/10 text-success border-success/30'
+  : /pending|review|submitted/i.test(st ?? '') ? 'bg-warning/10 text-warning border-warning/30' : 'bg-primary/10 text-primary border-primary/30';
+const TH = 'h-8 px-2 text-[11px] font-semibold uppercase tracking-wide text-primary';
+const TD = 'px-2 py-1.5 text-xs';
 
 function Kpi({ icon: Icon, label, value, tone = 'primary' }: { icon: any; label: string; value: string | number; tone?: string }) {
   return (
-    <Card className="rounded-[10px]">
-      <CardContent className="p-4 flex items-center gap-3">
-        <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${TONES[tone] ?? TONES.primary}`}><Icon className="h-5 w-5" /></div>
+    <Card className={`rounded-[10px] bg-gradient-to-br shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 ${(TONES[tone] ?? TONES.primary).card}`}>
+      <CardContent className="p-2.5 flex items-center gap-2.5">
+        <div className={`h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-primary-foreground shadow-sm ${(TONES[tone] ?? TONES.primary).icon}`}><Icon className="h-4 w-4" /></div>
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground truncate">{label}</p>
-          <p className="text-xl font-semibold text-foreground">{value}</p>
+          <p className="text-[11px] leading-tight text-muted-foreground line-clamp-2">{label}</p>
+          <p className={`text-lg leading-tight font-bold ${(TONES[tone] ?? TONES.primary).text}`}>{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -101,6 +116,7 @@ export default function UserAuditReport() {
   const [progress, setProgress] = useState<any[]>([]);
   const [pending, setPending] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
+  const [vInvites, setVInvites] = useState<Record<string, any>>({});
 
   useEffect(() => {
     (async () => {
@@ -158,6 +174,10 @@ export default function UserAuditReport() {
       const ids = Object.keys(rel);
       const vs = await chunked(ids, async (part) => (await supabase.from('vendors').select('*').in('id', part)).data ?? []);
       setVendorsMap(Object.fromEntries(vs.map((v: any) => [v.id, v])));
+      const invIds = [...new Set(vs.map((v: any) => v.invitation_id).filter(Boolean))] as string[];
+      const vi = await chunked(invIds, async (part) => (await supabase.from('vendor_invitations').select('id,vendor_id,created_by,original_created_by,created_on_behalf,created_at').in('id', part)).data ?? []);
+      const byInv = Object.fromEntries(vi.map((i: any) => [i.id, i]));
+      setVInvites(Object.fromEntries(vs.map((v: any) => [v.id, byInv[v.invitation_id] ?? (inv.data ?? []).find((i: any) => i.vendor_id === v.id)]).filter(([, i]) => i)));
       setRelations(rel); setInvites(inv.data ?? []); setHistory(hist.data ?? []); setProgress(prog.data ?? []);
       setPending(pend); setActivity(logs.data ?? []);
     } catch (e: any) {
@@ -168,6 +188,11 @@ export default function UserAuditReport() {
   useEffect(() => { if (userId) load(userId); }, [userId]);
 
   const user = profiles.find((p) => p.id === userId);
+  const pName = (id?: string | null) => { const p = profiles.find((x) => x.id === id); return p ? (p.full_name || p.email) : '—'; };
+  const pendingIds = useMemo(() => new Set(pending.map((p) => p.vendor_id)), [pending]);
+  const invitedBy = (vid?: string) => { const i = vInvites[vid ?? '']; if (!i) return { name: '—', behalf: false };
+    return { name: i.created_by === userId ? 'Self' : pName(i.created_by), behalf: !!i.created_on_behalf }; };
+  const invitedByText = (vid?: string) => { const b = invitedBy(vid); return b.behalf ? `${b.name} (On Behalf)` : b.name; };
   const inRange = (d?: string | null) => {
     if (!d) return !from && !to;
     const t = new Date(d).getTime();
@@ -180,12 +205,12 @@ export default function UserAuditReport() {
   const matchQ = (...xs: any[]) => !q || xs.some((x) => String(x ?? '').toLowerCase().includes(q));
 
   const vendorRows = useMemo(() => Object.entries(relations)
-    .map(([id, r]) => ({ vendor: vendorsMap[id], relation: [...r].join(', '), invite: invites.find((i) => i.vendor_id === id) }))
+    .map(([id, r]) => ({ vendor: vendorsMap[id], relation: [...r].join(', '), invite: invites.find((i) => i.vendor_id === id) ?? vInvites[id] }))
     .filter((x) => vendorOk(x.vendor) && inRange(x.invite?.created_at ?? x.vendor.created_at)
       && matchQ(vName(x.vendor), x.vendor.reference_number, x.vendor.gstin, x.vendor.pan, x.vendor.sap_vendor_code))
     .sort((a, b) => (b.vendor.created_at ?? '').localeCompare(a.vendor.created_at ?? '')),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [relations, vendorsMap, invites, company, status, from, to, q]);
+  [relations, vendorsMap, invites, vInvites, company, status, from, to, q]);
 
   const progByKey = useMemo(() => Object.fromEntries(progress.map((p) => [`${p.vendor_id}|${p.stage}`, p])), [progress]);
   const actionRows = useMemo(() => history
@@ -239,9 +264,9 @@ export default function UserAuditReport() {
   const companies = (tenantsBy[userId] ?? []).map((t) => tenantNames[t]).filter(Boolean).join(', ') || 'All Companies';
   const statuses = [...new Set(Object.values(vendorsMap).map((v: any) => v.status))].sort();
 
-  const doExport = () => {
-    if (!user) return;
-    exportUserAudit({
+  const buildExport = () => {
+    if (!user) return null;
+    return {
       userName: user.full_name || user.email,
       summary: {
         'User Name': user.full_name ?? '', Email: user.email, Roles: roles, Companies: companies, Status: titleCase(user.status),
@@ -251,38 +276,47 @@ export default function UserAuditReport() {
         'Pending In Queue': pendingRows.length, 'Average Approval Time (Hours)': avg ?? '—', 'SAP Synced Vendors': sapSynced,
         'Generated On': formatDateTime(new Date()),
       },
-      vendors: vendorRows.map((r) => ({ vendor: { ...r.vendor, company: tenantNames[r.vendor.tenant_id] ?? '' }, relation: r.relation })),
+      vendors: vendorRows.map((r) => ({ vendor: { ...r.vendor, company: tenantNames[r.vendor.tenant_id] ?? '', invited_by: invitedByText(r.vendor.id) }, relation: r.relation })),
       actions: actionRows.map((h) => ({
-        'Date / Time': formatDateTime(h.acted_at), 'Reference No': h.vendor?.reference_number ?? '', Vendor: vName(h.vendor),
+        'Date / Time': formatDateTime(h.acted_at), 'Reference No': h.vendor?.reference_number ?? '', Vendor: vName(h.vendor), 'Invited By': invitedByText(h.vendor_id),
         Stage: stageLabel(h.stage), Action: classifyAction(h.action) === 'Other' ? titleCase(h.action) : classifyAction(h.action),
         Comments: h.comments ?? '', 'Time Taken (Hours)': h.started_at ? Math.round((new Date(h.acted_at).getTime() - new Date(h.started_at).getTime()) / 36e5 * 10) / 10 : '',
       })),
       pending: pendingRows.map((p) => ({
-        'Reference No': p.vendor?.reference_number ?? '', Vendor: vName(p.vendor), Stage: stageLabel(p.stage),
+        'Reference No': p.vendor?.reference_number ?? '', Vendor: vName(p.vendor), 'Invited By': invitedByText(p.vendor_id), Stage: stageLabel(p.stage),
         'Waiting Since': formatDateTime(p.started_at ?? p.created_at), 'Waiting For': fmtWait(hoursSince(p.started_at ?? p.created_at)),
       })),
       activity: activityRows.map((a) => ({
         'Date / Time': formatDateTime(a.created_at), Action: titleCase(a.action), Vendor: vName(vendorsMap[a.vendor_id]) === 'Unnamed Vendor' ? '' : vName(vendorsMap[a.vendor_id]),
         Details: JSON.stringify(a.details ?? {}), 'IP Address': a.ip_address ?? '',
       })),
-    });
+    };
+  };
+  const doExport = () => { const d = buildExport(); if (d) exportUserAudit(d); };
+  const doPdf = () => {
+    const d = buildExport(); if (!d) return;
+    exportUserAuditPdf({ userName: d.userName, summary: d.summary, actions: d.actions, pending: d.pending, activity: d.activity,
+      vendors: vendorRows.map((r) => ({ 'Reference No': r.vendor.reference_number ?? '', Vendor: vName(r.vendor), GSTIN: r.vendor.gstin ?? '',
+        Company: tenantNames[r.vendor.tenant_id] ?? '', Status: titleCase(r.vendor.status), 'Invited By': invitedByText(r.vendor.id),
+        'SAP Code': r.vendor.sap_vendor_code ?? '', 'Pending With User': pendingIds.has(r.vendor.id) ? 'Pending' : '', Relation: r.relation })) });
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2"><FileSpreadsheet className="h-6 w-6 text-primary" />User Audit Report</h1>
-          <p className="text-sm text-muted-foreground">Select A User To See Every Vendor, Approval And Action Linked To Them.</p>
+          <h1 className="text-lg font-bold text-foreground flex items-center gap-2"><span className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center shadow-sm"><FileSpreadsheet className="h-4 w-4" /></span>User Audit Report</h1>
+          <p className="text-xs text-muted-foreground">Select A User To See Every Vendor, Approval And Action Linked To Them.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" disabled={!userId || loading} onClick={() => load(userId)}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
-          <Button disabled={!user || loading} onClick={doExport}><Download className="h-4 w-4 mr-2" />Export To Excel</Button>
+          <Button size="sm" variant="outline" disabled={!userId || loading} onClick={() => load(userId)}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
+          <Button size="sm" variant="outline" disabled={!user || loading} onClick={doPdf} className="border-destructive/30 text-destructive hover:bg-destructive/10"><FileText className="h-4 w-4 mr-1" />Download PDF</Button>
+          <Button size="sm" disabled={!user || loading} onClick={doExport} className="bg-gradient-to-r from-primary to-primary/80"><Download className="h-4 w-4 mr-1" />Export To Excel</Button>
         </div>
       </div>
 
       <Card className="rounded-[10px]">
-        <CardContent className="p-4 grid gap-3 md:grid-cols-2 lg:grid-cols-6">
+        <CardContent className="p-3 grid gap-2 md:grid-cols-2 lg:grid-cols-6 [&_input]:h-8 [&_input]:text-xs [&_button]:h-8 [&_button]:text-xs">
           <div className="lg:col-span-2">
             <p className="text-xs font-medium text-muted-foreground mb-1">User</p>
             <div className="relative" ref={pickerRef}>
@@ -351,138 +385,154 @@ export default function UserAuditReport() {
         <div className="space-y-4"><Skeleton className="h-24 w-full" /><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div><Skeleton className="h-72 w-full" /></div>
       ) : (
         <>
-          <Card className="rounded-[10px] border-l-4 border-l-primary">
-            <CardContent className="p-4 flex flex-wrap items-center gap-x-8 gap-y-2">
+          <Card className="rounded-[10px] border-l-4 border-l-primary bg-gradient-to-r from-primary/10 via-card to-card shadow-sm">
+            <CardContent className="p-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
               <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center"><UserRound className="h-6 w-6" /></div>
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-primary-foreground flex items-center justify-center shadow"><UserRound className="h-4 w-4" /></div>
                 <div><p className="font-semibold text-foreground">{user?.full_name || user?.email}</p>
                   <Badge variant={user?.status === 'active' ? 'default' : 'secondary'}>{titleCase(user?.status ?? '')}</Badge></div>
               </div>
-              <div className="text-sm"><p className="text-muted-foreground text-xs flex items-center gap-1"><Mail className="h-3 w-3" />Email</p>{user?.email}</div>
-              <div className="text-sm"><p className="text-muted-foreground text-xs">Roles</p>{roles}</div>
-              <div className="text-sm"><p className="text-muted-foreground text-xs flex items-center gap-1"><Building2 className="h-3 w-3" />Companies</p>{companies}</div>
-              <div className="text-sm"><p className="text-muted-foreground text-xs flex items-center gap-1"><Clock className="h-3 w-3" />Last Login</p>{formatDateTime(user?.last_login_attempt_at, '—')}</div>
-              <div className="text-sm"><p className="text-muted-foreground text-xs">User Since</p>{formatDate(user?.created_at, '—')}</div>
+              <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Mail className="h-3 w-3" />Email</p>{user?.email}</div>
+              <div className="text-xs"><p className="text-muted-foreground text-[11px]">Roles</p>{roles}</div>
+              <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Building2 className="h-3 w-3" />Companies</p>{companies}</div>
+              <div className="text-xs"><p className="text-muted-foreground text-[11px] flex items-center gap-1"><Clock className="h-3 w-3" />Last Login</p>{formatDateTime(user?.last_login_attempt_at, '—')}</div>
+              <div className="text-xs"><p className="text-muted-foreground text-[11px]">User Since</p>{formatDate(user?.created_at, '—')}</div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-8 gap-2">
             <Kpi icon={Send} label="Vendors Invited" value={invitedCount} />
-            <Kpi icon={Users} label="Created On Behalf" value={behalfCount} />
+            <Kpi icon={Users} label="Created On Behalf" value={behalfCount} tone="accent" />
             <Kpi icon={CheckCircle2} label="Approvals" value={types.Approved} tone="success" />
             <Kpi icon={XCircle} label="Rejections" value={types.Rejected} tone="destructive" />
             <Kpi icon={RotateCcw} label="Returns / Clarifications" value={types.Returned} tone="warning" />
             <Kpi icon={Hourglass} label="Pending In Queue" value={pendingRows.length} tone="warning" />
-            <Kpi icon={Timer} label="Avg Approval Time" value={avg == null ? '—' : `${avg} h`} />
+            <Kpi icon={Timer} label="Avg Approval Time" value={avg == null ? '—' : `${avg} h`} tone="accent" />
             <Kpi icon={RefreshCw} label="SAP Synced Vendors" value={sapSynced} tone="success" />
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4">
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Activity Over Time</h3></CardHeader>
-              <CardContent className="h-64">{timeline.length ? (
-                <ResponsiveContainer><LineChart data={timeline}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" fontSize={12} /><YAxis allowDecimals={false} fontSize={12} /><Tooltip /><Legend />
-                  <Line type="monotone" dataKey="Actions" stroke="hsl(var(--primary))" strokeWidth={2} />
-                  <Line type="monotone" dataKey="Invitations" stroke="hsl(var(--success))" strokeWidth={2} /></LineChart></ResponsiveContainer>
+          <svg width="0" height="0" className="absolute"><defs>
+            {[['gP','--primary'],['gS','--success'],['gD','--destructive'],['gW','--warning'],['gM','--muted-foreground']].map(([id, v]) => (
+              <linearGradient key={id} id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={`hsl(var(${v}))`} stopOpacity={1} /><stop offset="100%" stopColor={`hsl(var(${v}))`} stopOpacity={0.45} /></linearGradient>))}
+            <linearGradient id="gPv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} /></linearGradient>
+            <linearGradient id="gSv" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.35} /><stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} /></linearGradient>
+          </defs></svg>
+          <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-2">
+            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Activity Over Time</p></CardHeader>
+              <CardContent className="h-48 p-1.5">{timeline.length ? (
+                <ResponsiveContainer><AreaChart data={timeline}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="month" fontSize={10} /><YAxis allowDecimals={false} fontSize={10} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Area type="monotone" dataKey="Actions" stroke="hsl(var(--primary))" fill="url(#gPv)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="Invitations" stroke="hsl(var(--success))" fill="url(#gSv)" strokeWidth={2} /></AreaChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Actions By Type</h3></CardHeader>
-              <CardContent className="h-64">{typeData.length ? (
-                <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} label>
-                  {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer>
+            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Actions By Type</p></CardHeader>
+              <CardContent className="h-48 p-1.5">{typeData.length ? (
+                <ResponsiveContainer><PieChart><Pie data={typeData} dataKey="value" nameKey="name" innerRadius={38} outerRadius={62} paddingAngle={3} label={{ fontSize: 10 }}>
+                  {typeData.map((d, i) => <Cell key={d.name} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} /></PieChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Vendors By Current Status</h3></CardHeader>
-              <CardContent className="h-64">{statusData.length ? (
-                <ResponsiveContainer><BarChart data={statusData} layout="vertical" margin={{ left: 40 }}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" allowDecimals={false} fontSize={12} /><YAxis type="category" dataKey="name" width={130} fontSize={11} /><Tooltip />
-                  <Bar dataKey="count" name="Vendors" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer>
+            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Vendors By Current Status</p></CardHeader>
+              <CardContent className="h-48 p-1.5">{statusData.length ? (
+                <ResponsiveContainer><BarChart data={statusData} layout="vertical" margin={{ left: 0 }}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis type="number" allowDecimals={false} fontSize={10} /><YAxis type="category" dataKey="name" width={100} fontSize={9} /><Tooltip />
+                  <Bar dataKey="count" name="Vendors" fill="url(#gP)" radius={[0, 6, 6, 0]} /></BarChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
-            <Card className="rounded-[10px]"><CardHeader className="pb-2"><h3 className="text-sm font-semibold text-foreground">Actions By Approval Stage</h3></CardHeader>
-              <CardContent className="h-64">{stageData.length ? (
+            <Card className="rounded-[10px] shadow-sm"><CardHeader className="p-2.5 pb-0"><p className="text-xs font-semibold text-foreground">Actions By Approval Stage</p></CardHeader>
+              <CardContent className="h-48 p-1.5">{stageData.length ? (
                 <ResponsiveContainer><BarChart data={stageData}><CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="stage" fontSize={12} /><YAxis allowDecimals={false} fontSize={12} /><Tooltip /><Legend />
-                  <Bar dataKey="Approved" stackId="a" fill="hsl(var(--success))" /><Bar dataKey="Rejected" stackId="a" fill="hsl(var(--destructive))" />
-                  <Bar dataKey="Returned" stackId="a" fill="hsl(var(--warning))" /></BarChart></ResponsiveContainer>
+                  <XAxis dataKey="stage" fontSize={9} /><YAxis allowDecimals={false} fontSize={10} width={24} /><Tooltip /><Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="Approved" stackId="a" fill="url(#gS)" /><Bar dataKey="Rejected" stackId="a" fill="url(#gD)" />
+                  <Bar dataKey="Returned" stackId="a" fill="url(#gW)" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
               ) : <Empty />}</CardContent></Card>
           </div>
 
-          <Card className="rounded-[10px]">
-            <CardContent className="p-4">
+          <Card className="rounded-[10px] shadow-sm">
+            <CardContent className="p-3">
               <Tabs defaultValue="vendors">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                  <TabsList>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <TabsList className="h-8 bg-gradient-to-r from-primary/10 to-muted [&>button]:text-xs [&>button]:py-1">
                     <TabsTrigger value="vendors">Vendors ({vendorRows.length})</TabsTrigger>
                     <TabsTrigger value="actions">Approval Actions ({actionRows.length})</TabsTrigger>
                     <TabsTrigger value="pending">Pending Queue ({pendingRows.length})</TabsTrigger>
                     <TabsTrigger value="activity">Activity Log ({activityRows.length})</TabsTrigger>
                   </TabsList>
-                  <div className="relative w-full sm:w-72"><Search className="h-4 w-4 absolute left-3 top-3 text-muted-foreground" />
-                    <Input className="pl-9" placeholder="Search Vendor, Reference, GSTIN..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+                  <div className="relative w-full sm:w-64"><Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
+                    <Input className="pl-8 h-8 text-xs" placeholder="Search Vendor, Reference, GSTIN..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
                 </div>
 
                 <TabsContent value="vendors">
-                  <div className="overflow-x-auto"><Table><TableHeader><TableRow>
-                    <TableHead>Reference No</TableHead><TableHead>Vendor Name</TableHead><TableHead>GSTIN</TableHead><TableHead>PAN</TableHead>
-                    <TableHead>Company</TableHead><TableHead>Current Status</TableHead><TableHead>SAP Code</TableHead><TableHead>Invited On</TableHead>
-                    <TableHead>Submitted On</TableHead><TableHead>User Relation</TableHead><TableHead /></TableRow></TableHeader>
+                  <div className="flex flex-wrap gap-3 mb-2 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-warning/30 border-l-4 border-l-warning" />Pending With User</span>
+                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-success/20 border-l-4 border-l-success/60" />Approved / Synced</span>
+                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-destructive/15 border-l-4 border-l-destructive/60" />Rejected</span>
+                    <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border" />Other</span>
+                  </div>
+                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
+                    <TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor Name</TableHead><TableHead className={TH}>GSTIN</TableHead><TableHead className={TH}>PAN</TableHead>
+                    <TableHead className={TH}>Company</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Current Status</TableHead><TableHead className={TH}>SAP Code</TableHead><TableHead className={TH}>Invited On</TableHead>
+                    <TableHead className={TH}>Submitted On</TableHead><TableHead className={TH}>User Relation</TableHead><TableHead className={TH} /></TableRow></TableHeader>
                     <TableBody>{vPage.rows.length ? vPage.rows.map(({ vendor: v, relation, invite }) => (
-                      <TableRow key={v.id}>
-                        <TableCell className="font-mono text-xs">{v.reference_number ?? '—'}</TableCell>
-                        <TableCell className="font-medium">{vName(v)}</TableCell>
-                        <TableCell className="font-mono text-xs">{v.gstin ?? '—'}</TableCell>
-                        <TableCell className="font-mono text-xs">{v.pan ?? '—'}</TableCell>
-                        <TableCell>{tenantNames[v.tenant_id] ?? '—'}</TableCell>
-                        <TableCell><Badge variant="outline">{titleCase(v.status)}</Badge></TableCell>
-                        <TableCell>{v.sap_vendor_code ?? '—'}</TableCell>
-                        <TableCell>{formatDate(invite?.created_at, '—')}</TableCell>
-                        <TableCell>{formatDate(v.submitted_at, '—')}</TableCell>
-                        <TableCell className="text-xs">{relation}</TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => setReviewId(v.id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
-                      </TableRow>)) : <EmptyRow cols={11} />}</TableBody></Table></div>{vPage.pager}
+                      <TableRow key={v.id} className={STATUS_ROW(v.status, pendingIds.has(v.id))}>
+                        <TableCell className={`${TD} font-mono text-xs`}>{v.reference_number ?? '—'}</TableCell>
+                        <TableCell className={`${TD} font-medium`}>{vName(v)}</TableCell>
+                        <TableCell className={`${TD} font-mono text-xs`}>{v.gstin ?? '—'}</TableCell>
+                        <TableCell className={`${TD} font-mono text-xs`}>{v.pan ?? '—'}</TableCell>
+                        <TableCell className={`${TD} `}>{tenantNames[v.tenant_id] ?? '—'}</TableCell>
+                        <TableCell className={`${TD} `}><InvBy b={invitedBy(v.id)} /></TableCell>
+                        <TableCell className={`${TD} `}><div className="flex flex-col gap-0.5 items-start"><Badge variant="outline" className={`text-[10px] ${STATUS_BADGE(v.status)}`}>{titleCase(v.status)}</Badge>
+                          {pendingIds.has(v.id) && <Badge className="text-[10px] bg-gradient-to-r from-warning to-warning/70 text-warning-foreground border-0">Pending With User</Badge>}</div></TableCell>
+                        <TableCell className={`${TD} `}>{v.sap_vendor_code ?? '—'}</TableCell>
+                        <TableCell className={`${TD} `}>{formatDate(invite?.created_at, '—')}</TableCell>
+                        <TableCell className={`${TD} `}>{formatDate(v.submitted_at, '—')}</TableCell>
+                        <TableCell className={`${TD} text-xs`}>{relation}</TableCell>
+                        <TableCell className={`${TD} `}><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setReviewId(v.id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
+                      </TableRow>)) : <EmptyRow cols={12} />}</TableBody></Table></div>{vPage.pager}
                 </TabsContent>
 
                 <TabsContent value="actions">
-                  <div className="overflow-x-auto"><Table><TableHeader><TableRow>
-                    <TableHead>Date / Time</TableHead><TableHead>Reference No</TableHead><TableHead>Vendor</TableHead><TableHead>Stage</TableHead>
-                    <TableHead>Action</TableHead><TableHead>Comments</TableHead><TableHead>Time Taken</TableHead></TableRow></TableHeader>
+                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
+                    <TableHead className={TH}>Date / Time</TableHead><TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Stage</TableHead>
+                    <TableHead className={TH}>Action</TableHead><TableHead className={TH}>Comments</TableHead><TableHead className={TH}>Time Taken</TableHead></TableRow></TableHeader>
                     <TableBody>{aPage.rows.length ? aPage.rows.map((h) => {
                       const t = classifyAction(h.action);
                       const hrs = h.started_at ? Math.max(0, Math.round((new Date(h.acted_at).getTime() - new Date(h.started_at).getTime()) / 36e5)) : null;
                       return (<TableRow key={h.id}>
-                        <TableCell className="whitespace-nowrap">{formatDateTime(h.acted_at)}</TableCell>
-                        <TableCell className="font-mono text-xs">{h.vendor?.reference_number ?? '—'}</TableCell>
-                        <TableCell className="font-medium">{vName(h.vendor)}</TableCell>
-                        <TableCell>{stageLabel(h.stage)}</TableCell>
-                        <TableCell><Badge variant={t === 'Rejected' ? 'destructive' : 'outline'} className={t === 'Approved' ? 'bg-success/10 text-success' : t === 'Returned' ? 'bg-warning/10 text-warning' : ''}>{t === 'Other' ? titleCase(h.action) : t}</Badge></TableCell>
-                        <TableCell className="max-w-xs text-sm">{h.comments || '—'}</TableCell>
-                        <TableCell>{fmtWait(hrs)}</TableCell>
+                        <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(h.acted_at)}</TableCell>
+                        <TableCell className={`${TD} font-mono text-xs`}>{h.vendor?.reference_number ?? '—'}</TableCell>
+                        <TableCell className={`${TD} font-medium`}>{vName(h.vendor)}</TableCell>
+                        <TableCell className={`${TD} `}><InvBy b={invitedBy(h.vendor_id)} /></TableCell>
+                        <TableCell className={`${TD} `}>{stageLabel(h.stage)}</TableCell>
+                        <TableCell className={`${TD} `}><Badge variant={t === 'Rejected' ? 'destructive' : 'outline'} className={t === 'Approved' ? 'bg-success/10 text-success' : t === 'Returned' ? 'bg-warning/10 text-warning' : ''}>{t === 'Other' ? titleCase(h.action) : t}</Badge></TableCell>
+                        <TableCell className={`${TD} max-w-xs text-sm`}>{h.comments || '—'}</TableCell>
+                        <TableCell className={`${TD} `}>{fmtWait(hrs)}</TableCell>
                       </TableRow>);
-                    }) : <EmptyRow cols={7} />}</TableBody></Table></div>{aPage.pager}
+                    }) : <EmptyRow cols={8} />}</TableBody></Table></div>{aPage.pager}
                 </TabsContent>
 
                 <TabsContent value="pending">
-                  <div className="overflow-x-auto"><Table><TableHeader><TableRow>
-                    <TableHead>Reference No</TableHead><TableHead>Vendor</TableHead><TableHead>Stage</TableHead><TableHead>Waiting Since</TableHead><TableHead>Waiting For</TableHead><TableHead /></TableRow></TableHeader>
+                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
+                    <TableHead className={TH}>Reference No</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Invited By</TableHead><TableHead className={TH}>Stage</TableHead><TableHead className={TH}>Waiting Since</TableHead><TableHead className={TH}>Waiting For</TableHead><TableHead className={TH} /></TableRow></TableHeader>
                     <TableBody>{pPage.rows.length ? pPage.rows.map((p) => (
-                      <TableRow key={`${p.vendor_id}-${p.stage}`}>
-                        <TableCell className="font-mono text-xs">{p.vendor?.reference_number ?? '—'}</TableCell>
-                        <TableCell className="font-medium">{vName(p.vendor)}</TableCell>
-                        <TableCell>{stageLabel(p.stage)}</TableCell>
-                        <TableCell>{formatDateTime(p.started_at ?? p.created_at, '—')}</TableCell>
-                        <TableCell><Badge variant="outline" className="bg-warning/10 text-warning">{fmtWait(hoursSince(p.started_at ?? p.created_at))}</Badge></TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => setReviewId(p.vendor_id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
-                      </TableRow>)) : <EmptyRow cols={6} />}</TableBody></Table></div>{pPage.pager}
+                      <TableRow key={`${p.vendor_id}-${p.stage}`} className={STATUS_ROW('', true)}>
+                        <TableCell className={`${TD} font-mono text-xs`}>{p.vendor?.reference_number ?? '—'}</TableCell>
+                        <TableCell className={`${TD} font-medium`}>{vName(p.vendor)}</TableCell>
+                        <TableCell className={`${TD} `}><InvBy b={invitedBy(p.vendor_id)} /></TableCell>
+                        <TableCell className={`${TD} `}>{stageLabel(p.stage)}</TableCell>
+                        <TableCell className={`${TD} `}>{formatDateTime(p.started_at ?? p.created_at, '—')}</TableCell>
+                        <TableCell className={`${TD} `}><Badge variant="outline" className="bg-warning/10 text-warning">{fmtWait(hoursSince(p.started_at ?? p.created_at))}</Badge></TableCell>
+                        <TableCell className={`${TD} `}><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setReviewId(p.vendor_id)}><Eye className="h-4 w-4 mr-1" />View</Button></TableCell>
+                      </TableRow>)) : <EmptyRow cols={7} />}</TableBody></Table></div>{pPage.pager}
                 </TabsContent>
 
                 <TabsContent value="activity">
-                  <div className="overflow-x-auto"><Table><TableHeader><TableRow>
-                    <TableHead>Date / Time</TableHead><TableHead>Action</TableHead><TableHead>Vendor</TableHead><TableHead>Details</TableHead><TableHead>IP Address</TableHead></TableRow></TableHeader>
+                  <div className="overflow-x-auto rounded-md border"><Table><TableHeader className="bg-gradient-to-r from-primary/15 via-primary/5 to-success/10"><TableRow className="hover:bg-transparent">
+                    <TableHead className={TH}>Date / Time</TableHead><TableHead className={TH}>Action</TableHead><TableHead className={TH}>Vendor</TableHead><TableHead className={TH}>Details</TableHead><TableHead className={TH}>IP Address</TableHead></TableRow></TableHeader>
                     <TableBody>{lPage.rows.length ? lPage.rows.map((a) => (
                       <TableRow key={a.id}>
-                        <TableCell className="whitespace-nowrap">{formatDateTime(a.created_at)}</TableCell>
-                        <TableCell><Badge variant="outline">{titleCase(a.action)}</Badge></TableCell>
-                        <TableCell>{a.vendor_id && vendorsMap[a.vendor_id] ? vName(vendorsMap[a.vendor_id]) : '—'}</TableCell>
+                        <TableCell className={`${TD} whitespace-nowrap`}>{formatDateTime(a.created_at)}</TableCell>
+                        <TableCell className={`${TD} `}><Badge variant="outline">{titleCase(a.action)}</Badge></TableCell>
+                        <TableCell className={`${TD} `}>{a.vendor_id && vendorsMap[a.vendor_id] ? vName(vendorsMap[a.vendor_id]) : '—'}</TableCell>
                         <TableCell className="max-w-md text-xs text-muted-foreground truncate" title={JSON.stringify(a.details ?? {})}>{JSON.stringify(a.details ?? {})}</TableCell>
-                        <TableCell className="text-xs">{a.ip_address ?? '—'}</TableCell>
+                        <TableCell className={`${TD} text-xs`}>{a.ip_address ?? '—'}</TableCell>
                       </TableRow>)) : <EmptyRow cols={5} />}</TableBody></Table></div>{lPage.pager}
                 </TabsContent>
               </Tabs>
@@ -497,3 +547,6 @@ export default function UserAuditReport() {
 
 function Empty() { return <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No Data For This Selection</div>; }
 function EmptyRow({ cols }: { cols: number }) { return <TableRow><TableCell colSpan={cols} className="text-center py-8 text-muted-foreground">No Records Found</TableCell></TableRow>; }
+function InvBy({ b }: { b: { name: string; behalf: boolean } }) {
+  return <div className="flex flex-col gap-0.5"><span>{b.name}</span>{b.behalf && <Badge variant="outline" className="w-fit text-[10px] bg-primary/10 text-primary border-primary/30">On Behalf</Badge>}</div>;
+}
