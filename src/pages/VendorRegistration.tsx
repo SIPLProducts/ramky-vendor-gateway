@@ -26,6 +26,7 @@ import { useVendorRegistration } from '@/hooks/useVendorRegistration';
 import { HelpCircle, Phone, Mail, MessageSquare, X, Save, ChevronLeft, ChevronRight, Send, Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { isDeadSessionError, purgeDeadLocalSession } from '@/lib/authSessionCleanup';
 import ramkyLogo from '@/assets/ramky-logo-transparent.png';
 import registrationCollage from '@/assets/ramky-registration-collage.jpeg';
 
@@ -540,7 +541,14 @@ export default function VendorRegistration() {
             userReady = true;
             break;
           }
-          const { data: userData } = await supabase.auth.getUser();
+          const { data: userData, error: userErr } = await supabase.auth.getUser();
+          if (sessionData.session?.access_token && isDeadSessionError(userErr)) {
+            // Saved login is dead on the server: clear it silently and let the
+            // invite handler sign the vendor in fresh (no cache clearing needed).
+            await purgeDeadLocalSession();
+            navigate(`/vendor/invite?token=${encodeURIComponent(token)}`, { replace: true });
+            return;
+          }
           if (sessionData.session?.access_token && userData.user?.id) {
             session = sessionData.session;
             userReady = true;

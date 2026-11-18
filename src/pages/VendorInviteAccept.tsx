@@ -63,6 +63,14 @@ export default function VendorInviteAccept() {
           stale.forEach((k) => window.localStorage.removeItem(k));
         } catch { /* storage unavailable */ }
         try {
+          const staleS: string[] = [];
+          for (let i = 0; i < window.sessionStorage.length; i++) {
+            const k = window.sessionStorage.key(i);
+            if (k && k.startsWith('sb-') && k.includes('auth-token')) staleS.push(k);
+          }
+          staleS.forEach((k) => window.sessionStorage.removeItem(k));
+        } catch { /* storage unavailable */ }
+        try {
           await supabase.auth.signOut({ scope: 'local' });
           await new Promise((r) => setTimeout(r, 150));
         } catch {
