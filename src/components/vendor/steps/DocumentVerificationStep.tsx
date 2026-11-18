@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { XCircle } from "lucide-react";
+import { XCircle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OcrDocumentType } from "@/hooks/useOcrExtraction";
 import { useConfiguredKycApi } from "@/hooks/useConfiguredKycApi";
@@ -28,6 +28,7 @@ import { mergeOcrExtracted } from "@/lib/kycExtract";
 import { toast } from "sonner";
 import Swal from "sweetalert2";
 import { GstFilingStatusTable, normalizeFilingStatus, evaluateGstr1Compliance, type FilingStatusRow } from "@/components/vendor/kyc/GstFilingStatusTable";
+import { pickFilingRows } from "@/lib/gstFiling";
 import { ManualEntryFallbackDialog } from "@/components/vendor/kyc/ManualEntryFallbackDialog";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/vendor/FileUpload";
@@ -873,6 +874,7 @@ export function DocumentVerificationStep({
         address_state: addressParts.state || (d.state_jurisdiction || rawData.state_jurisdiction || "").toString().replace(/^State\s*-\s*/i, "").trim() || undefined,
         address_pincode: addressParts.pincode,
         address_line: addressParts.address,
+        filing_status: d.filing_status ?? rawData.filing_status,
       };
       return {
         ok: true as const,
@@ -1480,45 +1482,56 @@ export function DocumentVerificationStep({
     const gstin = String(baseGstData?.gstin || "").toUpperCase().trim();
     if (!gstin) return;
     setGstFilingChecking(true);
+    // Show rows from the main GST response straight away (if any).
+    const baseRows = normalizeFilingStatus(baseGstData?.filing_status);
+    if (baseRows.length) setGstFilingRows(baseRows);
     try {
-      const r = await callProvider({
-        providerName: "GST_FILING",
-        input: { id_number: gstin, gstin },
-      });
-      // Prefer the dedicated GST_FILING response, fall back to the
-      // filing_status returned by the main GST validation call.
-      const filingSrc =
-        r.found && r.ok && r.data
-          ? (r.data.filing_status ?? baseGstData.filing_status)
-          : baseGstData.filing_status;
-      const rows = normalizeFilingStatus(filingSrc);
+      console.log("[GST_FILING] request", { gstin });
+      let r: any = null;
+      try {
+        r = await Promise.race([
+          callProvider({ providerName: "GST_FILING", input: { id_number: gstin, gstin } }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("GST_FILING timed out after 20s")), 20000)),
+        ]);
+      } catch (err) {
+        console.warn("[GST_FILING] error", err);
+      }
+      const filingResp = r && r.found && r.ok && r.data ? r.data.filing_status : undefined;
+      const { rows, source } = pickFilingRows(filingResp, baseGstData?.filing_status);
+      console.log(`[GST_FILING] response rows=${rows.length} source=${source}`);
+      if (!rows.length) {
+        setGstFilingChecked(true);
+        return;
+      }
       setGstFilingRows(rows);
       setGstFilingChecked(true);
-      const evalRes = rows.length
-        ? evaluateGstr1Compliance(rows)
-        : { previousMonthFiled: false, declarationRequired: false, checkedPeriod: "" };
+      const evalRes = evaluateGstr1Compliance(rows);
       setGstCompliance(evalRes);
-      // Persist the filing status onto the vendor_validations GST row so the
-      // View Details "GST Compliance Report" popup can render the real table.
+      // Persist onto the latest GST validation row (update, else insert).
       if (vendorId) {
         try {
-          await supabase
-            .from("vendor_validations")
-            .delete()
-            .eq("vendor_id", vendorId)
-            .eq("validation_type", "gst");
           const msg = evalRes.previousMonthFiled
             ? `GST verified — GSTR1 filed for ${evalRes.checkedPeriod}`
             : evalRes.declarationRequired
               ? `GST verified — GSTR1 for ${evalRes.checkedPeriod} not filed (declaration required)`
               : `GST verified — GSTR1 for ${evalRes.checkedPeriod} not yet filed (within grace period, due 11th)`;
-          await supabase.from("vendor_validations").insert({
-            vendor_id: vendorId,
-            validation_type: "gst",
-            status: "passed",
-            message: msg,
-            details: { ...baseGstData, filing_status: filingSrc },
-          });
+          const details = { ...baseGstData, filing_status: rows } as any;
+          const { data: existing, error: selErr } = await supabase
+            .from("vendor_validations")
+            .select("id")
+            .eq("vendor_id", vendorId)
+            .eq("validation_type", "gst")
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (selErr) throw selErr;
+          const { error } = existing && existing.length
+            ? await supabase.from("vendor_validations")
+                .update({ status: "passed", message: msg, details, validated_at: new Date().toISOString() })
+                .eq("id", (existing[0] as any).id)
+            : await supabase.from("vendor_validations")
+                .insert({ vendor_id: vendorId, validation_type: "gst", status: "passed", message: msg, details });
+          if (error) throw error;
+          console.log(`[GST_FILING] persisted vendor=${vendorId} rows=${rows.length}`);
         } catch (err) {
           console.warn("[GST_FILING] Failed to persist filing status", err);
         }
@@ -1526,6 +1539,20 @@ export function DocumentVerificationStep({
     } finally {
       setGstFilingChecking(false);
     }
+  };
+
+  const [filingConfirmOpen, setFilingConfirmOpen] = useState(false);
+  const filingConfirmNextRef = useRef<(() => void) | null>(null);
+  const guardFilingData = (next: () => void) => {
+    if (isGstRegistered === true && gstDoc.status === "verified" && gstFilingRows.length === 0) {
+      filingConfirmNextRef.current = next;
+      setFilingConfirmOpen(true);
+      return;
+    }
+    next();
+  };
+  const refreshGstFiling = () => {
+    if (gstDoc.ocrData?.gstin) void runGstFilingStatusCheck(gstDoc.ocrData);
   };
 
   const handleGstUpload = (file: File) => {
@@ -2545,15 +2572,24 @@ export function DocumentVerificationStep({
                           </div>
                         </div>
 
-                        {gstFilingRows.length > 0 ? (
-                          <GstFilingStatusTable rows={gstFilingRows} limit={3} />
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {gstFilingChecking
-                              ? "Fetching latest filing status from GSTN…"
-                              : "Click \"Check Filing Status\" to fetch the last 3 months of returns."}
-                          </p>
-                        )}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          {gstFilingChecking ? (
+                            <span className="text-xs text-muted-foreground">Fetching Latest Filing Status From GSTN…</span>
+                          ) : gstFilingRows.length > 0 ? (
+                            <Badge variant="outline" className="border-emerald-400 text-emerald-700 bg-emerald-50">
+                              Filing Status Received ({gstFilingRows.length} Returns)
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                              {gstFilingChecked ? "No Filing Data Returned By GSTN" : "Filing Status Not Fetched Yet"}
+                            </Badge>
+                          )}
+                          <Button type="button" variant="outline" size="sm" disabled={gstFilingChecking} onClick={refreshGstFiling}>
+                            {gstFilingChecking ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                            Refresh Filing Status
+                          </Button>
+                        </div>
+                        {gstFilingRows.length > 0 && <GstFilingStatusTable rows={gstFilingRows} limit={3} />}
 
                         {/* Non-compliant -> require self-declaration upload */}
                         {gstFilingChecked && gstCompliance?.declarationRequired && (
@@ -2631,7 +2667,7 @@ export function DocumentVerificationStep({
             </StageShell>
 
             <div className="mt-4 flex justify-end">
-              <Button type="button" disabled={!stage1Done} onClick={() => setActiveTab("pan")}>
+              <Button type="button" disabled={!stage1Done} onClick={() => guardFilingData(() => setActiveTab("pan"))}>
                 Continue to PAN
               </Button>
             </div>
@@ -3295,13 +3331,38 @@ export function DocumentVerificationStep({
             </StageShell>
 
             <div className="mt-4 flex justify-end">
-              <Button type="button" disabled={!stage4Done} onClick={() => handleContinue()}>
+              <Button type="button" disabled={!stage4Done} onClick={() => guardFilingData(() => handleContinue())}>
                 Continue
               </Button>
             </div>
           </TabsContent>
         </Tabs>
       </TooltipProvider>
+
+      <AlertDialog open={filingConfirmOpen} onOpenChange={setFilingConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center">GST Filing Data Not Received</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              {gstFilingChecking ? "GST filing status is still being fetched from GSTN. " : ""}
+              Continue Without GST Filing Data?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-2">
+            <AlertDialogAction
+              className="bg-muted text-foreground hover:bg-muted/80"
+              onClick={() => { setFilingConfirmOpen(false); setActiveTab("gst"); if (!gstFilingChecking) refreshGstFiling(); }}
+            >
+              No, Refresh
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => { setFilingConfirmOpen(false); const n = filingConfirmNextRef.current; filingConfirmNextRef.current = null; n?.(); }}
+            >
+              Yes, Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={mismatchDialog.open}

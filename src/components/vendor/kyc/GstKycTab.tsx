@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { pickFilingRows } from '@/lib/gstFiling';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -104,10 +105,8 @@ export function GstKycTab(props: GstKycTabProps) {
       });
       // If the dedicated provider isn't configured, fall back to the filing_status
       // that the GST Validation call already returned.
-      const filingSrc = r.found && r.ok && r.data
-        ? (r.data.filing_status ?? baseGstData.filing_status)
-        : baseGstData.filing_status;
-      const rows = normalizeFilingStatus(filingSrc);
+      const { rows } = pickFilingRows(r.found && r.ok && r.data ? r.data.filing_status : undefined, baseGstData.filing_status);
+      const filingSrc = rows;
       setFilingStatusRows(rows);
       setFilingChecked(true);
       const evalRes = evaluateGstr1Compliance(rows);
