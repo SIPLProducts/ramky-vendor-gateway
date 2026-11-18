@@ -12,9 +12,11 @@
 ## Changes
 All current features keep working the same way. Existing saved data is not changed.
 
-1. **Switch account automatically on a wrong session**
-   - When the signed-in account doesn't match the invitation, the portal signs that account out on this browser only.
-   - It then restarts the normal invitation sign-in, the same flow Incognito uses. The vendor sees "Switching to the invited account…" instead of Access Denied.
+1. **Confirm the invited email before switching account**
+   - When the signed-in account doesn't match the invitation, show a small screen instead of Access Denied: "This browser is signed in with another account. Enter the email address this invitation was sent to."
+   - The portal checks the typed email against the invitation using the existing email-check service, ignoring capital letters and spaces. It never shows the invited email on screen.
+   - **Match:** sign the other account out on this browser only, then start the normal invitation sign-in, the same flow Incognito uses.
+   - **No match:** show "This Email Does Not Match The Invitation" and stay on the screen. The other account stays signed in.
    - The real "different email" denial from the server, for someone who isn't the invited person, still blocks as it does now.
 2. **Email check ignores capital letters and extra spaces**, both in the browser and in the link-opening service.
 3. **Returned/rejected applications get a fresh 14-day link**
@@ -30,7 +32,7 @@ All current features keep working the same way. Existing saved data is not chang
 - Expired links: the buyer uses the existing "Extend/Resend" action on the Vendor Invitations screen. No bulk data change.
 
 ## Technical details
-- `src/pages/VendorRegistration.tsx` (around line 554): compare `trim().toLowerCase()`. On mismatch, call `supabase.auth.signOut({ scope: 'local' })` and `navigate('/vendor/invite?token=…')`, with a sessionStorage guard against loops. Keep the hard denial when `claim-vendor-invite` returns `denied`.
+- `src/pages/VendorRegistration.tsx` (around line 554): compare `trim().toLowerCase()`. On mismatch, show the email-confirm form, check the typed email with the existing `verify-invite-email` function, and only on `ok` call `supabase.auth.signOut({ scope: 'local' })` and `navigate('/vendor/invite?token=…')`, with a sessionStorage guard against loops. Keep the hard denial when `claim-vendor-invite` returns `denied`.
 - `src/pages/VendorInviteAccept.tsx`: same wrong-session handling before claiming; friendly expired copy.
 - `supabase/functions/claim-vendor-invite`, `verify-invite-session`: normalise the email compare.
 - `supabase/functions/buyer-return-to-vendor`, `sap-team-return-to-buyer` / reject paths that notify the vendor: set the latest invitation's `expires_at = now() + 14 days` (only when it would be earlier), then send the email.
