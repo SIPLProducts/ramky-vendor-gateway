@@ -71,14 +71,14 @@ const STATUS_BADGE = (st?: string) => /reject/i.test(st ?? '') ? 'bg-destructive
 const TH = '!h-auto !py-1.5 !px-2 !text-[10px] leading-tight whitespace-nowrap font-semibold uppercase tracking-wide !text-[hsl(207,100%,28%)] !bg-transparent !rounded-none border-b-2 border-[hsl(207,100%,32%)]';
 const TD = '!px-2 !py-1 !text-[11px] leading-tight whitespace-nowrap';
 const TYPE_ORDER = ['Pending', 'Approved', 'Rejected', 'Returned', 'Invited', 'On Behalf', 'Activity'] as const;
-const TYPE_LABEL: Record<string, string> = { Pending: 'Pending With User', Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
+const TYPE_LABEL: Record<string, string> = { Returned: 'Returned For Clarification', 'On Behalf': 'Created On Behalf' };
 type RowType = typeof TYPE_ORDER[number];
 const TYPE_STYLE: Record<RowType, { pill: string; row: string; chip: string; chipOn: string }> = {
-  Pending: { pill: 'bg-gradient-to-r from-warning to-warning/70 text-warning-foreground', row: 'border-l-warning bg-warning/10 font-medium', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
-  Approved: { pill: 'bg-success text-success-foreground', row: 'border-l-success bg-success/5', chip: 'border-success/40 text-success bg-success/5', chipOn: 'bg-success text-success-foreground border-success' },
-  Rejected: { pill: 'bg-destructive text-destructive-foreground', row: 'border-l-destructive bg-destructive/5', chip: 'border-destructive/40 text-destructive bg-destructive/5', chipOn: 'bg-destructive text-destructive-foreground border-destructive' },
-  Returned: { pill: 'bg-warning/80 text-warning-foreground', row: 'border-l-warning/60 bg-warning/5', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
-  Invited: { pill: 'bg-primary text-primary-foreground', row: 'border-l-primary bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
+  Pending: { pill: 'bg-warning/15 text-warning border border-warning/40', row: 'border-l-warning bg-warning/10 font-medium', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
+  Approved: { pill: 'bg-success/15 text-success border border-success/40', row: 'border-l-success bg-success/5', chip: 'border-success/40 text-success bg-success/5', chipOn: 'bg-success text-success-foreground border-success' },
+  Rejected: { pill: 'bg-destructive/10 text-destructive border border-destructive/40', row: 'border-l-destructive bg-destructive/5', chip: 'border-destructive/40 text-destructive bg-destructive/5', chipOn: 'bg-destructive text-destructive-foreground border-destructive' },
+  Returned: { pill: 'bg-warning/10 text-warning border border-warning/30', row: 'border-l-warning/60 bg-warning/5', chip: 'border-warning/40 text-warning bg-warning/5', chipOn: 'bg-warning text-warning-foreground border-warning' },
+  Invited: { pill: 'bg-primary/10 text-primary border border-primary/30', row: 'border-l-primary bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
   'On Behalf': { pill: 'bg-gradient-to-r from-primary/25 to-success/20 text-primary', row: 'border-l-primary/60 bg-primary/5', chip: 'border-primary/40 text-primary bg-primary/5', chipOn: 'bg-primary text-primary-foreground border-primary' },
   Activity: { pill: 'bg-muted text-muted-foreground', row: 'border-l-muted-foreground/30', chip: 'border-border text-muted-foreground', chipOn: 'bg-muted-foreground text-background border-muted-foreground' },
 };
@@ -288,8 +288,8 @@ export default function UserAuditReport() {
   const cPage = usePaged(shown);
   useEffect(() => { cPage.reset(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, from, to, company, status, q, typeFilter]);
-  const combinedExport = () => combined.map((r) => ({ 'Action Date': formatDateTime(r.at, ''), Action: r.type, 'Ref No': r.ref, 'Vendor Name': r.vendor,
-    GSTIN: r.gstin, Company: r.company, 'Invited By': r.invitedBy, 'Approval Stage': r.stage, Comments: r.details, 'Current Vendor Status': r.status, 'SAP Code': r.sap }));
+  const combinedExport = () => combined.map((r) => ({ 'Action Taken On': formatDateTime(r.at, ''), 'User Action': r.type, 'Ref No': r.ref, 'Vendor Name': r.vendor,
+    GSTIN: r.gstin, Company: r.company, 'Invited By': r.invitedBy, 'Stage Handled': r.stage, 'User Comments': r.details, 'Vendor Status (Now)': r.status, 'SAP Code': r.sap }));
 
   const roles = (rolesBy[userId] ?? []).map(titleCase).join(', ') || '—';
   const companies = (tenantsBy[userId] ?? []).map((t) => tenantNames[t]).filter(Boolean).join(', ') || 'All Companies';
@@ -372,10 +372,10 @@ export default function UserAuditReport() {
                   <ChevronsUpDown className="h-4 w-4 opacity-50" />
                 </Button>
               {pickerOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 w-[360px] max-w-[90vw] rounded-md border bg-popover text-popover-foreground shadow-md">
-                <Command>
+              <div className="absolute left-0 top-full z-50 mt-1 w-[360px] max-w-[90vw] rounded-[10px] border bg-card text-foreground shadow-lg overflow-hidden">
+                <Command className="bg-card">
                   <CommandInput autoFocus placeholder="Search Name Or Email..." />
-                  <CommandList>
+                  <CommandList className="max-h-72">
                     <CommandEmpty>No Users Found.</CommandEmpty>
                     <CommandGroup>
                       {profiles.map((p) => (
@@ -386,14 +386,14 @@ export default function UserAuditReport() {
                           onSelect={() => { setUserId(p.id); setPickerOpen(false); }}
                           onPointerDown={(e) => e.preventDefault()}
                           onClick={() => { setUserId(p.id); setPickerOpen(false); }}
-                          className="cursor-pointer"
+                          className="cursor-pointer rounded-md px-2 py-1.5 aria-selected:bg-primary/10 aria-selected:text-foreground data-[selected=true]:bg-primary/10 data-[selected=true]:text-foreground hover:bg-primary/10"
                         >
-                          <Check className={`h-4 w-4 mr-2 ${p.id === userId ? 'opacity-100' : 'opacity-0'}`} />
+                          <Check className={`h-4 w-4 mr-2 text-primary ${p.id === userId ? 'opacity-100' : 'opacity-0'}`} />
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm truncate">{p.full_name || p.email}</p>
+                            <p className={`text-sm truncate ${p.id === userId ? 'font-semibold text-primary' : ''}`}>{p.full_name || p.email}</p>
                             <p className="text-xs text-muted-foreground truncate">{p.email} · {(rolesBy[p.id] ?? []).map(titleCase).join(', ')}</p>
                           </div>
-                          {p.status !== 'active' && <Badge variant="secondary" className="ml-2">Inactive</Badge>}
+                          {p.status !== 'active' && <Badge variant="outline" className="ml-2 text-[10px] text-muted-foreground">Inactive</Badge>}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -459,17 +459,18 @@ export default function UserAuditReport() {
                 <div className="relative w-full sm:w-60"><Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
                   <Input className="pl-8 h-8 text-xs" placeholder="Search Any Column..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
               </div>
+              <p className="text-[11px] text-muted-foreground mb-1.5">Showing actions performed by <b className="text-foreground">{user?.full_name || user?.email}</b>. Pending = vendors currently waiting for this user's approval (date shows Pending Since).</p>
               <div className="rounded-md border overflow-x-auto"><Table className="w-max min-w-full">
                 <TableHeader className="sticky top-0"><TableRow className="hover:bg-transparent border-0" style={{ background: 'linear-gradient(90deg, hsl(207 80% 93%), hsl(30 90% 94%) 55%, hsl(140 50% 92%))' }}>
-                  <TableHead className={`${TH}`}>Action Date</TableHead><TableHead className={`${TH}`}>Action</TableHead>
+                  <TableHead className={`${TH}`}>Action Taken On</TableHead><TableHead className={`${TH}`}>User Action</TableHead>
                   <TableHead className={`${TH}`}>Ref No</TableHead><TableHead className={`${TH}`}>Vendor Name</TableHead>
                   <TableHead className={`${TH}`}>GSTIN</TableHead><TableHead className={`${TH}`}>Company</TableHead>
-                  <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Approval Stage</TableHead>
-                  <TableHead className={`${TH}`}>Comments</TableHead><TableHead className={`${TH}`}>Current Vendor Status</TableHead>
+                  <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Stage Handled</TableHead>
+                  <TableHead className={`${TH}`}>User Comments</TableHead><TableHead className={`${TH}`}>Vendor Status (Now)</TableHead>
                   <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 !bg-[hsl(140,50%,92%)]`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 even:bg-primary/[0.03] hover:bg-primary/5 ${TYPE_STYLE[r.type].row}`}>
-                    <TableCell className={TD}>{formatDateTime(r.at, '—')}</TableCell>
+                    <TableCell className={TD} title={r.type === 'Pending' ? 'Pending Since' : 'Action Taken On'}>{formatDateTime(r.at, '—')}{r.type === 'Pending' && <span className="ml-1 text-[9px] text-muted-foreground">(Since)</span>}</TableCell>
                     <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
                     <TableCell className={`${TD} font-mono text-[11px] whitespace-nowrap`} title={r.ref}>{r.ref || '—'}</TableCell>
                     <TableCell className={`${TD} font-medium whitespace-nowrap`} title={r.vendor}>{r.vendor || '—'}</TableCell>

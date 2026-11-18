@@ -49,7 +49,7 @@ function sheet(rows: Record<string, any>[], title = '', tintKey?: string) {
 }
 
 export function exportUserAudit(opts: { userName: string; user: Record<string, string>; all: Record<string, any>[] }) {
-  const cols = Object.keys(opts.all[0] || { 'Action Date': '', Action: '', 'Ref No': '', 'Vendor Name': '' });
+  const cols = Object.keys(opts.all[0] || { 'Action Taken On': '', 'User Action': '', 'Ref No': '', 'Vendor Name': '' });
   const n = cols.length;
   const uf = Object.entries(opts.user);
   const aoa: any[][] = [[`Ramky Group – User Audit Report`], [`Generated ${formatDateTime(new Date())}`], []];
@@ -68,7 +68,7 @@ export function exportUserAudit(opts: { userName: string; user: Record<string, s
     set(r, c, { border, fill: { fgColor: { rgb: c % 2 ? 'F3FAF5' : 'E8F2FB' } }, font: { sz: 10, bold: c % 2 === 0, color: { rgb: c % 2 ? '1F2937' : BLUE } } });
   for (let c = 0; c < n; c++) {
     set(hr, c, { font: { bold: true, color: { rgb: BLUE } }, fill: { fgColor: { rgb: 'E8F2FB' } }, alignment: { vertical: 'center' }, border: { ...border, bottom: { style: 'medium', color: { rgb: BLUE } } } });
-    opts.all.forEach((row, i) => { const tint = TINT[String(row.Action)];
+    opts.all.forEach((row, i) => { const tint = TINT[String(row['User Action'])];
       set(hr + 1 + i, c, { border, fill: { fgColor: { rgb: tint ?? (i % 2 ? 'FFFFFF' : 'F5F9FD') } }, font: { sz: 10, bold: c === 1, color: { rgb: '1F2937' } } }); });
   }
   ws['!cols'] = cols.map((k, i) => ({ wch: Math.min(45, Math.max(14, k.length + 2, String(aoa[3 + Math.floor(i / 2)]?.[i] ?? '').length, ...opts.all.slice(0, 50).map((r) => String(r[k] ?? '').length))) }));
