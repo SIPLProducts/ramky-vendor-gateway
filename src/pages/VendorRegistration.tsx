@@ -542,7 +542,7 @@ export default function VendorRegistration() {
             break;
           }
           const { data: userData, error: userErr } = await supabase.auth.getUser();
-          if (sessionData.session?.access_token && isDeadSessionError(userErr)) {
+          if (!isFreshInviteHandoff && sessionData.session?.access_token && isDeadSessionError(userErr)) {
             // Saved login is dead on the server: clear it silently and let the
             // invite handler sign the vendor in fresh (no cache clearing needed).
             await purgeDeadLocalSession();

@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { isDeadSessionError, purgeDeadLocalSession } from '@/lib/authSessionCleanup';
 import { useToast } from '@/hooks/use-toast';
 import { VendorFormData, ValidationResult, VendorStatus } from '@/types/vendor';
 import { normalizeRegisteredState } from '../../supabase/functions/_shared/sap-registered-address';
@@ -139,10 +138,12 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
   // which drops the user back onto the Vendor Type selector.
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getUser().then(async ({ data, error }) => {
-      if (isDeadSessionError(error)) await purgeDeadLocalSession();
+    // Read the saved login locally (no network call). A live getUser() here
+    // raced the fresh invite sign-in, got session_not_found and wiped the
+    // brand-new session. Dead sessions are handled by the registration page.
+    supabase.auth.getSession().then(({ data }) => {
       if (mounted) {
-        setAuthUserId(data.user?.id ?? null);
+        setAuthUserId(data.session?.user?.id ?? null);
         setIsAuthReady(true);
       }
     });
