@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
             vendorName: vendor.legal_name ?? 'Vendor',
             comments: combinedRemarks,
             simulationMode: false,
+            frontendUrl: req.headers.get('origin') || undefined,
           },
         });
       } catch (e) {

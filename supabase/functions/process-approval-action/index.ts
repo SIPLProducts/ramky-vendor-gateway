@@ -133,6 +133,7 @@ Deno.serve(async (req) => {
             const notification = await invokeFunctionJson('send-status-notification', {
               vendorId: progress.vendor_id, newStatus: 'returned_to_vendor', previousStatus: 'buyer_review',
               vendorEmail, vendorName: vendorRow?.legal_name ?? 'Vendor', comments: comments ?? '', simulationMode: false,
+              frontendUrl: req.headers.get('origin') || undefined,
             });
             vendorEmailSent = notification.ok;
             vendorEmailError = notification.error;

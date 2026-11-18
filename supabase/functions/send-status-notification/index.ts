@@ -16,6 +16,7 @@ interface NotificationRequest {
   vendorName: string;
   comments?: string;
   simulationMode?: boolean;
+  frontendUrl?: string;
 }
 
 const statusMessages: Record<string, { subject: string; body: string }> = {
@@ -75,7 +76,7 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: string, reference?: string): string {
+function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: string, reference?: string, actionLink?: string): string {
   const statusInfo = statusMessages[status] || {
     subject: 'Status Update',
     body: 'Your vendor registration status has been updated.',
@@ -113,7 +114,8 @@ function generateEmailHtml(vendorNameRaw: string, status: string, commentsRaw?: 
     ` : ''}
     
     <div style="margin-top: 30px;">
-      <a href="#" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">View Registration Status</a>
+      ${actionLink ? `<a href="${escapeHtml(actionLink)}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">${status === 'returned_to_vendor' ? 'Open Application To Correct' : 'View Registration Status'}</a>
+      <p style="margin: 14px 0 0 0; font-size: 13px; color: #555;">If the button does not work, copy and open this link:<br><a href="${escapeHtml(actionLink)}" style="color: #1a56db; word-break: break-all;">${escapeHtml(actionLink)}</a></p>` : ''}
     </div>
     
     <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
@@ -149,7 +151,8 @@ serve(async (req) => {
       vendorEmail, 
       vendorName, 
       comments,
-      simulationMode = true 
+      simulationMode = true,
+      frontendUrl: bodyFrontendUrl,
     }: NotificationRequest = await req.json();
 
     console.log(`[Email Notification] Processing for vendor ${vendorId}`);
@@ -172,7 +175,25 @@ serve(async (req) => {
       notificationName = identity.name;
       reference = identity.reference;
     }
-    const emailHtml = generateEmailHtml(notificationName, newStatus, comments, reference);
+    let actionLink: string | undefined;
+    if (newStatus === 'returned_to_vendor') {
+      try {
+        let refOrigin = '';
+        try { const r = req.headers.get('referer'); if (r) refOrigin = new URL(r).origin; } catch { /* ignore */ }
+        const base = (bodyFrontendUrl || Deno.env.get('FRONTEND_URL') || req.headers.get('origin') || refOrigin || '').replace(/\/+$/, '');
+        if (base) {
+          const client = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+          const { data: invite } = await client.from('vendor_invitations')
+            .select('token').eq('vendor_id', vendorId)
+            .order('created_at', { ascending: false }).limit(1).maybeSingle();
+          if (invite?.token) actionLink = `${base}/vendor/invite?token=${encodeURIComponent(invite.token)}`;
+        }
+        if (!actionLink) console.warn('[Email Notification] No application link available for returned vendor');
+      } catch (e) {
+        console.warn('[Email Notification] Failed to build application link', e);
+      }
+    }
+    const emailHtml = generateEmailHtml(notificationName, newStatus, comments, reference, actionLink);
 
     // Simulation mode - log the email instead of sending
     if (simulationMode) {
