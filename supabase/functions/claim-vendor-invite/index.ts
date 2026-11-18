@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
         const { data: userData } = await admin.auth.getUser(jwt);
         if (userData?.user) {
           callerUserId = userData.user.id;
-          callerEmail = (userData.user.email || '').toLowerCase();
+          callerEmail = (userData.user.email || '').trim().toLowerCase();
         }
       } catch { /* ignore */ }
     }
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
       return json(410, { status: 'expired', code: 'expired', message: 'Invitation expired' });
     }
 
-    const invitedEmail = String(invite.email || '').toLowerCase();
+    const invitedEmail = String(invite.email || '').trim().toLowerCase();
     const redirectPath = `/vendor/registration?token=${encodeURIComponent(token)}`;
 
     // Case A: caller is already signed in

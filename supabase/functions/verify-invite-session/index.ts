@@ -44,7 +44,7 @@ serve(async (req: Request) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const authedEmail = (userData.user.email || "").toLowerCase();
+    const authedEmail = (userData.user.email || "").trim().toLowerCase();
 
     // Look up the invitation
     const { data: invite, error: lookupErr } = await admin
@@ -73,7 +73,7 @@ serve(async (req: Request) => {
       });
     }
 
-    const invitedEmail = String(invite.email || "").toLowerCase();
+    const invitedEmail = String(invite.email || "").trim().toLowerCase();
     if (!authedEmail || authedEmail !== invitedEmail) {
       // Someone opened a mailed link but they're signed in as a different user
       try {

@@ -92,6 +92,15 @@ export default function VendorInviteAccept() {
             try {
               if (ctx?.response?.text) raw = await ctx.response.text();
             } catch { /* ignore */ }
+            let parsed: any = null;
+            try { parsed = raw ? JSON.parse(raw) : null; } catch { /* ignore */ }
+            if (ctx?.status === 410 || parsed?.status === 'expired' || parsed?.code === 'expired') {
+              setErrorDetails({
+                message: 'This Link Has Expired. Please Ask Your Buyer To Resend The Invitation.',
+              });
+              setPhase('error');
+              return;
+            }
             setErrorDetails({
               message: error.message || 'We could not open your invitation.',
               status: ctx?.status,
@@ -196,7 +205,7 @@ export default function VendorInviteAccept() {
 
           if (status === 'expired' || code === 'expired') {
             setErrorDetails({
-              message: 'This invitation link has expired. Please contact the administrator.',
+              message: 'This Link Has Expired. Please Ask Your Buyer To Resend The Invitation.',
               code,
             });
             setPhase('error');

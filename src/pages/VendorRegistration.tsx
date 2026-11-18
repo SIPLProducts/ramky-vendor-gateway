@@ -173,6 +173,10 @@ export default function VendorRegistration() {
   const isValidatingTokenRef = useRef(true);
   useEffect(() => { isValidatingTokenRef.current = isValidatingToken; }, [isValidatingToken]);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [wrongAccountToken, setWrongAccountToken] = useState<string | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [confirmEmailError, setConfirmEmailError] = useState<string | null>(null);
+  const [confirmingEmail, setConfirmingEmail] = useState(false);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [isTokenMode, setIsTokenMode] = useState(false);
   const [invitationEmail, setInvitationEmail] = useState<string>('');
@@ -511,7 +515,7 @@ export default function VendorRegistration() {
 
         const expiresAt = new Date(invitation.expires_at);
         if (expiresAt < new Date()) {
-          setTokenError('This invitation link has expired. Please request a new one.');
+          setTokenError('This Link Has Expired. Please Ask Your Buyer To Resend The Invitation.');
           setIsValidatingToken(false);
           return;
         }
@@ -551,8 +555,10 @@ export default function VendorRegistration() {
         }
 
         // Verify the logged-in email matches the invitation email
-        if (session.user.email !== invitation.email) {
-          setTokenError('This invitation is for a different email. Please log in with the correct account.');
+        if ((session.user.email || '').trim().toLowerCase() !== String(invitation.email || '').trim().toLowerCase()) {
+          // Another account is signed in on this browser. Ask the vendor to
+          // confirm the invited email before switching accounts.
+          setWrongAccountToken(token);
           setIsValidatingToken(false);
           return;
         }
@@ -1620,6 +1626,62 @@ export default function VendorRegistration() {
 
 
 
+
+  if (wrongAccountToken && !tokenError) {
+    const submitConfirm = async (e: React.FormEvent) => {
+      e.preventDefault();
+      const email = confirmEmail.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        setConfirmEmailError('Please Enter A Valid Email Address.');
+        return;
+      }
+      setConfirmingEmail(true);
+      setConfirmEmailError(null);
+      try {
+        const { data } = await supabase.functions.invoke('verify-invite-email', {
+          body: { token: wrongAccountToken, email },
+        });
+        const d = (data as any) || {};
+        // "used" still means the email matched (returned applications reuse the link).
+        if (d.ok || d.code === 'used') {
+          await supabase.auth.signOut({ scope: 'local' });
+          navigate(`/vendor/invite?token=${encodeURIComponent(wrongAccountToken)}`, { replace: true });
+          return;
+        }
+        if (d.code === 'expired') setConfirmEmailError('This Link Has Expired. Please Ask Your Buyer To Resend The Invitation.');
+        else if (d.code === 'rate_limited') setConfirmEmailError('Too Many Attempts. Please Try Again After 15 Minutes.');
+        else setConfirmEmailError('This Email Does Not Match The Invitation.');
+      } catch {
+        setConfirmEmailError('We Could Not Check The Email Right Now. Please Try Again.');
+      } finally {
+        setConfirmingEmail(false);
+      }
+    };
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <form onSubmit={submitConfirm} className="max-w-md w-full bg-card rounded-lg shadow-lg p-6 space-y-4">
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-semibold">Confirm Your Invitation Email</h2>
+            <p className="text-sm text-muted-foreground">
+              This browser is signed in with another account. Enter the email address this invitation was sent to.
+            </p>
+          </div>
+          <input
+            type="email"
+            autoFocus
+            value={confirmEmail}
+            onChange={(e) => { setConfirmEmail(e.target.value); setConfirmEmailError(null); }}
+            placeholder="vendor@company.com"
+            className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          {confirmEmailError && <p className="text-sm text-destructive">{confirmEmailError}</p>}
+          <Button type="submit" className="w-full" disabled={confirmingEmail || !confirmEmail.trim()}>
+            {confirmingEmail ? 'Checking…' : 'Verify And Continue'}
+          </Button>
+        </form>
+      </div>
+    );
+  }
 
   // Show error if token validation failed
   if (tokenError) {

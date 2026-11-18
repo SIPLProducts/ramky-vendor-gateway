@@ -3,6 +3,7 @@
 //
 // Sets vendors.status = 'returned_to_vendor', stores remarks, and emails
 // the vendor.
+import { extendVendorInviteExpiry } from '../_shared/extend-invite.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { requireAuthenticatedUser, authErrorResponse } from '../_shared/auth.ts';
 
@@ -63,6 +64,8 @@ Deno.serve(async (req) => {
       last_rejected_by: auth.userId,
       last_rejected_at: new Date().toISOString(),
     }).eq('id', vendor_id);
+
+    await extendVendorInviteExpiry(admin, vendor_id);
 
     await admin.from('audit_logs').insert({
       action: 'vendor_returned_to_vendor',

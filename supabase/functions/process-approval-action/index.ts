@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { invokeFunctionJson } from '../_shared/invoke-function.ts';
 import { vendorEmailIdentity } from '../_shared/vendor-email-identity.ts';
+import { extendVendorInviteExpiry } from '../_shared/extend-invite.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
         });
         if (historyError) console.warn('history log failed (non-blocking):', historyError.message);
         await admin.from('vendors').update({ status: 'returned_to_vendor', ...vendorRejectionPatch }).eq('id', progress.vendor_id);
+        await extendVendorInviteExpiry(admin, progress.vendor_id);
         await admin.from('audit_logs').insert({
           action: 'vendor_buyer_rejected', user_id: userId, vendor_id: progress.vendor_id, details: { comments },
         });
