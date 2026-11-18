@@ -746,3 +746,17 @@ textarea::placeholder {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
 }
+
+/* Ramky Group brand loader — 4.5s loop, staggered reveal, hold, fade */
+.rbl-layer { opacity: 0; animation: rbl-reveal 4.5s cubic-bezier(.22,.8,.3,1) infinite both; will-change: opacity, transform; }
+.rbl-green   { --rbl-from: translate3d(0, 8%, 0) scale(.9); transform-origin: 30% 55%; animation-name: rbl-reveal-0; }
+.rbl-orange  { --rbl-from: translate3d(4%, -6%, 0) scale(.92); transform-origin: 60% 40%; animation-name: rbl-reveal-1; }
+.rbl-ramky   { --rbl-from: translate3d(0, 6%, 0); animation-name: rbl-reveal-2; }
+.rbl-group   { --rbl-from: translate3d(0, 4%, 0); animation-name: rbl-reveal-3; }
+.rbl-tagline { --rbl-from: translate3d(0, 4%, 0); animation-name: rbl-reveal-4; }
+@keyframes rbl-reveal-0 { 0%{opacity:0;transform:var(--rbl-from)} 15%,86%{opacity:1;transform:none} 96%,100%{opacity:0;transform:none} }
+@keyframes rbl-reveal-1 { 0%,13%{opacity:0;transform:var(--rbl-from)} 29%,86%{opacity:1;transform:none} 96%,100%{opacity:0;transform:none} }
+@keyframes rbl-reveal-2 { 0%,28%{opacity:0;transform:var(--rbl-from)} 42%,86%{opacity:1;transform:none} 96%,100%{opacity:0;transform:none} }
+@keyframes rbl-reveal-3 { 0%,40%{opacity:0;transform:var(--rbl-from)} 52%,86%{opacity:1;transform:none} 96%,100%{opacity:0;transform:none} }
+@keyframes rbl-reveal-4 { 0%,50%{opacity:0;transform:var(--rbl-from)} 64%,86%{opacity:1;transform:none} 96%,100%{opacity:0;transform:none} }
+@media (prefers-reduced-motion: reduce) { .rbl-layer { animation: none; opacity: 1; } }
