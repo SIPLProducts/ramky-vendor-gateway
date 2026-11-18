@@ -9,10 +9,12 @@
 - Both responses you shared hold real data. GST returns a flat list of 13 rows. GST_FILING returns a nested `[[...]]` list of 29 rows. The table code already reads both shapes, so the data itself is fine. Quality probably works because vendors there wait for the table before clicking Continue.
 
 ## Changes
-1. **Hold Continue until the filing check finishes**
-   - While GST_FILING is running, Continue shows "Fetching GST Filing Status..." and cannot be clicked.
-   - It also works this way for email invitation links and returned applications.
-   - Time limit of 20 s. After that, Continue unlocks and the rows from the first GST response are used.
+1. **Ask before continuing without filing data**
+   - If the vendor clicks Continue while the filing check is still running, or after it returned no rows, a popup appears: "GST Filing Data Not Received. Continue Without GST Filing Data?"
+   - **Yes:** move to the next tab. Filing data is still saved later if it arrives.
+   - **No:** stay on the GST tab and call the GST_FILING API again straight away. A **Refresh Filing Status** button in the GST filing card does the same.
+   - Works the same for email invitation links and returned applications.
+   - When filing rows are present, Continue works as it does now, with no popup.
 2. **Keep the filing rows from the first GST response**
    - Keep `filing_status` when the GST response is read, so it can serve as the fallback.
    - Show those rows straight away, then replace them with the fuller GST_FILING list when it arrives.
