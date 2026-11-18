@@ -32,12 +32,12 @@
    - Keep the existing "Check Filing Status" retry button.
 6. **Console logs** (same style as the OCR logs): `[GST_FILING] request`, `response rows=N source=GST_FILING|GST`, `persisted vendor=<id> rows=N`, or the error.
 
-## Existing Production records
-- Vendors already submitted without filing data, such as OCHRE DRILLERS, are fixed by View Details. It already fetches the data live when nothing is saved.
-- I will also make View Details save what it fetches, so the next viewer sees it straight away.
-- No bulk change to existing data.
+## Existing Data Stays Untouched
+- No change to any existing vendor, validation record or document. No bulk update and no database change.
+- View Details keeps working as it does today. It shows the live fetch when nothing is saved, and does not save that fetch.
+- The new saving rules apply only to GST checks done from now on.
 
 ## Technical details
-- Files: `DocumentVerificationStep.tsx` (`runGstFilingStatusCheck`, the GST response reading that maps `filing_status` into ocrData, Continue gating via `gstFilingChecking`, timeout), `useVendorRegistration.tsx` (filing-row save at about line 1234), `VendorReviewDialog.tsx` (save after the live fetch), `GstKycTab.tsx` (same fallback rules).
+- Files: `DocumentVerificationStep.tsx` (`runGstFilingStatusCheck`, the GST response reading that maps `filing_status` into ocrData, Continue gating via `gstFilingChecking`, timeout), `useVendorRegistration.tsx` (filing-row save at about line 1234), `GstKycTab.tsx` (same fallback rules).
 - Add a small `pickFilingRows(filingResp, gstResp)` helper with tests: nested GST_FILING wins; empty GST_FILING falls back to the flat GST list; both empty gives `[]` and leaves saved rows alone.
 - Self-hosted Production needs the new frontend build deployed. No database change.
