@@ -9,13 +9,15 @@ Logged-in users include Admin, Sharvi Admin, Buyer, SCM, Finance, CEO Office and
 - **View Details popup:** the same loader shows while vendor details and documents load.
 - **Login and sign-in:** a spinner on the Sign In button while signing in.
 
+- **Vendor GST, PAN, MSME and Bank tabs:** these currently have only small, basic spinners. They will get the same improved loader while OCR reads the uploaded document ("Reading Document…"), during verification and manual-verification popups ("Verifying With GSTN / NSDL / Bank / Udyam…"), during the bank penny-drop check, and while the GST filing check runs.
+
 The spinner always stops when the API finishes:
 - **Success:** the data fades in, or a success message appears.
 - **Failure:** the exact API error is shown prominently, with small, normal guidance text below it. Nothing is retried automatically; the existing Refresh button lets the user try again manually.
 
 ## Not Changed
 - Data, permissions, API calls and business logic stay the same. Only the loading display changes.
-- The vendor registration screens are not part of this change. The GST filing loader can be done separately if you want it.
+
 
 ## Technical Details
 - New shared `src/components/common/ApiLoader.tsx` with three variants:
@@ -24,6 +26,6 @@ The spinner always stops when the API finishes:
   - `overlay`: for dialogs
 - The loader uses semantic tokens (`border-primary`, `text-muted-foreground`), Tailwind `animate-spin`/`animate-ping`, `motion-reduce` support and `aria-busy`/`role="status"`.
 - New `LoadingButton` wrapper that takes a `loading` prop: it disables the button and swaps the icon for the spinner.
-- Apply it to the pages under `src/pages` and `src/pages/approvals` (including Dashboard, VendorList, UserManagement, AuditLogs, UserAuditReport, SAPSync, AdminInvitations, SharviAdminConsole, Kyc/Sap settings, RolePermissions, CustomRoles, Reports, Auth/VendorLogin) and to `VendorReviewDialog`, using their existing `isLoading`/`loading`/mutation `isPending` flags.
+- Apply it to the pages under `src/pages` and `src/pages/approvals` (including Dashboard, VendorList, UserManagement, AuditLogs, UserAuditReport, SAPSync, AdminInvitations, SharviAdminConsole, Kyc/Sap settings, RolePermissions, CustomRoles, Reports, Auth/VendorLogin) and to `VendorReviewDialog`, `steps/DocumentVerificationStep.tsx`, `kyc/OcrUploadAndVerify.tsx`, `kyc/ManualEntryFallbackDialog.tsx`, `kyc/GstKycTab.tsx` and `kyc/BankKycTab.tsx`, using their existing `isLoading`/`loading`/mutation `isPending` flags.
 - Show error text from `error.message` or the function response message instead of a generic message.
 - Self-hosted deployment needs a frontend build only.
