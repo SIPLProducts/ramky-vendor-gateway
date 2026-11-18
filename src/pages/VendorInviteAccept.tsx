@@ -52,6 +52,16 @@ export default function VendorInviteAccept() {
       };
 
       const clearLocalInviteSession = async () => {
+        // Remove any stale saved login (e.g. a dead session_id) straight from
+        // browser storage so the invite opens like a fresh/incognito window.
+        try {
+          const stale: string[] = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && k.startsWith('sb-') && k.includes('auth-token')) stale.push(k);
+          }
+          stale.forEach((k) => window.localStorage.removeItem(k));
+        } catch { /* storage unavailable */ }
         try {
           await supabase.auth.signOut({ scope: 'local' });
           await new Promise((r) => setTimeout(r, 150));
