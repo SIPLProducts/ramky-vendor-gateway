@@ -1,4 +1,4 @@
-# GST Filing Status – Loading Spinner
+# Vendor Registration – Loading Spinners For All API Calls
 
 ## What The User Will See
 - While the GST filing check runs, the filing card shows a clear loading panel in place of the empty table:
@@ -13,12 +13,23 @@
   - **No automatic re-call:** when the API has already answered with an error, the portal does not call it again by itself. A manual "Retry" button is available only if the vendor chooses to try again. The vendor can also continue to PAN through the popup.
 - The same loader is used in View Details → GST while it fetches live.
 
+## All Vendor Scenarios Covered
+The same loader style is used wherever the vendor waits for an API response:
+- GST, PAN, Bank and MSME document upload while OCR reads the file ("Reading Document…")
+- GST, PAN, Bank and MSME verification, including manual verification popups ("Verifying With GSTN / NSDL / Bank…")
+- Bank penny-drop check
+- GST filing status (detailed above)
+- Draft save, Continue between steps, and final Submit or Resubmit (button spinner plus disabled button, so it can't be double-clicked)
+- Opening the invitation link ("Opening Your Application…")
+- View Details → GST live filing fetch
+Every loader stops when the API succeeds or fails. On failure, the exact API error is shown prominently with small, normal guidance text below it, and nothing is called again automatically.
+
 ## Not Changed
 - API calls, saving logic and existing data stay as they are. Only the display changes.
 
 ## Technical Details
-- New `src/components/vendor/GstFilingLoader.tsx`: a ring spinner built from Tailwind `animate-spin` and `animate-ping` with semantic tokens (`border-primary`), plus skeleton rows from `@/components/ui/skeleton`. Respects `motion-reduce`.
-- `DocumentVerificationStep.tsx`, `kyc/GstKycTab.tsx`, `VendorReviewDialog.tsx`: render the loader while `gstFilingChecking`, `filingChecking` or `filingFetching` is true. A `finally` block already clears the flag on both success and failure, so the spinner always stops.
+- New shared `src/components/vendor/ApiLoader.tsx` (variants: inline card panel, button spinner, full overlay): a ring spinner built from Tailwind `animate-spin` and `animate-ping` with semantic tokens (`border-primary`), plus skeleton rows from `@/components/ui/skeleton`. Respects `motion-reduce`.
+- Use it in `DocumentVerificationStep.tsx`, the `kyc/*Tab.tsx` files, `VendorRegistration.tsx`, `VendorInviteAccept.tsx` and `VendorReviewDialog.tsx`, replacing their plain text or basic `Loader2` indicators with the existing loading flags. For the GST filing card, render the loader while `gstFilingChecking`, `filingChecking` or `filingFetching` is true. A `finally` block already clears the flag on both success and failure, so the spinner always stops.
 - Capture the provider error (`r.message`, `r.error`, `r.data.message`, or the thrown error) in a new `gstFilingError` state and show it in the card, the popup and the console. Clear it on success or empty.
 - In the popup, when `gstFilingError` is set, show the error and offer "Stay On GST" and "Yes, Continue". Staying does not call the API again; only the manual Retry button calls it.
 - Add a fade-in on the table when the result arrives (`animate-in fade-in`).
