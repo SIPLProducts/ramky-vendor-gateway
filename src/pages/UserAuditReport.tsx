@@ -288,7 +288,7 @@ export default function UserAuditReport() {
   const cPage = usePaged(shown);
   useEffect(() => { cPage.reset(); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, from, to, company, status, q, typeFilter]);
-  const combinedExport = () => combined.map((r) => ({ 'Action Taken On': formatDateTime(r.at, ''), 'User Action': r.type, 'Ref No': r.ref, 'Vendor Name': r.vendor,
+  const combinedExport = () => combined.map((r) => ({ 'Approval Status': r.type, 'Action Date': formatDateTime(r.at, '') + (r.type === 'Pending' ? ' (Pending Since)' : ''), 'Ref No': r.ref, 'Vendor Name': r.vendor,
     GSTIN: r.gstin, Company: r.company, 'Invited By': r.invitedBy, 'Stage Handled': r.stage, 'User Comments': r.details, 'Vendor Status (Now)': r.status, 'SAP Code': r.sap }));
 
   const roles = (rolesBy[userId] ?? []).map(titleCase).join(', ') || '—';
@@ -450,7 +450,7 @@ export default function UserAuditReport() {
           <Card className="rounded-[10px] shadow-sm">
             <CardContent className="p-3">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5"><span className="text-[11px] font-semibold text-muted-foreground mr-1">Filter By Approval Status:</span>
                   {(['All', ...TYPE_ORDER] as const).map((t) => { const n = t === 'All' ? combined.length : combined.filter((r) => r.type === t).length;
                     if (t !== 'All' && !n) return null; const on = typeFilter === t;
                     return <button key={t} type="button" onClick={() => setTypeFilter(t)}
@@ -462,7 +462,7 @@ export default function UserAuditReport() {
               <p className="text-[11px] text-muted-foreground mb-1.5">Showing actions performed by <b className="text-foreground">{user?.full_name || user?.email}</b>. Pending = vendors currently waiting for this user's approval (date shows Pending Since).</p>
               <div className="rounded-md border overflow-x-auto"><Table className="w-max min-w-full">
                 <TableHeader className="sticky top-0"><TableRow className="hover:bg-transparent border-0" style={{ background: 'linear-gradient(90deg, hsl(207 80% 93%), hsl(30 90% 94%) 55%, hsl(140 50% 92%))' }}>
-                  <TableHead className={`${TH}`}>Action Taken On</TableHead><TableHead className={`${TH}`}>User Action</TableHead>
+                  <TableHead className={`${TH}`}>Approval Status</TableHead><TableHead className={`${TH}`}>Action Date</TableHead>
                   <TableHead className={`${TH}`}>Ref No</TableHead><TableHead className={`${TH}`}>Vendor Name</TableHead>
                   <TableHead className={`${TH}`}>GSTIN</TableHead><TableHead className={`${TH}`}>Company</TableHead>
                   <TableHead className={`${TH}`}>Invited By</TableHead><TableHead className={`${TH}`}>Stage Handled</TableHead>
@@ -470,8 +470,8 @@ export default function UserAuditReport() {
                   <TableHead className={`${TH}`}>SAP Code</TableHead><TableHead className={`${TH} sticky right-0 !bg-[hsl(140,50%,92%)]`} /></TableRow></TableHeader>
                 <TableBody>{cPage.rows.length ? cPage.rows.map((r) => (
                   <TableRow key={r.key} className={`border-l-4 even:bg-primary/[0.03] hover:bg-primary/5 ${TYPE_STYLE[r.type].row}`}>
-                    <TableCell className={TD} title={r.type === 'Pending' ? 'Pending Since' : 'Action Taken On'}>{formatDateTime(r.at, '—')}{r.type === 'Pending' && <span className="ml-1 text-[9px] text-muted-foreground">(Since)</span>}</TableCell>
                     <TableCell className={TD}><span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${TYPE_STYLE[r.type].pill}`}>{TYPE_LABEL[r.type] ?? r.type}</span></TableCell>
+                    <TableCell className={TD} title={r.type === 'Pending' ? 'Pending Since' : 'Action Date'}>{formatDateTime(r.at, '—')}{r.type === 'Pending' && <span className="ml-1 text-[9px] text-muted-foreground">(Pending Since)</span>}</TableCell>
                     <TableCell className={`${TD} font-mono text-[11px] whitespace-nowrap`} title={r.ref}>{r.ref || '—'}</TableCell>
                     <TableCell className={`${TD} font-medium whitespace-nowrap`} title={r.vendor}>{r.vendor || '—'}</TableCell>
                     <TableCell className={`${TD} font-mono text-[10px] whitespace-nowrap`} title={r.gstin}>{r.gstin || '—'}</TableCell>

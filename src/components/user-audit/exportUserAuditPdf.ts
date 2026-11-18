@@ -67,7 +67,7 @@ export async function exportUserAuditPdf(opts: { userName: string; user: Record<
       margin: { bottom: 40 },
       didParseCell: (d) => {
         if (d.section !== 'body') return;
-        const f = ACTION_TINT[String((opts.all[d.row.index] as any)['User Action'])]; if (f) d.cell.styles.fillColor = f;
+        const f = ACTION_TINT[String((opts.all[d.row.index] as any)['Approval Status'])]; if (f) d.cell.styles.fillColor = f;
         if (d.column.index === 1) { d.cell.styles.fontStyle = 'bold'; }
       },
     });
