@@ -1,36 +1,29 @@
-# Vendor Registration – Loading Spinners For All API Calls
+# Loading Spinner For Logged-In User Screens
 
 ## What The User Will See
-- While the GST filing check runs, the filing card shows a clear loading panel in place of the empty table:
-  - A smooth spinning ring in the portal's blue, with a soft pulse behind it
-  - Text: "Fetching GST Filing Status From GSTN…" and a smaller line "This may take up to 20 seconds"
-  - Three shimmering placeholder table rows, so the vendor can see data is on its way
-- The "Continue to PAN" popup also shows a small spinner next to "Still fetching…" while the request runs. The "No, Wait" button then waits and closes the popup when the result arrives.
-- The spinner stops automatically in every case:
-  - **Success:** it fades into the filing table, with a green "Filing Status Received" badge
-  - **Empty `[]`:** it shows the saved "No Filing Records" message
-  - **Failed or timed out (20s):** the exact error returned by the GST filing API is shown prominently, for example "Invalid GSTIN" or "GST_FILING timed out after 20s". Portal guidance appears below it in small, normal text.
-  - **No automatic re-call:** when the API has already answered with an error, the portal does not call it again by itself. A manual "Retry" button is available only if the vendor chooses to try again. The vendor can also continue to PAN through the popup.
-- The same loader is used in View Details → GST while it fetches live.
+Logged-in users include Admin, Sharvi Admin, Buyer, SCM, Finance, CEO Office and SAP Team. On their screens (Dashboard, All Vendors, User Management, Audit Logs, User Audit Report, Approvals, SAP Sync and the others), loading will look like this:
 
-## All Vendor Scenarios Covered
-The same loader style is used wherever the vendor waits for an API response:
-- GST, PAN, Bank and MSME document upload while OCR reads the file ("Reading Document…")
-- GST, PAN, Bank and MSME verification, including manual verification popups ("Verifying With GSTN / NSDL / Bank…")
-- Bank penny-drop check
-- GST filing status (detailed above)
-- Draft save, Continue between steps, and final Submit or Resubmit (button spinner plus disabled button, so it can't be double-clicked)
-- Opening the invitation link ("Opening Your Application…")
-- View Details → GST live filing fetch
-Every loader stops when the API succeeds or fails. On failure, the exact API error is shown prominently with small, normal guidance text below it, and nothing is called again automatically.
+- **Page or table loading:** a centered loader in the table area, with a blue spinning ring, a soft pulse and the text "Loading Vendors…", "Loading Users…" and so on. Headers and filters stay visible.
+- **Refresh, Search and Export Excel/PDF buttons:** the button's icon turns into a small spinner and the button is disabled until the response arrives, so it can't be double-clicked.
+- **Actions** (Approve, Reject, Return, SAP Sync, DMS Sync, Send Invite, Save User, Reassign and similar): the button spinner shows "Processing…", and the dialog stays locked until the result comes back.
+- **View Details popup:** the same loader shows while vendor details and documents load.
+- **Login and sign-in:** a spinner on the Sign In button while signing in.
+
+The spinner always stops when the API finishes:
+- **Success:** the data fades in, or a success message appears.
+- **Failure:** the exact API error is shown prominently, with small, normal guidance text below it. Nothing is retried automatically; the existing Refresh button lets the user try again manually.
 
 ## Not Changed
-- API calls, saving logic and existing data stay as they are. Only the display changes.
+- Data, permissions, API calls and business logic stay the same. Only the loading display changes.
+- The vendor registration screens are not part of this change. The GST filing loader can be done separately if you want it.
 
 ## Technical Details
-- New shared `src/components/vendor/ApiLoader.tsx` (variants: inline card panel, button spinner, full overlay): a ring spinner built from Tailwind `animate-spin` and `animate-ping` with semantic tokens (`border-primary`), plus skeleton rows from `@/components/ui/skeleton`. Respects `motion-reduce`.
-- Use it in `DocumentVerificationStep.tsx`, the `kyc/*Tab.tsx` files, `VendorRegistration.tsx`, `VendorInviteAccept.tsx` and `VendorReviewDialog.tsx`, replacing their plain text or basic `Loader2` indicators with the existing loading flags. For the GST filing card, render the loader while `gstFilingChecking`, `filingChecking` or `filingFetching` is true. A `finally` block already clears the flag on both success and failure, so the spinner always stops.
-- Capture the provider error (`r.message`, `r.error`, `r.data.message`, or the thrown error) in a new `gstFilingError` state and show it in the card, the popup and the console. Clear it on success or empty.
-- In the popup, when `gstFilingError` is set, show the error and offer "Stay On GST" and "Yes, Continue". Staying does not call the API again; only the manual Retry button calls it.
-- Add a fade-in on the table when the result arrives (`animate-in fade-in`).
+- New shared `src/components/common/ApiLoader.tsx` with three variants:
+  - `panel`: centered spinner and label for tables and cards
+  - `button`: `Loader2` with `animate-spin`, for inline button use
+  - `overlay`: for dialogs
+- The loader uses semantic tokens (`border-primary`, `text-muted-foreground`), Tailwind `animate-spin`/`animate-ping`, `motion-reduce` support and `aria-busy`/`role="status"`.
+- New `LoadingButton` wrapper that takes a `loading` prop: it disables the button and swaps the icon for the spinner.
+- Apply it to the pages under `src/pages` and `src/pages/approvals` (including Dashboard, VendorList, UserManagement, AuditLogs, UserAuditReport, SAPSync, AdminInvitations, SharviAdminConsole, Kyc/Sap settings, RolePermissions, CustomRoles, Reports, Auth/VendorLogin) and to `VendorReviewDialog`, using their existing `isLoading`/`loading`/mutation `isPending` flags.
+- Show error text from `error.message` or the function response message instead of a generic message.
 - Self-hosted deployment needs a frontend build only.
