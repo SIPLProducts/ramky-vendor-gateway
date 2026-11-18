@@ -9,7 +9,8 @@
 - The spinner stops automatically in every case:
   - **Success:** it fades into the filing table, with a green "Filing Status Received" badge
   - **Empty `[]`:** it shows the saved "No Filing Records" message
-  - **Failed or timed out (20s):** it shows a red message, "Filing Status Not Received – Please Refresh", and the Refresh button
+  - **Failed or timed out (20s):** the exact error returned by the GST filing API is shown prominently, for example "Invalid GSTIN" or "GST_FILING timed out after 20s". Portal guidance appears below it in small, normal text.
+  - **No automatic re-call:** when the API has already answered with an error, the portal does not call it again by itself. A manual "Retry" button is available only if the vendor chooses to try again. The vendor can also continue to PAN through the popup.
 - The same loader is used in View Details → GST while it fetches live.
 
 ## Not Changed
@@ -18,5 +19,7 @@
 ## Technical Details
 - New `src/components/vendor/GstFilingLoader.tsx`: a ring spinner built from Tailwind `animate-spin` and `animate-ping` with semantic tokens (`border-primary`), plus skeleton rows from `@/components/ui/skeleton`. Respects `motion-reduce`.
 - `DocumentVerificationStep.tsx`, `kyc/GstKycTab.tsx`, `VendorReviewDialog.tsx`: render the loader while `gstFilingChecking`, `filingChecking` or `filingFetching` is true. A `finally` block already clears the flag on both success and failure, so the spinner always stops.
+- Capture the provider error (`r.message`, `r.error`, `r.data.message`, or the thrown error) in a new `gstFilingError` state and show it in the card, the popup and the console. Clear it on success or empty.
+- In the popup, when `gstFilingError` is set, show the error and offer "Stay On GST" and "Yes, Continue". Staying does not call the API again; only the manual Retry button calls it.
 - Add a fade-in on the table when the result arrives (`animate-in fade-in`).
 - Self-hosted deployment needs a frontend build only.
