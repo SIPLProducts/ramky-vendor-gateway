@@ -142,6 +142,8 @@ function isDomesticStepComplete(
 
 export default function VendorRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [submitCommentOpen, setSubmitCommentOpen] = useState(false);
+  const [submitComment, setSubmitComment] = useState('');
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [formData, setFormData] = useState<VendorFormData>(initialFormData);
   const [vendorTypeChosen, setVendorTypeChosen] = useState(false);
@@ -1473,7 +1475,10 @@ export default function VendorRegistration() {
     navigate('/');
   };
 
+  const openSubmitComment = () => setSubmitCommentOpen(true);
+
   const handleSubmit = async () => {
+    setSubmitCommentOpen(false);
     // Pre-submit gating — bounce user back to the first tab with missing
     // mandatory fields so they can see the inline errors immediately.
     if (!isInternational) {
@@ -1490,7 +1495,7 @@ export default function VendorRegistration() {
       }
     }
     try {
-      const submitPayload = { ...formData, customFieldValues } as VendorFormData;
+      const submitPayload = { ...formData, customFieldValues, vendorSubmitComments: submitComment } as VendorFormData;
       const vendor = isEditMode && vendorId
         ? await resubmitVendor(submitPayload)
         : await submitVendor(submitPayload);
@@ -1560,7 +1565,7 @@ export default function VendorRegistration() {
     if (isInternational) {
       const intl = formData.international ?? EMPTY_INTERNATIONAL_DATA;
       if (currentStep === lastStepId) {
-        return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
+        return <ReviewStep data={formData} onSubmit={openSubmitComment} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
       }
       switch (currentStep) {
         case 1:
@@ -1602,7 +1607,7 @@ export default function VendorRegistration() {
     }
     // Last step is always Review
     if (currentStep === lastStepId) {
-      return <ReviewStep data={formData} onSubmit={handleSubmit} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
+      return <ReviewStep data={formData} onSubmit={openSubmitComment} onBack={handleBack} onEditStep={handleEditStep} onDeclarationChange={(d) => setFormData(prev => ({ ...prev, declaration: d }))} />;
     }
     // Anything in between is an admin-defined custom tab (ids 5..N-1)
     const customIdx = currentStep - 5;
@@ -2034,7 +2039,7 @@ export default function VendorRegistration() {
                   {isLastStep ? (
                     <Button
                       type="button"
-                      onClick={handleSubmit}
+                      onClick={openSubmitComment}
                       disabled={isSubmitting || !formData.declaration?.selfDeclared || !formData.declaration?.termsAccepted}
                       className={cn(
                         "min-w-[160px]",
@@ -2079,6 +2084,27 @@ export default function VendorRegistration() {
           </div>
         </main>
       </div>
+      <AlertDialog open={submitCommentOpen} onOpenChange={setSubmitCommentOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add Comments (Optional)</AlertDialogTitle>
+            <AlertDialogDescription>Any note for the approvers. You can leave this empty and submit.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <textarea
+            value={submitComment}
+            maxLength={1000}
+            onChange={(e) => setSubmitComment(e.target.value)}
+            rows={4}
+            placeholder="Enter Comments"
+            className="w-full rounded-md border border-input bg-background p-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p className="text-right text-xs text-muted-foreground">{submitComment.length}/1000</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); handleSubmit(); }}>Submit Application</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <SubmissionSuccessDialog
         open={submissionSuccess.open}
         inviter={submissionSuccess.inviter}

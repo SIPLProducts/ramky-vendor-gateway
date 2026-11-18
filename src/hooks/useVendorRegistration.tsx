@@ -1384,6 +1384,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         ...verificationStatuses,
         status: 'scm_manager_review' as const, // Goes to SCM CO approval first
         submitted_at: new Date().toISOString(),
+        vendor_submit_comments: ((formData as any).vendorSubmitComments ?? '').trim() || null,
       };
       // Backfill invitation link in case the row was created before this fix
       if ((invitation as any)?.id) {
@@ -1596,6 +1597,7 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const vendorData = {
         status: nextStatus as VendorStatus,
         submitted_at: new Date().toISOString(),
+        vendor_submit_comments: ((formData as any).vendorSubmitComments ?? '').trim() || null,
         // Clear stale rejection metadata once the vendor resubmits.
         ...((wasReturned || wasReturnedToBuyer) ? {
           last_rejection_comments: null,

@@ -694,9 +694,20 @@ export function VendorReviewDialog({
                   })()}
 
 
-                  {(vendor.finance_comments || vendor.purchase_comments) && (
+                  {((vendor as any).vendor_submit_comments || vendor.finance_comments || vendor.purchase_comments) && (
                     <SectionCard icon={MessageSquare} title="Review Comments">
                       <div className="grid grid-cols-1 gap-4 text-sm">
+                        {(vendor as any).vendor_submit_comments && (
+                          <div className="bg-muted/40 border border-border rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-semibold text-primary">Vendor Comments</span>
+                              {vendor.submitted_at && (
+                                <span className="text-xs text-muted-foreground">{formatDate(vendor.submitted_at)}</span>
+                              )}
+                            </div>
+                            <p className="whitespace-pre-wrap">{(vendor as any).vendor_submit_comments}</p>
+                          </div>
+                        )}
                         {vendor.finance_comments && (
                           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
                             <div className="flex items-center gap-2 mb-2">

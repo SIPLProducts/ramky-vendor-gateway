@@ -2127,6 +2127,7 @@ export type Database = {
           vendor_category: string | null
           vendor_location: string | null
           vendor_locations: string[]
+          vendor_submit_comments: string | null
           vendor_type: string
           water_supply: string | null
         }
@@ -2330,6 +2331,7 @@ export type Database = {
           vendor_category?: string | null
           vendor_location?: string | null
           vendor_locations?: string[]
+          vendor_submit_comments?: string | null
           vendor_type?: string
           water_supply?: string | null
         }
@@ -2533,6 +2535,7 @@ export type Database = {
           vendor_category?: string | null
           vendor_location?: string | null
           vendor_locations?: string[]
+          vendor_submit_comments?: string | null
           vendor_type?: string
           water_supply?: string | null
         }
