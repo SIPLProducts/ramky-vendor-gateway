@@ -1010,7 +1010,9 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
         session = refreshed.data.session ?? null;
       }
       let { data: userResp, error: userErr } = await supabase.auth.getUser();
-      if ((userErr || !userResp?.user?.id) && options?.invitationToken && session?.user?.id) {
+      const inviteTokenForAuth = options?.invitationToken
+        || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') : null);
+      if ((userErr || !userResp?.user?.id) && inviteTokenForAuth && session?.user?.id) {
         userResp = { user: session.user } as typeof userResp;
         userErr = null;
       }
@@ -1322,12 +1324,17 @@ export function useVendorRegistration(options?: UseVendorRegistrationOptions) {
       const code = error?.code || '';
       const msg = String(error?.message || '');
       if (code === 'AUTH_REQUIRED') {
-        toast({
-          title: 'Session expired',
-          description: 'Please reopen the invitation link to continue your registration.',
-          variant: 'destructive',
-        });
-        const token = options?.invitationToken;
+        const token = options?.invitationToken
+          || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') : null);
+        // With an invitation link the vendor is signed back in automatically,
+        // so skip the alarming red toast and just re-run the invite sign-in.
+        if (!token) {
+          toast({
+            title: 'Session expired',
+            description: 'Please reopen the invitation link to continue your registration.',
+            variant: 'destructive',
+          });
+        }
         if (typeof window !== 'undefined') {
           window.location.href = token ? `/vendor/invite?token=${token}` : '/auth';
         }
