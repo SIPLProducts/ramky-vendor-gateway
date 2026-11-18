@@ -9,6 +9,7 @@
 - Both responses you shared hold real data. GST returns a flat list of 13 rows. GST_FILING returns a nested `[[...]]` list of 29 rows. The table code already reads both shapes, so the data itself is fine. Quality probably works because vendors there wait for the table before clicking Continue.
 
 ## Changes
+All current features keep working the same way. Only the GST filing step gets new behaviour.
 1. **Ask before continuing without filing data**
    - If the vendor clicks Continue while the filing check is still running, or after it returned no rows, a popup appears: "GST Filing Data Not Received. Continue Without GST Filing Data?"
    - **Yes:** move to the next tab. Filing data is still saved later if it arrives.
