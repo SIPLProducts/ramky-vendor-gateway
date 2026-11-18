@@ -388,7 +388,7 @@ export function VendorReviewDialog({
   useEffect(() => {
     if (!open || !vendor?.gstin) return;
     const persisted = normalizeFilingStatus(gstValidation?.details?.filing_status);
-    if (persisted.length > 0) {
+    if (persisted.length > 0 || gstValidation?.details?.filing_status_empty) {
       setFilingFetched(true);
       return;
     }
@@ -782,7 +782,9 @@ export function VendorReviewDialog({
                             <GstFilingStatusTable rows={rawRows} limit={3} scrollable={false} />
                           ) : (
                             <p className="text-xs text-muted-foreground">
-                              {filingFetching
+                              {gstValidation?.details?.filing_status_empty
+                                ? (gstValidation?.details?.filing_status_message || 'GST Filing Data Not Available – GSTN Returned No Filing Records ([])')
+                                : filingFetching
                                 ? 'Fetching latest filing status from GSTN…'
                                 : filingFetched
                                   ? 'No filing data returned by GSTN for this GSTIN.'

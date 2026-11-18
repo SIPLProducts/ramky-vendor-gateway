@@ -146,6 +146,7 @@ export interface VerifiedDocumentData {
     jurisdictionCentre?: string;
     jurisdictionState?: string;
     filing_status?: any;
+    filing_status_empty?: boolean;
     filingCompliant?: boolean;
     /** Parsed parts of the principal place of business — used to auto-populate the Address step. */
     addressParts?: { address?: string; city?: string; state?: string; pincode?: string };
@@ -519,6 +520,7 @@ export function DocumentVerificationStep({
     () => normalizeFilingStatus((initialData?.gst as any)?.filing_status).length > 0,
   );
   const [gstFilingChecking, setGstFilingChecking] = useState(false);
+  const [gstFilingEmpty, setGstFilingEmpty] = useState<boolean>(() => !!(initialData?.gst as any)?.filing_status_empty);
   const [gstCompliance, setGstCompliance] = useState<{ previousMonthFiled: boolean; declarationRequired: boolean; checkedPeriod: string } | null>(
     () => {
       const rows = normalizeFilingStatus((initialData?.gst as any)?.filing_status);
@@ -1501,8 +1503,29 @@ export function DocumentVerificationStep({
       console.log(`[GST_FILING] response rows=${rows.length} source=${source}`);
       if (!rows.length) {
         setGstFilingChecked(true);
+        // Provider answered successfully with an empty list -> record it.
+        const answeredEmpty = !!(r && r.found && r.ok) && Array.isArray(filingResp) && filingResp.length === 0;
+        setGstFilingEmpty(answeredEmpty);
+        if (answeredEmpty && vendorId) {
+          try {
+            const { data: existing } = await supabase
+              .from("vendor_validations").select("id, details")
+              .eq("vendor_id", vendorId).eq("validation_type", "gst")
+              .order("created_at", { ascending: false }).limit(1);
+            const extra = { filing_status: [], filing_status_empty: true, filing_status_message: "GST Filing Data Not Available – GSTN Returned No Filing Records ([])", filing_checked_at: new Date().toISOString() };
+            if (existing && existing.length) {
+              await supabase.from("vendor_validations")
+                .update({ details: { ...(((existing[0] as any).details) || {}), ...extra } as any })
+                .eq("id", (existing[0] as any).id);
+            } else {
+              await supabase.from("vendor_validations").insert({ vendor_id: vendorId, validation_type: "gst", status: "passed", message: "GST verified — no filing records returned", details: { ...baseGstData, ...extra } as any });
+            }
+            console.log(`[GST_FILING] persisted empty filing result vendor=${vendorId}`);
+          } catch (err) { console.warn("[GST_FILING] Failed to persist empty filing result", err); }
+        }
         return;
       }
+      setGstFilingEmpty(false);
       setGstFilingRows(rows);
       setGstFilingChecked(true);
       const evalRes = evaluateGstr1Compliance(rows);
@@ -2260,7 +2283,8 @@ export function DocumentVerificationStep({
         additionalPlaces: Array.isArray(gstDoc.ocrData.additional_places) ? gstDoc.ocrData.additional_places : undefined,
         jurisdictionCentre: gstDoc.ocrData.jurisdiction_centre,
         jurisdictionState: gstDoc.ocrData.jurisdiction_state,
-        filing_status: gstFilingRows.length ? gstFilingRows : undefined,
+        filing_status: gstFilingRows.length ? gstFilingRows : (gstFilingEmpty ? [] : undefined),
+        filing_status_empty: gstFilingRows.length ? undefined : (gstFilingEmpty || undefined),
         filingCompliant: gstCompliance?.previousMonthFiled ?? undefined,
         addressParts: (gstDoc.ocrData.address_city || gstDoc.ocrData.address_state || gstDoc.ocrData.address_pincode || gstDoc.ocrData.address_line)
           ? {
@@ -2581,13 +2605,13 @@ export function DocumentVerificationStep({
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
-                              {gstFilingChecked ? "No Filing Data Returned By GSTN" : "Filing Status Not Fetched Yet"}
+                              {gstFilingEmpty ? "GST Filing Data Not Available – GSTN Returned No Filing Records ([])" : gstFilingChecked ? "Filing Status Not Received – Please Refresh" : "Filing Status Not Fetched Yet"}
                             </Badge>
                           )}
-                          <Button type="button" variant="outline" size="sm" disabled={gstFilingChecking} onClick={refreshGstFiling}>
+                          {gstFilingRows.length === 0 && <Button type="button" variant="outline" size="sm" disabled={gstFilingChecking} onClick={refreshGstFiling}>
                             {gstFilingChecking ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                             Refresh Filing Status
-                          </Button>
+                          </Button>}
                         </div>
                         {gstFilingRows.length > 0 && <GstFilingStatusTable rows={gstFilingRows} limit={3} />}
 
@@ -3353,7 +3377,7 @@ export function DocumentVerificationStep({
               className="bg-muted text-foreground hover:bg-muted/80"
               onClick={() => { setFilingConfirmOpen(false); setActiveTab("gst"); if (!gstFilingChecking) refreshGstFiling(); }}
             >
-              No, Refresh
+              {gstFilingChecking ? "No, Wait" : "No, Refresh"}
             </AlertDialogAction>
             <AlertDialogAction
               onClick={() => { setFilingConfirmOpen(false); const n = filingConfirmNextRef.current; filingConfirmNextRef.current = null; n?.(); }}

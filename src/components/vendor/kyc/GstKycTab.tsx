@@ -407,7 +407,7 @@ export function GstKycTab(props: GstKycTabProps) {
                   GSTR1 for {compliance.checkedPeriod} not filed — declaration required
                 </Badge>
               )}
-              <Button
+              {filingStatusRows.length === 0 && <Button
                 type="button"
                 size="sm"
                 variant="outline"
@@ -416,7 +416,7 @@ export function GstKycTab(props: GstKycTabProps) {
               >
                 <RefreshCw className={`h-3.5 w-3.5 mr-2 ${filingChecking ? 'animate-spin' : ''}`} />
                 {filingChecked ? 'Refresh Filing Status' : 'Check GST Filing Status'}
-              </Button>
+              </Button>}
             </div>
           </div>
 
@@ -426,6 +426,7 @@ export function GstKycTab(props: GstKycTabProps) {
             <p className="text-xs text-muted-foreground">
               {filingChecking
                 ? 'Fetching latest filing status from GSTN…'
+                : (verifiedGstData as any)?.filing_status_empty ? 'GST Filing Data Not Available – GSTN Returned No Filing Records ([])'
                 : 'Click "Check GST Filing Status" to fetch the last 3 months of returns.'}
             </p>
           )}
