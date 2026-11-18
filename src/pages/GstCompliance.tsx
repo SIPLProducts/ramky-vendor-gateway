@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from 'react';
 import { paginateItems } from '@/lib/pagination';
@@ -496,9 +497,7 @@ export default function GstCompliance() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <ApiLoader label="Loading GST Compliance…" />
           ) : !filteredVendors?.length ? (
             <p className="text-center py-8 text-muted-foreground">No vendors with GST numbers found</p>
           ) : (

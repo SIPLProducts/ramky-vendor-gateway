@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useState } from 'react';
 import { paginateItems } from '@/lib/pagination';
 import { TenantCombobox } from '@/components/admin/TenantCombobox';
@@ -958,9 +959,7 @@ export default function AdminInvitations() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <ApiLoader label="Loading Invitations…" />
           ) : filteredInvitations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {invitations?.length === 0

@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useState } from 'react';
@@ -316,9 +317,7 @@ export default function ScheduledChecks() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
+              <ApiLoader label="Loading Scheduled Checks…" />
             ) : !scheduledChecks?.length ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Calendar className="h-10 w-10 mx-auto mb-2 opacity-50" />

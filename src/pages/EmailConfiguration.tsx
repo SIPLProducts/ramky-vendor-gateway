@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from "react";
@@ -535,7 +536,7 @@ export default function EmailConfiguration() {
             </TableHeader>
             <TableBody>
               {list.isLoading ? (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8}><ApiLoader label="Loading Email Settings…" /></TableCell></TableRow>
               ) : data.length === 0 ? (
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">No configurations yet. Click "Add Config" to create one.</TableCell></TableRow>
               ) : (

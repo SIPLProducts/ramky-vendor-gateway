@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -140,9 +141,7 @@ export default function CustomRoles() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                  ))
+                  <TableRow><TableCell colSpan={5}><ApiLoader label="Loading Roles…" /></TableCell></TableRow>
                 ) : roles.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No custom roles yet. Click "Create Role" to add one.

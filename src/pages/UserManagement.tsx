@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useMemo, useState } from 'react';
@@ -612,9 +613,7 @@ export default function UserManagement() {
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}><TableCell colSpan={9}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                      ))
+                      <TableRow><TableCell colSpan={9}><ApiLoader label="Loading Users…" /></TableCell></TableRow>
                     ) : filtered.length === 0 ? (
                       <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No users found

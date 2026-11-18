@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useState, useMemo } from 'react';
@@ -590,9 +591,7 @@ export default function SAPSync() {
 
           <div className="grid gap-4">
             {isLoading ? (
-              [...Array(3)].map((_, i) => (
-                <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
-              ))
+              <Card className="border-0 shadow-md"><CardContent className="p-2"><ApiLoader label="Loading SAP Queue…" /></CardContent></Card>
             ) : filteredSap.length === 0 ? (
               <Card className="border-0 shadow-md"><CardContent className="py-16 text-center">
                 <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center mx-auto mb-4 shadow-lg">

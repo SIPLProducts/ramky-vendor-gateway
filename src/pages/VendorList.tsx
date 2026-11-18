@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useState } from 'react';
 import { paginateItems } from '@/lib/pagination';
 import { useQuery } from '@tanstack/react-query';
@@ -440,6 +441,8 @@ export default function VendorList() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
+            <ApiLoader label="Loading Vendors…" />
+          ) : false ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">

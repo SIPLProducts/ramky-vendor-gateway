@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useState } from 'react';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
 import { supabase } from '@/integrations/supabase/client';
@@ -221,6 +222,8 @@ export default function FinanceReview() {
       {/* Vendor Cards */}
       <div className="grid gap-4">
         {isLoading ? (
+          <Card className="border-0 shadow-md"><CardContent className="p-2"><ApiLoader label="Loading Pending Reviews…" /></CardContent></Card>
+        ) : false ? (
           [...Array(3)].map((_, i) => (
             <Card key={i} className="border-0 shadow-md">
               <CardContent className="p-6">

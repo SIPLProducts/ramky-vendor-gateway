@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useState } from 'react';
 import { getSapName1 } from '@/lib/sapPayloadBuilder';
 import { formatPanStatus, formatAadhaarLinked, PAN_STATUS_LABEL, AADHAAR_LINKED_LABEL } from '@/lib/panComprehensive';
@@ -280,6 +281,8 @@ export default function PurchaseApproval() {
 
       <div className="grid gap-4">
         {isLoading ? (
+          <Card className="border-0 shadow-md"><CardContent className="p-2"><ApiLoader label="Loading Pending Approvals…" /></CardContent></Card>
+        ) : false ? (
           [...Array(3)].map((_, i) => (
             <Card key={i} className="border-0 shadow-md"><CardContent className="p-6"><div className="flex items-start gap-4"><Skeleton className="h-14 w-14 rounded-xl" /><div className="flex-1 space-y-3"><Skeleton className="h-5 w-56" /><Skeleton className="h-4 w-40" /></div></div></CardContent></Card>
           ))

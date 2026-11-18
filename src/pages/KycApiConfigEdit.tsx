@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -119,7 +120,7 @@ export default function KycApiConfigEdit() {
   }, [cred]);
 
   if (isLoading || !form) {
-    return <div className="p-8 text-center text-muted-foreground">Loading…</div>;
+    return <ApiLoader label="Loading Configuration…" />;
   }
 
   const addHeaderRow = () => setHeaderRows((r) => [...r, { key: "", value: "" }]);

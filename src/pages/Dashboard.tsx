@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -485,6 +486,8 @@ export default function Dashboard() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
+                  <TableRow><TableCell colSpan={20}><ApiLoader label="Loading Applications…" /></TableCell></TableRow>
+                ) : false ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       {Array.from({ length: 7 }).map((__, j) => (

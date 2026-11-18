@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -429,7 +430,7 @@ export default function UserAuditReport() {
           <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />Select A User Above To View Their Audit Report.
         </CardContent></Card>
       ) : loading ? (
-        <div className="space-y-4"><Skeleton className="h-24 w-full" /><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div><Skeleton className="h-72 w-full" /></div>
+        <ApiLoader label="Loading User Audit Report…" />
       ) : (
         <>
           <Card className="rounded-[10px] border-l-4 border-l-primary bg-gradient-to-r from-primary/10 via-success/5 to-card shadow-sm">

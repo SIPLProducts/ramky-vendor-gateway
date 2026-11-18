@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { ReactNode, useEffect, useState } from 'react';
 import { formatDate } from '@/lib/dateFormat';
 import { cn } from '@/lib/utils';
@@ -474,7 +475,7 @@ export function VendorReviewDialog({
 
 
         {loading ? (
-          <Skeleton className="h-64 w-full" />
+          <ApiLoader label="Loading Vendor Details…" />
         ) : vendor ? (
           <Tabs defaultValue="details" className="w-full flex-1 overflow-hidden flex flex-col">
             <TabsList className="grid w-full grid-cols-3 rounded-xl bg-muted p-1">

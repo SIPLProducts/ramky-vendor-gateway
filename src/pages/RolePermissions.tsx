@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -179,7 +180,7 @@ export default function RolePermissions({ tenantId = null, tenantLabel = 'All Te
         </CardHeader>
         <CardContent>
           {loading ? (
-            <Skeleton className="h-64 w-full" />
+            <ApiLoader label="Loading Permissions…" />
           ) : (
             <>
               {customRoles.length > 0 && (

@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -268,9 +269,7 @@ export default function KycApiSettings() {
                   </p>
                 </div>
                 {isLoading ? (
-                  <div className="p-6 space-y-3">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-                  </div>
+                  <ApiLoader label="Loading KYC API Settings…" />
                 ) : !filtered.length ? (
                   <div className="p-12 text-center text-muted-foreground">
                     No {tab === "OCR" ? "OCR" : "validation"} APIs yet. Use a template above to add one.

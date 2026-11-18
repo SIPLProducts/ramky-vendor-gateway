@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { PaginatedRecords } from '@/components/ui/paginated-records';
 import { formatDateTime } from '@/lib/dateFormat';
 import { useMemo, useRef, useState } from "react";
@@ -150,9 +151,7 @@ export default function SapApiSettings() {
                 </p>
               </div>
               {isLoading ? (
-                <div className="p-6 space-y-3">
-                  {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-                </div>
+                <ApiLoader label="Loading SAP API Settings…" />
               ) : !configs?.length ? (
                 <div className="p-12 text-center text-muted-foreground">
                   No API configurations yet. Click <strong>Add API Configuration</strong> to create one.

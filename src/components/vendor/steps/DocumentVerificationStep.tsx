@@ -1,3 +1,4 @@
+import { ApiLoader, InlineSpinner } from "@/components/common/ApiLoader";
 import { useState, useRef, useCallback, useMemo, useEffect, createContext, useContext } from "react";
 import { Upload, CheckCircle2, Loader2, AlertCircle, AlertTriangle, FileText, RotateCcw, ShieldCheck, Download, Lock, Clock, Landmark, BadgeCheck, Building2, CreditCard, Sparkles, Pencil, PlusCircle, Info } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -2598,7 +2599,7 @@ export function DocumentVerificationStep({
 
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           {gstFilingChecking ? (
-                            <span className="text-xs text-muted-foreground">Fetching Latest Filing Status From GSTN…</span>
+                            <span className="inline-flex items-center gap-2 text-xs font-medium text-primary"><InlineSpinner className="text-primary" />Fetching Latest Filing Status From GSTN…</span>
                           ) : gstFilingRows.length > 0 ? (
                             <Badge variant="outline" className="border-emerald-400 text-emerald-700 bg-emerald-50">
                               Filing Status Received ({gstFilingRows.length} Returns)
@@ -2613,7 +2614,8 @@ export function DocumentVerificationStep({
                             Refresh Filing Status
                           </Button>}
                         </div>
-                        {gstFilingRows.length > 0 && <GstFilingStatusTable rows={gstFilingRows} limit={3} />}
+                        {gstFilingChecking && gstFilingRows.length === 0 && <ApiLoader size="sm" label="Fetching GST Filing Status From GSTN…" hint="This may take up to 20 seconds" />}
+                        {gstFilingRows.length > 0 && <div className="animate-in fade-in duration-500"><GstFilingStatusTable rows={gstFilingRows} limit={3} /></div>}
 
                         {/* Non-compliant -> require self-declaration upload */}
                         {gstFilingChecked && gstCompliance?.declarationRequired && (
@@ -3730,7 +3732,10 @@ function FilePill({
     <div className={cn("flex items-center gap-3 rounded-md border px-3 py-2.5", accent)}>
       <div className="h-8 w-8 rounded-md bg-background border border-border/60 flex items-center justify-center shrink-0">
         {state === "busy" ? (
-          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+          <span className="relative h-5 w-5">
+            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping motion-reduce:hidden" />
+            <span className="absolute inset-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+          </span>
         ) : state === "verified" ? (
           <CheckCircle2 className="h-4 w-4 text-success" />
         ) : (
@@ -3751,7 +3756,7 @@ function FilePill({
           )}
         </div>
         <p className="text-xs text-muted-foreground truncate">
-          {state === "busy" ? busyLabel : (
+          {state === "busy" ? <span className="font-medium text-primary">{busyLabel}</span> : (
             <>
               {fileSize ? formatBytes(fileSize) : ""}
               {state === "verified" && <span className="text-success"> · Verified</span>}
@@ -3759,6 +3764,11 @@ function FilePill({
             </>
           )}
         </p>
+        {state === "busy" && (
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-primary/15">
+            <div className="h-full w-1/3 rounded-full bg-primary animate-[api-progress_1.1s_ease-in-out_infinite]" />
+          </div>
+        )}
       </div>
       {state !== "busy" && (
         <div className="flex items-center gap-1 shrink-0">

@@ -1,3 +1,4 @@
+import { ApiLoader } from "@/components/common/ApiLoader";
 import { formatDateTime } from '@/lib/dateFormat';
 import { useEffect, useState } from 'react';
 import { paginateItems } from '@/lib/pagination';
@@ -136,6 +137,8 @@ export default function AuditLogs() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
+            <ApiLoader label="Loading Audit Logs…" />
+          ) : false ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-start gap-4 p-4 border rounded-lg">
