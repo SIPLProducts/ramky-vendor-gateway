@@ -17,3 +17,4 @@
 - Paginate record-list rendering through the shared pagination boundary, never the low-level table primitive; retain full filtered arrays for counts, exports, and bulk actions, and leave fixed detail/editing matrices unpaged.
 - Keep document image orientation inside a source-keyed preview component and fit rotated natural dimensions to its viewport; this resets viewing state without rewriting stored files or changing download authorization.- Invitation link opened ≠ submitted; submitted screen requires a linked vendor record (VendorRegistration token flow).
 - User Audit Report aggregates per-user vendor, approval, pending-queue and audit-log data client-side under existing RLS, so admins see only what their visibility rules already allow.
+- Bundle loader/brand images as local imports, not CDN asset pointers, because on-premise servers serve only dist/ and cannot reach CDN paths.
