@@ -3,6 +3,14 @@
 ## Deliverable
 A new Word file `Existing_Vendor_KYC_Revalidation_Solution_Design_v2.docx` in Files, keeping your document's structure and Sharvi/Ramky styling. It adds review notes, a feasibility and gap analysis, updated APIs including DMS sync, and an approximate build-credit estimate. Your original file stays unchanged.
 
+## Writing Style (Simple and Clear)
+- Target length: about 10–12 pages, down from the long draft.
+- Each section opens with a 2–3 line summary, followed by short bullets.
+- Use plain business words. Explain technical terms (OData, PATCH, token) in one line, or leave them out.
+- Show the process as one simple flow: Sync from SAP -> Invite Vendor -> Vendor Uploads KYC -> Auto Verify -> Compare -> Approve -> Update SAP -> DMS Sync -> Done.
+- Use tables for the gap list, APIs and credits, with no long paragraphs.
+- Put detailed field lists and status codes in a short appendix.
+
 ## 1. Review and Suggestions (added as a new section and inline notes)
 - **Overall verdict:** Feasible on the current portal. About 60–65% can reuse what already works today: GST/PAN/MSME/Bank checks, OCR, penny drop, invitation links, the approval engine, email, audit logs, SAP connection and DMS sync.
 - **Corrections to the draft:**
